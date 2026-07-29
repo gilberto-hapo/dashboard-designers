@@ -1,0 +1,97 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@layer base {
+  :root {
+    --background: 220 15% 8%;
+    --foreground: 0 0% 95%;
+
+    --card: 220 15% 12%;
+    --card-foreground: 0 0% 95%;
+
+    --popover: 220 15% 12%;
+    --popover-foreground: 0 0% 95%;
+
+    --primary: 14 82% 51%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 220 15% 18%;
+    --secondary-foreground: 0 0% 85%;
+
+    --muted: 220 12% 16%;
+    --muted-foreground: 220 10% 55%;
+
+    --accent: 14 82% 51%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 220 12% 20%;
+    --input: 220 12% 20%;
+    --ring: 14 82% 51%;
+
+    --radius: 0.75rem;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 8%;
+
+    --success: 142 70% 45%;
+    --success-foreground: 0 0% 8%;
+
+    --info: 217 91% 60%;
+    --info-foreground: 0 0% 98%;
+
+    --surface: 220 15% 10%;
+    --surface-hover: 220 15% 14%;
+
+    --sidebar-background: 220 15% 6%;
+    --sidebar-foreground: 0 0% 85%;
+    --sidebar-primary: 14 82% 51%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 220 15% 14%;
+    --sidebar-accent-foreground: 0 0% 85%;
+    --sidebar-border: 220 12% 16%;
+    --sidebar-ring: 14 82% 51%;
+
+    /* Tag colors */
+    --tag-feed: 262 80% 55%;
+    --tag-reels: 340 80% 55%;
+    --tag-story: 25 90% 55%;
+    --tag-correcao: 200 80% 50%;
+    --tag-aprovado: 142 70% 45%;
+    --tag-aguardando: 38 92% 50%;
+    --tag-data-comemorativa: 340 80% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', sans-serif;
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border));
+    border-radius: 3px;
+  }
+}
