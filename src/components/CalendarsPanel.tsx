@@ -165,7 +165,7 @@ export function CalendarsPanel({ selectedMonth, selectedYear, onFilterOptionsCha
                 <div className="h-px flex-1 bg-border" />
               </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
                 {group.items.map((calendario) => (
                   <div key={calendario.id} className="space-y-2 rounded-xl border border-border bg-card p-3">
                     <div>
