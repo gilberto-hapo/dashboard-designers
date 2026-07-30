@@ -217,34 +217,24 @@ function matchesLabel(value: string, selected: string) {
   return normalizedValue.includes(normalizedSelected) || normalizedSelected.includes(normalizedValue);
 }
 
-type ClienteContato = {
+export type ClienteContato = {
   nome: string;
   designer: string | null;
   copywriter: string | null;
 };
 
-async function fetchClientesContatos(): Promise<ClienteContato[]> {
+export async function fetchClientesContatos(): Promise<ClienteContato[]> {
   const response = await fetch('/api/clientes', { credentials: 'include' });
   const body = await response.json().catch(() => null);
   if (!response.ok) return [];
   return (body?.clients || []) as ClienteContato[];
 }
 
-function getTaskClientDesigner(task: DesignTask) {
-  return String(task.responsavel || task.designerResponsavel1 || task.responsavelCliente || '');
-}
-
-function matchesDesigner(task: DesignTask, selected: string) {
-  if (selected === 'Todos') return true;
-
-  return matchesLabel(getTaskClientDesigner(task), selected);
-}
-
 function getTaskClient(task: DesignTask) {
   return task.clienteRelacionado?.trim() || task.parceiro?.trim() || 'Sem cliente';
 }
 
-function getClienteContatoForTask(task: DesignTask, clientesContatos: ClienteContato[]) {
+export function getClienteContatoForTask(task: DesignTask, clientesContatos: ClienteContato[]) {
   const taskClient = getTaskClient(task);
   const exactMatch = clientesContatos.find(
     (cliente) => normalizeText(cliente.nome) === normalizeText(taskClient),
@@ -255,6 +245,13 @@ function getClienteContatoForTask(task: DesignTask, clientesContatos: ClienteCon
   // Julho/2026"), enquanto o cadastro tem só o nome puro (ex: "Porto
   // Itapoá") — cai para match parcial nesse caso.
   return clientesContatos.find((cliente) => matchesLabel(taskClient, cliente.nome)) || null;
+}
+
+function matchesDesigner(task: DesignTask, selected: string, clientesContatos: ClienteContato[]) {
+  if (selected === 'Todos') return true;
+
+  const designer = getClienteContatoForTask(task, clientesContatos)?.designer || '';
+  return matchesLabel(designer, selected);
 }
 
 function getTaskTagLabels(task: DesignTask) {
@@ -314,7 +311,7 @@ function getCalendarMonthOptions(anchorDate: Date = new Date()): CalendarMonthOp
   ];
 }
 
-function getSelectedPeriodRange(selectedMonth: string, customRange?: { start: Date | null; end: Date | null }) {
+export function getSelectedPeriodRange(selectedMonth: string, customRange?: { start: Date | null; end: Date | null }) {
   if (selectedMonth === CALENDAR_NEXT_15_DAYS_VALUE) {
     const start = normalizeDate(new Date());
     const end = normalizeDate(addDays(start, 14));
@@ -454,6 +451,7 @@ function buildMonthView(
   selectedDesigner: string,
   selectedClient: string,
   selectedStages: Array<DesignTask['stage']>,
+  clientesContatos: ClienteContato[],
   periodStart: Date = startOfMonth(monthDate),
   periodEnd: Date = endOfMonth(monthDate),
 ): MonthView {
@@ -464,7 +462,7 @@ function buildMonthView(
 
   const tasksInMonth = tasks
     .filter((task) => task.dataVencimento >= periodStart && task.dataVencimento <= periodEnd)
-    .filter((task) => matchesDesigner(task, selectedDesigner))
+    .filter((task) => matchesDesigner(task, selectedDesigner, clientesContatos))
     .filter((task) => matchesLabel(getTaskClient(task), selectedClient))
     .filter((task) => selectedStages.length === 0 || selectedStages.includes(task.stage))
     .slice()
@@ -671,21 +669,22 @@ export function CalendarPanel({
       selectedDesigner,
       selectedClient,
       selectedStages,
+      clientesContatos,
       allPeriodRange.start,
       allPeriodRange.end,
     ),
-    [monthDate, tasks, today, selectedDesigner, selectedClient, selectedStages, allPeriodRange.end, allPeriodRange.start],
+    [monthDate, tasks, today, selectedDesigner, selectedClient, selectedStages, clientesContatos, allPeriodRange.end, allPeriodRange.start],
   );
   const previousPeriod = useMemo(() => {
     if (selectedMonth === CALENDAR_NEXT_15_DAYS_VALUE) {
       const start = addDays(periodRange.start, -15);
       const end = addDays(periodRange.start, -1);
-      return buildMonthView(monthDate, tasks, today, selectedDesigner, selectedClient, selectedStages, start, end);
+      return buildMonthView(monthDate, tasks, today, selectedDesigner, selectedClient, selectedStages, clientesContatos, start, end);
     }
 
     const previousMonthDate = addMonths(monthDate, -1);
-    return buildMonthView(previousMonthDate, tasks, today, selectedDesigner, selectedClient, selectedStages, undefined, undefined);
-  }, [monthDate, periodRange.start, selectedClient, selectedDesigner, selectedMonth, selectedStages, tasks, today]);
+    return buildMonthView(previousMonthDate, tasks, today, selectedDesigner, selectedClient, selectedStages, clientesContatos, undefined, undefined);
+  }, [monthDate, periodRange.start, selectedClient, selectedDesigner, selectedMonth, selectedStages, clientesContatos, tasks, today]);
   const weekdays = weekdayShortLabels();
   const totalTrend = getTrendTone(month.total, previousPeriod.total);
   const concludedTrend = getTrendTone(month.concluded, previousPeriod.concluded);

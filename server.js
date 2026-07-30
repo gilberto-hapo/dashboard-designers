@@ -2233,8 +2233,8 @@ const CARDS_CALENDAR_PHASE_POSTS_PROGRAMADOS_ID = '5dcada9c-8cab-4eeb-b3f0-5632c
 // para cada fase (traduzidas de --choice-*-900 para hex aproximado).
 const CARDS_CALENDAR_PHASES = {
   [CARDS_CALENDAR_PHASE_CAIXA_ENTRADA_ID]: { title: 'Caixa de Entrada', color: '#ef4444' },
-  [CARDS_CALENDAR_PHASE_EM_ANDAMENTO_ID]: { title: 'Em Andamento', color: '#22c55e' },
-  [CARDS_CALENDAR_PHASE_POSTS_PROGRAMADOS_ID]: { title: 'Posts Programados', color: '#71717a' },
+  [CARDS_CALENDAR_PHASE_EM_ANDAMENTO_ID]: { title: 'Em Andamento', color: '#f97316' },
+  [CARDS_CALENDAR_PHASE_POSTS_PROGRAMADOS_ID]: { title: 'Posts Programados', color: '#22c55e' },
 };
 const CARDS_CALENDAR_FIELD_PRIMEIRO_DIA_ID = '5c0802d8-cf18-4f62-836a-fb0a64663b9b';
 const CARDS_CALENDAR_FIELD_CLIENTE_ID = '161d97db-7214-4d95-bc02-a332e607e6d9';

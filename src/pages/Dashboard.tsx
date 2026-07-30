@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CalendarDays, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Gauge, LayoutDashboard, Loader2, LogOut, PlusSquare, RefreshCw, WifiOff } from 'lucide-react';
 import hapoLogo from '@/assets/hapo-logo.svg';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -6,11 +6,15 @@ import {
   CALENDAR_CUSTOM_RANGE_VALUE,
   CALENDAR_NEXT_15_DAYS_VALUE,
   CalendarPanel,
+  fetchClientesContatos,
   getCalendarMonthOptionsList,
+  getClienteContatoForTask,
+  getSelectedPeriodRange,
+  type ClienteContato,
 } from '@/components/CalendarPanel';
 import { AlertsPanel } from '@/components/AlertsPanel';
 import { BottlenecksPanel } from '@/components/BottlenecksPanel';
-import { CalendarsPanel } from '@/components/CalendarsPanel';
+import { CalendarsPanel, type CalendarsFilterOptions } from '@/components/CalendarsPanel';
 import { ClientScorePanel } from '@/components/ClientScorePanel';
 import { CreateCardsPanel } from '@/components/CreateCardsPanel';
 import { DesignerCard } from '@/components/DesignerCard';
@@ -261,6 +265,12 @@ export default function Dashboard() {
   const [isCalendarCustomRangeDialogOpen, setIsCalendarCustomRangeDialogOpen] = useState(false);
   const [selectedCalendarDesigner, setSelectedCalendarDesigner] = useState('Todos');
   const [selectedCalendarClient, setSelectedCalendarClient] = useState('Todos');
+  const [calendarsFilterOptions, setCalendarsFilterOptions] = useState<CalendarsFilterOptions>({
+    monthOptions: ['Todos'],
+    yearOptions: ['Todos'],
+  });
+  const [selectedCalendarsMonth, setSelectedCalendarsMonth] = useState('Todos');
+  const [selectedCalendarsYear, setSelectedCalendarsYear] = useState('Todos');
   const [selectedClientScoreDesigner, setSelectedClientScoreDesigner] = useState('Todos');
   const [designerAiReferences, setDesignerAiReferences] = useState<Record<string, DesignerAiReference[]>>({});
   const [isDesignerAiLoading, setIsDesignerAiLoading] = useState(false);
@@ -290,6 +300,7 @@ export default function Dashboard() {
   }, [calendarMonthOptions, selectedCalendarMonth]);
 
   const [clientesDesigners, setClientesDesigners] = useState<string[]>([]);
+  const [clientesContatos, setClientesContatos] = useState<ClienteContato[]>([]);
 
   useEffect(() => {
     if (activeView !== 'client-score') return;
@@ -299,47 +310,51 @@ export default function Dashboard() {
       .catch(() => setClientesDesigners([]));
   }, [activeView]);
 
+  useEffect(() => {
+    fetchClientesContatos().then(setClientesContatos);
+  }, []);
+
   const clientScoreDesignerOptions = useMemo(
     () => ['Todos', ...clientesDesigners],
     [clientesDesigners],
   );
 
+  const calendarCustomRange = useMemo(() => {
+    const start = calendarCustomStart ? new Date(`${calendarCustomStart}T00:00:00`) : null;
+    const end = calendarCustomEnd ? new Date(`${calendarCustomEnd}T00:00:00`) : null;
+    return { start, end };
+  }, [calendarCustomEnd, calendarCustomStart]);
+
+  const tasksInSelectedPeriod = useMemo(() => {
+    const { start, end } = getSelectedPeriodRange(selectedCalendarMonth, calendarCustomRange);
+    return (data?.tasks ?? []).filter(
+      (task) => task.dataVencimento >= start && task.dataVencimento <= end,
+    );
+  }, [data?.tasks, selectedCalendarMonth, calendarCustomRange]);
+
   const calendarDesignerOptions = useMemo(() => {
     const designerSet = new Set<string>();
 
-    (data?.tasks ?? [])
-      .filter((task) => task.clienteAtivo === true && typeof task.clientePostsMes === 'number' && task.clientePostsMes > 0)
-      .forEach((task) => {
-        const responsaveis = String(task.responsavel || task.designerResponsavel1 || task.responsavelCliente || '')
-          .split(/[;,/]+/)
-          .map((value) => value.trim())
-          .filter(Boolean);
-
-        responsaveis.forEach((responsavel) => {
-          if (responsavel && responsavel !== 'Sem designer') {
-            designerSet.add(responsavel);
-          }
-        });
-      });
+    tasksInSelectedPeriod.forEach((task) => {
+      const designer = getClienteContatoForTask(task, clientesContatos)?.designer?.trim();
+      if (designer) designerSet.add(designer);
+    });
 
     const options = [...designerSet].sort((left, right) => left.localeCompare(right, 'pt-BR'));
     return ['Todos', ...options];
-  }, [data]);
+  }, [tasksInSelectedPeriod, clientesContatos]);
 
   const calendarClientOptions = useMemo(() => {
-    const fallbackClients = (data?.tasks ?? [])
-      .filter((task) => task.clienteAtivo === true && typeof task.clientePostsMes === 'number' && task.clientePostsMes > 0)
-      .map((task) => task.clienteRelacionado?.trim())
-      .filter((value): value is string => Boolean(value));
+    const clientSet = new Set<string>();
 
-    const sourceClients = (data?.clients?.length ? data.clients : fallbackClients)
-      .filter(Boolean)
-      .sort((left, right) => left.localeCompare(right, 'pt-BR'));
+    tasksInSelectedPeriod.forEach((task) => {
+      const cliente = task.clienteRelacionado?.trim();
+      if (cliente) clientSet.add(cliente);
+    });
 
-    const options = [...new Set(sourceClients)];
-
+    const options = [...clientSet].sort((left, right) => left.localeCompare(right, 'pt-BR'));
     return ['Todos', ...options];
-  }, [data?.clients, data?.tasks]);
+  }, [tasksInSelectedPeriod]);
 
   const currentStatisticsMonth = useMemo(() => getStatisticsCurrentMonth(), []);
   const isStatisticsCurrentMonth = selectedStatisticsMonth === currentStatisticsMonth;
@@ -356,12 +371,6 @@ export default function Dashboard() {
       return nextValue > currentStatisticsMonth ? currentStatisticsMonth : nextValue;
     });
   };
-  const calendarCustomRange = useMemo(() => {
-    const start = calendarCustomStart ? new Date(`${calendarCustomStart}T00:00:00`) : null;
-    const end = calendarCustomEnd ? new Date(`${calendarCustomEnd}T00:00:00`) : null;
-    return { start, end };
-  }, [calendarCustomEnd, calendarCustomStart]);
-
   useEffect(() => {
     if (!clientScoreDesignerOptions.includes(selectedClientScoreDesigner)) {
       setSelectedClientScoreDesigner('Todos');
@@ -379,6 +388,22 @@ export default function Dashboard() {
       setSelectedCalendarClient('Todos');
     }
   }, [calendarClientOptions, selectedCalendarClient]);
+
+  const handleCalendarsFilterOptionsChange = useCallback((options: CalendarsFilterOptions) => {
+    setCalendarsFilterOptions(options);
+  }, []);
+
+  useEffect(() => {
+    if (!calendarsFilterOptions.monthOptions.includes(selectedCalendarsMonth)) {
+      setSelectedCalendarsMonth('Todos');
+    }
+  }, [calendarsFilterOptions.monthOptions, selectedCalendarsMonth]);
+
+  useEffect(() => {
+    if (!calendarsFilterOptions.yearOptions.includes(selectedCalendarsYear)) {
+      setSelectedCalendarsYear('Todos');
+    }
+  }, [calendarsFilterOptions.yearOptions, selectedCalendarsYear]);
 
   const openCustomRangeDialog = () => {
     setCalendarRangeDraftStart(calendarCustomStart);
@@ -691,6 +716,50 @@ export default function Dashboard() {
                   </div>
 
                 </div>
+              ) : activeView === 'calendars' ? (
+                <div className="grid w-full gap-3 md:ml-auto md:w-auto md:grid-cols-2">
+                  <div className="w-full md:w-48">
+                    <label htmlFor="calendars-month-filter" className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                      Mês
+                    </label>
+                    <div className="relative mt-2">
+                      <select
+                        id="calendars-month-filter"
+                        value={selectedCalendarsMonth}
+                        onChange={(event) => setSelectedCalendarsMonth(event.target.value)}
+                        className="w-full appearance-none rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground outline-none transition-colors hover:border-primary/30 focus:border-primary/40"
+                      >
+                        {calendarsFilterOptions.monthOptions.map((value) => (
+                          <option key={value} value={value}>
+                            {value}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    </div>
+                  </div>
+
+                  <div className="w-full md:w-48">
+                    <label htmlFor="calendars-year-filter" className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                      Ano
+                    </label>
+                    <div className="relative mt-2">
+                      <select
+                        id="calendars-year-filter"
+                        value={selectedCalendarsYear}
+                        onChange={(event) => setSelectedCalendarsYear(event.target.value)}
+                        className="w-full appearance-none rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground outline-none transition-colors hover:border-primary/30 focus:border-primary/40"
+                      >
+                        {calendarsFilterOptions.yearOptions.map((value) => (
+                          <option key={value} value={value}>
+                            {value}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    </div>
+                  </div>
+                </div>
               ) : activeView === 'client-score' && clientScoreDesignerOptions.length > 0 ? (
                 <div className="w-full max-w-xs">
                   <label htmlFor="client-score-designer-filter" className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
@@ -745,7 +814,11 @@ export default function Dashboard() {
               customRange={calendarCustomRange}
             />
           ) : activeView === 'calendars' ? (
-            <CalendarsPanel />
+            <CalendarsPanel
+              selectedMonth={selectedCalendarsMonth}
+              selectedYear={selectedCalendarsYear}
+              onFilterOptionsChange={handleCalendarsFilterOptionsChange}
+            />
           ) : activeView === 'create-cards' ? (
             <CreateCardsPanel />
           ) : (
