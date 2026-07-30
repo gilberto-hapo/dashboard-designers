@@ -70,17 +70,21 @@ function groupCalendariosByMesAno(calendarios: CalendarioInfo[]) {
 export type CalendarsFilterOptions = {
   monthOptions: string[];
   yearOptions: string[];
+  designerOptions: string[];
 };
 
 type CalendarsPanelProps = {
   selectedMonth: string;
   selectedYear: string;
+  selectedDesigner: string;
   onFilterOptionsChange?: (options: CalendarsFilterOptions) => void;
 };
 
-export function CalendarsPanel({ selectedMonth, selectedYear, onFilterOptionsChange }: CalendarsPanelProps) {
+type ClienteInfo = { nome?: string; designer?: string };
+
+export function CalendarsPanel({ selectedMonth, selectedYear, selectedDesigner, onFilterOptionsChange }: CalendarsPanelProps) {
   const [calendarios, setCalendarios] = useState<CalendarioInfo[]>([]);
-  const [totalClientes, setTotalClientes] = useState<number | null>(null);
+  const [clientes, setClientes] = useState<ClienteInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -92,41 +96,73 @@ export function CalendarsPanel({ selectedMonth, selectedYear, onFilterOptionsCha
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
 
-    fetchJson<{ clients: unknown[] }>('/api/clientes')
-      .then((data) => setTotalClientes(data.clients.length))
-      .catch(() => setTotalClientes(null));
+    fetchJson<{ clients: ClienteInfo[] }>('/api/clientes')
+      .then((data) => setClientes(data.clients))
+      .catch(() => setClientes([]));
   }, []);
+
+  const totalClientes = clientes.length || null;
+
+  const designerByClientName = useMemo(() => {
+    const map = new Map<string, string>();
+    clientes.forEach((cliente) => {
+      const nome = cliente.nome?.trim();
+      const designer = cliente.designer?.trim();
+      if (nome && designer) map.set(nome.toLowerCase(), designer);
+    });
+    return map;
+  }, [clientes]);
+
+  // "Posts Programados" é a fase final do board (calendário concluído) —
+  // não faz sentido continuar exibindo aqui.
+  const visibleCalendarios = useMemo(
+    () => calendarios.filter((calendario) => calendario.phaseTitle !== 'Posts Programados'),
+    [calendarios],
+  );
 
   const monthOptions = useMemo(() => {
     const months = new Set<string>();
-    calendarios.forEach((calendario) => {
+    visibleCalendarios.forEach((calendario) => {
       const [month] = calendario.mesAno.split('/');
       if (month) months.add(month);
     });
     return ['Todos', ...[...months].sort((a, b) => MONTH_ORDER.indexOf(a) - MONTH_ORDER.indexOf(b))];
-  }, [calendarios]);
+  }, [visibleCalendarios]);
 
   const yearOptions = useMemo(() => {
     const years = new Set<string>();
-    calendarios.forEach((calendario) => {
+    visibleCalendarios.forEach((calendario) => {
       const [, year] = calendario.mesAno.split('/');
       if (year) years.add(year);
     });
     return ['Todos', ...[...years].sort()];
-  }, [calendarios]);
+  }, [visibleCalendarios]);
+
+  const designerOptions = useMemo(() => {
+    const designers = new Set<string>();
+    visibleCalendarios.forEach((calendario) => {
+      const designer = designerByClientName.get(calendario.clienteNome?.trim().toLowerCase() || '');
+      if (designer) designers.add(designer);
+    });
+    return ['Todos', ...[...designers].sort((a, b) => a.localeCompare(b, 'pt-BR'))];
+  }, [visibleCalendarios, designerByClientName]);
 
   useEffect(() => {
-    onFilterOptionsChange?.({ monthOptions, yearOptions });
-  }, [monthOptions, yearOptions, onFilterOptionsChange]);
+    onFilterOptionsChange?.({ monthOptions, yearOptions, designerOptions });
+  }, [monthOptions, yearOptions, designerOptions, onFilterOptionsChange]);
 
   const filteredCalendarios = useMemo(() => {
-    return calendarios.filter((calendario) => {
+    return visibleCalendarios.filter((calendario) => {
       const [month, year] = calendario.mesAno.split('/');
       if (selectedMonth !== 'Todos' && month !== selectedMonth) return false;
       if (selectedYear !== 'Todos' && year !== selectedYear) return false;
+      if (selectedDesigner !== 'Todos') {
+        const designer = designerByClientName.get(calendario.clienteNome?.trim().toLowerCase() || '');
+        if (designer !== selectedDesigner) return false;
+      }
       return true;
     });
-  }, [calendarios, selectedMonth, selectedYear]);
+  }, [visibleCalendarios, selectedMonth, selectedYear, selectedDesigner, designerByClientName]);
 
   if (loading) {
     return (
@@ -186,7 +222,7 @@ export function CalendarsPanel({ selectedMonth, selectedYear, onFilterOptionsCha
 
                     <div className="space-y-1 border-t border-border pt-2">
                       <InfoRow label="Posts Contratados" value={calendario.postsContratados} />
-                      <InfoRow label="Posts Conectados" value={calendario.postsConectados} />
+                      <InfoRow label="Posts Criados" value={calendario.postsConectados} />
                       <InfoRow label="Posts Concluídos" value={calendario.postsConcluidos} />
                     </div>
                   </div>

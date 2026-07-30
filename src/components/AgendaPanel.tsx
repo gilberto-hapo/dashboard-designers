@@ -22,7 +22,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 
-type CalendarPanelProps = {
+type AgendaPanelProps = {
   tasks: DesignTask[];
   selectedMonth: string;
   selectedDesigner: string;
@@ -68,7 +68,7 @@ type StatusTone = {
   tooltipClass: string;
 };
 
-type CalendarMonthOption = {
+type AgendaMonthOption = {
   value: string;
   label: string;
 };
@@ -78,8 +78,8 @@ type StageFilterOption = {
   label: string;
 };
 
-export const CALENDAR_NEXT_15_DAYS_VALUE = 'next-15-days';
-export const CALENDAR_CUSTOM_RANGE_VALUE = 'custom-range';
+export const AGENDA_NEXT_15_DAYS_VALUE = 'next-15-days';
+export const AGENDA_CUSTOM_RANGE_VALUE = 'custom-range';
 
 const STAGE_FILTER_OPTIONS: StageFilterOption[] = [
   { stage: 'fazer', label: 'Criação Textual' },
@@ -183,7 +183,7 @@ function monthValue(date: Date) {
 }
 
 function parseMonthValue(value: string) {
-  if (value === CALENDAR_NEXT_15_DAYS_VALUE || value === CALENDAR_CUSTOM_RANGE_VALUE) {
+  if (value === AGENDA_NEXT_15_DAYS_VALUE || value === AGENDA_CUSTOM_RANGE_VALUE) {
     return startOfMonth(new Date());
   }
 
@@ -292,12 +292,12 @@ function getTaskHistoryLabel(step: TaskHistoryStep) {
   return `${step.label} ${formatDateLong(step.value)} (${formatDaysAgo(step.value)})`;
 }
 
-function getCalendarMonthOptions(anchorDate: Date = new Date()): CalendarMonthOption[] {
+function getAgendaMonthOptions(anchorDate: Date = new Date()): AgendaMonthOption[] {
   const base = startOfMonth(anchorDate);
 
   return [
     {
-      value: CALENDAR_NEXT_15_DAYS_VALUE,
+      value: AGENDA_NEXT_15_DAYS_VALUE,
       label: 'Próximos 15 dias',
     },
     {
@@ -305,14 +305,14 @@ function getCalendarMonthOptions(anchorDate: Date = new Date()): CalendarMonthOp
       label: 'Mês atual',
     },
     {
-      value: CALENDAR_CUSTOM_RANGE_VALUE,
+      value: AGENDA_CUSTOM_RANGE_VALUE,
       label: 'Intervalo customizado',
     },
   ];
 }
 
 export function getSelectedPeriodRange(selectedMonth: string, customRange?: { start: Date | null; end: Date | null }) {
-  if (selectedMonth === CALENDAR_NEXT_15_DAYS_VALUE) {
+  if (selectedMonth === AGENDA_NEXT_15_DAYS_VALUE) {
     const start = normalizeDate(new Date());
     const end = normalizeDate(addDays(start, 14));
     return {
@@ -322,7 +322,7 @@ export function getSelectedPeriodRange(selectedMonth: string, customRange?: { st
     };
   }
 
-  if (selectedMonth === CALENDAR_CUSTOM_RANGE_VALUE) {
+  if (selectedMonth === AGENDA_CUSTOM_RANGE_VALUE) {
     const today = normalizeDate(new Date());
     const defaultEnd = normalizeDate(addDays(today, 29));
     const start = customRange?.start ? normalizeDate(customRange.start) : today;
@@ -345,23 +345,23 @@ export function getSelectedPeriodRange(selectedMonth: string, customRange?: { st
 }
 
 function getPeriodTitle(selectedMonth: string) {
-  if (selectedMonth === CALENDAR_NEXT_15_DAYS_VALUE) {
+  if (selectedMonth === AGENDA_NEXT_15_DAYS_VALUE) {
     return 'Próximos 15 dias';
   }
 
-  if (selectedMonth === CALENDAR_CUSTOM_RANGE_VALUE) {
+  if (selectedMonth === AGENDA_CUSTOM_RANGE_VALUE) {
     return 'Intervalo customizado';
   }
 
   return monthLabel(parseMonthValue(selectedMonth));
 }
 
-export function getCalendarCurrentMonth() {
+export function getAgendaCurrentMonth() {
   return monthValue(startOfMonth(new Date()));
 }
 
-export function getCalendarMonthOptionsList(anchorDate: Date = new Date()) {
-  return getCalendarMonthOptions(anchorDate);
+export function getAgendaMonthOptionsList(anchorDate: Date = new Date()) {
+  return getAgendaMonthOptions(anchorDate);
 }
 
 function weekdayShortLabels() {
@@ -562,7 +562,7 @@ function formatCriticalDeadlineSummary(overdue: number, dueSoon: number) {
   return parts.join(' + ');
 }
 
-function CalendarDayCell({
+function AgendaDayCell({
   cell,
   onTaskClick,
 }: {
@@ -626,14 +626,14 @@ function CalendarDayCell({
   );
 }
 
-export function CalendarPanel({
+export function AgendaPanel({
   tasks,
   selectedMonth,
   selectedDesigner,
   selectedClient,
   onEditCustomRange,
   customRange,
-}: CalendarPanelProps) {
+}: AgendaPanelProps) {
   const today = useMemo(() => normalizeDate(new Date()), []);
   const monthDate = useMemo(() => parseMonthValue(selectedMonth), [selectedMonth]);
   const periodRange = useMemo(
@@ -676,7 +676,7 @@ export function CalendarPanel({
     [monthDate, tasks, today, selectedDesigner, selectedClient, selectedStages, clientesContatos, allPeriodRange.end, allPeriodRange.start],
   );
   const previousPeriod = useMemo(() => {
-    if (selectedMonth === CALENDAR_NEXT_15_DAYS_VALUE) {
+    if (selectedMonth === AGENDA_NEXT_15_DAYS_VALUE) {
       const start = addDays(periodRange.start, -15);
       const end = addDays(periodRange.start, -1);
       return buildMonthView(monthDate, tasks, today, selectedDesigner, selectedClient, selectedStages, clientesContatos, start, end);
@@ -703,7 +703,7 @@ export function CalendarPanel({
 
   return (
     <section className="w-full space-y-6">
-      {selectedMonth === CALENDAR_CUSTOM_RANGE_VALUE ? (
+      {selectedMonth === AGENDA_CUSTOM_RANGE_VALUE ? (
         <div className="rounded-2xl border border-primary/25 bg-primary/10 px-4 py-3 text-sm text-primary">
           <div className="flex items-center justify-between gap-3">
             <p>
@@ -855,7 +855,7 @@ export function CalendarPanel({
           {month.weeks.map((week, weekIndex) => (
             <div key={`${month.label}-${weekIndex}`} className="grid grid-cols-7 gap-1.5">
               {week.map((cell) => (
-                <CalendarDayCell
+                <AgendaDayCell
                   key={cell.date.toISOString()}
                   cell={cell}
                   onTaskClick={(task) => setSelectedTask(task)}

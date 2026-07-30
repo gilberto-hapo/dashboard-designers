@@ -1579,7 +1579,7 @@ const CARDS_CALENDAR_PHASE_POSTS_PROGRAMADOS_ID = '5dcada9c-8cab-4eeb-b3f0-5632c
 // para cada fase (traduzidas de --choice-*-900 para hex aproximado).
 const CARDS_CALENDAR_PHASES = {
   [CARDS_CALENDAR_PHASE_CAIXA_ENTRADA_ID]: { title: 'Caixa de Entrada', color: '#ef4444' },
-  [CARDS_CALENDAR_PHASE_EM_ANDAMENTO_ID]: { title: 'Em Andamento', color: '#eab308' },
+  [CARDS_CALENDAR_PHASE_EM_ANDAMENTO_ID]: { title: 'Em Andamento', color: '#22c55e' },
   [CARDS_CALENDAR_PHASE_POSTS_PROGRAMADOS_ID]: { title: 'Posts Programados', color: '#22c55e' },
 };
 const CARDS_CALENDAR_FIELD_PRIMEIRO_DIA_ID = '5c0802d8-cf18-4f62-836a-fb0a64663b9b';
@@ -1587,6 +1587,7 @@ const CARDS_CALENDAR_FIELD_CLIENTE_ID = '161d97db-7214-4d95-bc02-a332e607e6d9';
 const CARDS_CALENDAR_FIELD_LINK_DRIVE_ARTES_ID = '9e66b7f1-1e79-45b2-93eb-8c730f6cf65c';
 const CARDS_CALENDAR_FIELD_LINK_EDITORIAL_ID = '7cc2a9ee-bafc-4675-ac5d-fd07eef9fe08';
 const CARDS_POSTS_BOARD_ID = 'e9d22a5a-8263-41da-9784-3e77589e8469';
+const CARDS_POSTS_PHASE_CRIACAO_DAS_ARTES_ID = 'be275650-93bf-424a-b4d3-cfa815bb0100';
 const CARDS_CLIENTS_DATABASE_ID = '652cab0e-7792-409c-81a0-b3cba1447209';
 const CARDS_CLIENT_FIELD_NOME_ID = 'b794bfc5-f574-4b39-94b1-4c3b55345cdc';
 const CARDS_CLIENT_FIELD_DESIGNER_ID = '460d3f59-8038-43a9-a05e-b96b9e523d4a';
@@ -2041,7 +2042,13 @@ app.get('/api/criar-cards/preview', requireAuth, async (req, res) => {
     }));
 
     res.json({
-      calendar: { id: calendarId, title: cardDetail.title, clienteNome: client.nome, mesAno },
+      calendar: {
+        id: calendarId,
+        title: cardDetail.title,
+        clienteNome: client.nome,
+        mesAno,
+        hasCopywriter: Boolean(String(client.copywriter || '').trim()),
+      },
       posts,
       formatoOptions: CARDS_POST_FORMATO_OPTIONS,
     });
@@ -2058,6 +2065,11 @@ app.post('/api/criar-cards/create-one', requireAuth, async (req, res) => {
   const dueDate = String(req.body?.dueDate || '').trim();
   const title = String(req.body?.title || '').trim();
   const formato = String(req.body?.formato || '').trim();
+  // Clientes com Copywriter Dedicado já entregam os posts com texto pronto —
+  // nesse caso o card nasce em "Criação das artes" em vez de "Criação
+  // textual" (fase inicial padrão do formulário), pulando a etapa de texto.
+  const hasCopywriter = Boolean(req.body?.hasCopywriter);
+  const moveToPhaseId = hasCopywriter ? CARDS_POSTS_PHASE_CRIACAO_DAS_ARTES_ID : '';
 
   if (!calendarId) {
     res.status(400).json({ error: 'calendarId is required' });
@@ -2088,6 +2100,24 @@ app.post('/api/criar-cards/create-one', requireAuth, async (req, res) => {
       },
     });
     logServerEvent('Criar Cards: post created', { id: card.id, title });
+
+    if (moveToPhaseId) {
+      try {
+        await goalfyApiFetch(`/cards/moveTo/${card.id}`, {
+          method: 'PUT',
+          writeToken,
+          body: { phaseId: moveToPhaseId },
+        });
+        logServerEvent('Criar Cards: post moved after creation', { id: card.id, moveToPhaseId });
+      } catch (moveError) {
+        logServerEvent('Criar Cards: post move-after-creation failed', {
+          id: card.id,
+          moveToPhaseId,
+          error: moveError.message,
+        });
+      }
+    }
+
     res.json({ ok: true, card: { id: card.id, title: card.title } });
   } catch (error) {
     logServerEvent('Criar Cards: post creation failed', { title, error: error.message });

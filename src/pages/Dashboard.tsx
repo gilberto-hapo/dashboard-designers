@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CalendarDays, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, Gauge, LayoutDashboard, Loader2, LogOut, PlusSquare, RefreshCw, WifiOff } from 'lucide-react';
+import { CalendarCheck2, ChevronDown, ChevronLeft, ChevronRight, FileText, LayoutDashboard, Loader2, LogOut, PanelLeftClose, PanelLeftOpen, PlusSquare, RefreshCw, Users, WifiOff } from 'lucide-react';
 import hapoLogo from '@/assets/hapo-logo.svg';
+import hapoLogoSmall from '@/assets/hapo-logo-menor.svg';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
-  CALENDAR_CUSTOM_RANGE_VALUE,
-  CALENDAR_NEXT_15_DAYS_VALUE,
-  CalendarPanel,
+  AGENDA_CUSTOM_RANGE_VALUE,
+  AGENDA_NEXT_15_DAYS_VALUE,
+  AgendaPanel,
   fetchClientesContatos,
-  getCalendarMonthOptionsList,
+  getAgendaMonthOptionsList,
   getClienteContatoForTask,
   getSelectedPeriodRange,
   type ClienteContato,
-} from '@/components/CalendarPanel';
+} from '@/components/AgendaPanel';
 import { AlertsPanel } from '@/components/AlertsPanel';
 import { BottlenecksPanel } from '@/components/BottlenecksPanel';
 import { CalendarsPanel, type CalendarsFilterOptions } from '@/components/CalendarsPanel';
@@ -54,13 +55,6 @@ function shiftMonthValue(value: string, offset: number) {
   const date = parseMonthValue(value);
   date.setMonth(date.getMonth() + offset);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function getCalendarPrimaryDesigner(task: DesignTask) {
-  return String(task.responsavel || task.designerResponsavel1 || task.responsavelCliente || '')
-    .split(/[;,/]+/)
-    .map((value) => value.trim())
-    .find(Boolean) || '';
 }
 
 function buildDesignerReferencesSignature(
@@ -116,17 +110,17 @@ const navItems: Array<{
   {
     id: 'calendar',
     label: 'Agenda',
-    icon: CalendarDays,
+    icon: CalendarCheck2,
   },
   {
     id: 'client-score',
     label: 'Clientes',
-    icon: Gauge,
+    icon: Users,
   },
   {
     id: 'calendars',
     label: 'Calendários',
-    icon: CalendarRange,
+    icon: FileText,
   },
   {
     id: 'create-cards',
@@ -144,6 +138,12 @@ function formatLastUpdated(lastUpdatedAt: number) {
   }).format(new Date(lastUpdatedAt));
 }
 
+const SIDEBAR_COLLAPSED_STORAGE_KEY = 'hapo:sidebar-collapsed';
+export const SIDEBAR_WIDTH_EXPANDED_CLASS = 'lg:w-60';
+export const SIDEBAR_WIDTH_COLLAPSED_CLASS = 'lg:w-[4.5rem]';
+export const SIDEBAR_MARGIN_EXPANDED_CLASS = 'lg:ml-60';
+export const SIDEBAR_MARGIN_COLLAPSED_CLASS = 'lg:ml-[4.5rem]';
+
 function SidebarNav({
   activeView,
   onChange,
@@ -151,8 +151,9 @@ function SidebarNav({
   isRefreshing,
   isBackgroundSyncing,
   lastUpdatedAt,
-  userName,
   onLogout,
+  isCollapsed,
+  onToggleCollapsed,
 }: {
   activeView: ViewMode;
   onChange: (view: ViewMode) => void;
@@ -160,17 +161,41 @@ function SidebarNav({
   isRefreshing: boolean;
   isBackgroundSyncing: boolean;
   lastUpdatedAt: number;
-  userName?: string;
   onLogout: () => void;
+  isCollapsed: boolean;
+  onToggleCollapsed: () => void;
 }) {
   return (
-    <aside className="w-full lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 lg:w-72">
-      <div className="flex min-h-[100dvh] flex-col border-r border-border bg-card px-4 py-5 lg:h-screen lg:min-h-0">
-        <div className="border-b border-border pb-5">
-          <img src={hapoLogo} alt="Hapo" className="h-8 w-auto" />
-          <p className="mt-4 max-w-[16rem] text-sm leading-relaxed text-muted-foreground">
-            Gestão de Produção de Conteúdo
-          </p>
+    <aside
+      className={`w-full lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 ${
+        isCollapsed ? SIDEBAR_WIDTH_COLLAPSED_CLASS : SIDEBAR_WIDTH_EXPANDED_CLASS
+      }`}
+    >
+      <div className="flex min-h-[100dvh] flex-col border-r border-border bg-card px-3 py-5 lg:h-screen lg:min-h-0">
+        <div className="flex items-center gap-2 border-b border-border pb-5">
+          {isCollapsed ? (
+            <div className="flex w-full flex-col items-center gap-3">
+              <img src={hapoLogoSmall} alt="Hapo" className="h-6 w-auto" />
+              <button
+                onClick={onToggleCollapsed}
+                className="rounded-lg p-2.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                title="Expandir menu"
+              >
+                <PanelLeftOpen className="h-5 w-5" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex w-full items-center justify-between gap-2">
+              <img src={hapoLogo} alt="Hapo" className="h-8 w-auto" />
+              <button
+                onClick={onToggleCollapsed}
+                className="shrink-0 rounded-lg p-2.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                title="Encolher menu"
+              >
+                <PanelLeftClose className="h-5 w-5" />
+              </button>
+            </div>
+          )}
         </div>
 
         <nav className="mt-5 space-y-2">
@@ -182,7 +207,10 @@ function SidebarNav({
               <button
                 key={item.id}
                 onClick={() => onChange(item.id)}
-                className={`flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
+                title={isCollapsed ? item.label : undefined}
+                className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                  isCollapsed ? 'justify-center' : ''
+                } ${
                   isActive
                     ? 'border-primary/30 bg-primary/10'
                     : 'border-transparent hover:border-border hover:bg-muted/60'
@@ -195,7 +223,7 @@ function SidebarNav({
                 >
                   <Icon className="h-4 w-4" />
                 </div>
-                <span className="text-sm font-semibold text-foreground">{item.label}</span>
+                {!isCollapsed && <span className="text-sm font-semibold text-foreground">{item.label}</span>}
               </button>
             );
           })}
@@ -205,33 +233,38 @@ function SidebarNav({
           <button
             onClick={onRefresh}
             disabled={isRefreshing}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-border px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+            title={isCollapsed ? 'Atualizar dados' : undefined}
+            className={`flex w-full items-center justify-center gap-2 rounded-xl border border-border px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60`}
           >
-            <RefreshCw className={`h-4 w-4 text-muted-foreground ${isRefreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-4 w-4 shrink-0 text-muted-foreground ${isRefreshing ? 'animate-spin' : ''}`} />
+            {!isCollapsed && (
               <span>
                 {isRefreshing
                   ? 'Atualizando...'
                   : 'Atualizar dados'}
               </span>
-            </button>
-          <p className="mt-2 text-center text-[11px] text-muted-foreground">
-            Última atualização: <span className="text-foreground">{formatLastUpdated(lastUpdatedAt)}</span>
-          </p>
+            )}
+          </button>
+          {!isCollapsed && (
+            <p className="mt-2 text-center text-[11px] text-muted-foreground">
+              Última atualização: <span className="text-foreground">{formatLastUpdated(lastUpdatedAt)}</span>
+            </p>
+          )}
 
-          <div className="mt-3 flex items-center justify-between rounded-xl border border-border bg-muted/40 px-3 py-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/20 text-sm font-semibold text-primary">
-                {userName?.charAt(0).toUpperCase() || 'U'}
-              </div>
-              <span className="truncate text-sm font-semibold text-foreground">{userName || 'Usuário'}</span>
-            </div>
-
+          <div
+            className={`mt-3 flex items-center rounded-xl border border-border bg-muted/40 px-3 py-3 ${
+              isCollapsed ? 'justify-center' : 'justify-center gap-2'
+            }`}
+          >
             <button
               onClick={onLogout}
-              className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
               title="Sair"
+              className={`flex items-center gap-2 rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive ${
+                isCollapsed ? 'p-2' : 'w-full justify-center px-3 py-2 text-sm font-medium'
+              }`}
             >
               <LogOut className="h-4 w-4" />
+              {!isCollapsed && <span>Sair</span>}
             </button>
           </div>
         </div>
@@ -253,24 +286,34 @@ export default function Dashboard() {
     lastUpdatedAt,
     refetch,
   } = useGoalfyData();
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
+    () => window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) !== '0',
+  );
+
+  useEffect(() => {
+    window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, isSidebarCollapsed ? '1' : '0');
+  }, [isSidebarCollapsed]);
+
   const [activeView, setActiveView] = useState<ViewMode>('calendar');
   const [selectedStatisticsMonth, setSelectedStatisticsMonth] = useState(getStatisticsCurrentMonth());
-  const calendarMonthOptions = useMemo(() => getCalendarMonthOptionsList(), []);
-  const [selectedCalendarMonth, setSelectedCalendarMonth] = useState(CALENDAR_NEXT_15_DAYS_VALUE);
-  const [calendarCustomStart, setCalendarCustomStart] = useState('');
-  const [calendarCustomEnd, setCalendarCustomEnd] = useState('');
-  const [calendarRangeDraftStart, setCalendarRangeDraftStart] = useState('');
-  const [calendarRangeDraftEnd, setCalendarRangeDraftEnd] = useState('');
-  const [isCalendarCustomRangeDialogOpen, setIsCalendarCustomRangeDialogOpen] = useState(false);
-  const [selectedCalendarDesigner, setSelectedCalendarDesigner] = useState('Todos');
-  const [selectedCalendarClient, setSelectedCalendarClient] = useState('Todos');
+  const agendaMonthOptions = useMemo(() => getAgendaMonthOptionsList(), []);
+  const [selectedAgendaMonth, setSelectedAgendaMonth] = useState(AGENDA_NEXT_15_DAYS_VALUE);
+  const [agendaCustomStart, setAgendaCustomStart] = useState('');
+  const [agendaCustomEnd, setAgendaCustomEnd] = useState('');
+  const [agendaRangeDraftStart, setAgendaRangeDraftStart] = useState('');
+  const [agendaRangeDraftEnd, setAgendaRangeDraftEnd] = useState('');
+  const [isAgendaCustomRangeDialogOpen, setIsAgendaCustomRangeDialogOpen] = useState(false);
+  const [selectedAgendaDesigner, setSelectedAgendaDesigner] = useState('Todos');
+  const [selectedAgendaClient, setSelectedAgendaClient] = useState('Todos');
   const [calendarsFilterOptions, setCalendarsFilterOptions] = useState<CalendarsFilterOptions>({
     monthOptions: ['Todos'],
     yearOptions: ['Todos'],
+    designerOptions: ['Todos'],
   });
   const [selectedCalendarsMonth, setSelectedCalendarsMonth] = useState('Todos');
   const [selectedCalendarsYear, setSelectedCalendarsYear] = useState('Todos');
+  const [selectedCalendarsDesigner, setSelectedCalendarsDesigner] = useState('Todos');
   const [selectedClientScoreDesigner, setSelectedClientScoreDesigner] = useState('Todos');
   const [designerAiReferences, setDesignerAiReferences] = useState<Record<string, DesignerAiReference[]>>({});
   const [isDesignerAiLoading, setIsDesignerAiLoading] = useState(false);
@@ -293,11 +336,11 @@ export default function Dashboard() {
   }, [insights?.porDesigner]);
 
   useEffect(() => {
-    if (calendarMonthOptions.length === 0) return;
-    if (!calendarMonthOptions.some((option) => option.value === selectedCalendarMonth)) {
-      setSelectedCalendarMonth(calendarMonthOptions[0].value);
+    if (agendaMonthOptions.length === 0) return;
+    if (!agendaMonthOptions.some((option) => option.value === selectedAgendaMonth)) {
+      setSelectedAgendaMonth(agendaMonthOptions[0].value);
     }
-  }, [calendarMonthOptions, selectedCalendarMonth]);
+  }, [agendaMonthOptions, selectedAgendaMonth]);
 
   const [clientesDesigners, setClientesDesigners] = useState<string[]>([]);
   const [clientesContatos, setClientesContatos] = useState<ClienteContato[]>([]);
@@ -319,42 +362,42 @@ export default function Dashboard() {
     [clientesDesigners],
   );
 
-  const calendarCustomRange = useMemo(() => {
-    const start = calendarCustomStart ? new Date(`${calendarCustomStart}T00:00:00`) : null;
-    const end = calendarCustomEnd ? new Date(`${calendarCustomEnd}T00:00:00`) : null;
+  const agendaCustomRange = useMemo(() => {
+    const start = agendaCustomStart ? new Date(`${agendaCustomStart}T00:00:00`) : null;
+    const end = agendaCustomEnd ? new Date(`${agendaCustomEnd}T00:00:00`) : null;
     return { start, end };
-  }, [calendarCustomEnd, calendarCustomStart]);
+  }, [agendaCustomEnd, agendaCustomStart]);
 
-  const tasksInSelectedPeriod = useMemo(() => {
-    const { start, end } = getSelectedPeriodRange(selectedCalendarMonth, calendarCustomRange);
+  const tasksInSelectedAgendaPeriod = useMemo(() => {
+    const { start, end } = getSelectedPeriodRange(selectedAgendaMonth, agendaCustomRange);
     return (data?.tasks ?? []).filter(
       (task) => task.dataVencimento >= start && task.dataVencimento <= end,
     );
-  }, [data?.tasks, selectedCalendarMonth, calendarCustomRange]);
+  }, [data?.tasks, selectedAgendaMonth, agendaCustomRange]);
 
-  const calendarDesignerOptions = useMemo(() => {
+  const agendaDesignerOptions = useMemo(() => {
     const designerSet = new Set<string>();
 
-    tasksInSelectedPeriod.forEach((task) => {
+    tasksInSelectedAgendaPeriod.forEach((task) => {
       const designer = getClienteContatoForTask(task, clientesContatos)?.designer?.trim();
       if (designer) designerSet.add(designer);
     });
 
     const options = [...designerSet].sort((left, right) => left.localeCompare(right, 'pt-BR'));
     return ['Todos', ...options];
-  }, [tasksInSelectedPeriod, clientesContatos]);
+  }, [tasksInSelectedAgendaPeriod, clientesContatos]);
 
-  const calendarClientOptions = useMemo(() => {
+  const agendaClientOptions = useMemo(() => {
     const clientSet = new Set<string>();
 
-    tasksInSelectedPeriod.forEach((task) => {
+    tasksInSelectedAgendaPeriod.forEach((task) => {
       const cliente = task.clienteRelacionado?.trim();
       if (cliente) clientSet.add(cliente);
     });
 
     const options = [...clientSet].sort((left, right) => left.localeCompare(right, 'pt-BR'));
     return ['Todos', ...options];
-  }, [tasksInSelectedPeriod]);
+  }, [tasksInSelectedAgendaPeriod]);
 
   const currentStatisticsMonth = useMemo(() => getStatisticsCurrentMonth(), []);
   const isStatisticsCurrentMonth = selectedStatisticsMonth === currentStatisticsMonth;
@@ -378,16 +421,16 @@ export default function Dashboard() {
   }, [clientScoreDesignerOptions, selectedClientScoreDesigner]);
 
   useEffect(() => {
-    if (!calendarDesignerOptions.includes(selectedCalendarDesigner)) {
-      setSelectedCalendarDesigner('Todos');
+    if (!agendaDesignerOptions.includes(selectedAgendaDesigner)) {
+      setSelectedAgendaDesigner('Todos');
     }
-  }, [calendarDesignerOptions, selectedCalendarDesigner]);
+  }, [agendaDesignerOptions, selectedAgendaDesigner]);
 
   useEffect(() => {
-    if (!calendarClientOptions.includes(selectedCalendarClient)) {
-      setSelectedCalendarClient('Todos');
+    if (!agendaClientOptions.includes(selectedAgendaClient)) {
+      setSelectedAgendaClient('Todos');
     }
-  }, [calendarClientOptions, selectedCalendarClient]);
+  }, [agendaClientOptions, selectedAgendaClient]);
 
   const handleCalendarsFilterOptionsChange = useCallback((options: CalendarsFilterOptions) => {
     setCalendarsFilterOptions(options);
@@ -405,17 +448,23 @@ export default function Dashboard() {
     }
   }, [calendarsFilterOptions.yearOptions, selectedCalendarsYear]);
 
-  const openCustomRangeDialog = () => {
-    setCalendarRangeDraftStart(calendarCustomStart);
-    setCalendarRangeDraftEnd(calendarCustomEnd);
-    setIsCalendarCustomRangeDialogOpen(true);
+  useEffect(() => {
+    if (!calendarsFilterOptions.designerOptions.includes(selectedCalendarsDesigner)) {
+      setSelectedCalendarsDesigner('Todos');
+    }
+  }, [calendarsFilterOptions.designerOptions, selectedCalendarsDesigner]);
+
+  const openAgendaCustomRangeDialog = () => {
+    setAgendaRangeDraftStart(agendaCustomStart);
+    setAgendaRangeDraftEnd(agendaCustomEnd);
+    setIsAgendaCustomRangeDialogOpen(true);
   };
 
-  const applyCustomRange = () => {
-    setCalendarCustomStart(calendarRangeDraftStart);
-    setCalendarCustomEnd(calendarRangeDraftEnd);
-    setSelectedCalendarMonth(CALENDAR_CUSTOM_RANGE_VALUE);
-    setIsCalendarCustomRangeDialogOpen(false);
+  const applyAgendaCustomRange = () => {
+    setAgendaCustomStart(agendaRangeDraftStart);
+    setAgendaCustomEnd(agendaRangeDraftEnd);
+    setSelectedAgendaMonth(AGENDA_CUSTOM_RANGE_VALUE);
+    setIsAgendaCustomRangeDialogOpen(false);
   };
 
   const designerReferencesPayload = useMemo(
@@ -519,11 +568,16 @@ export default function Dashboard() {
             isRefreshing={isFetching || isBackgroundSyncing}
             isBackgroundSyncing={isBackgroundSyncing}
             lastUpdatedAt={lastUpdatedAt}
-            userName={user?.name}
             onLogout={() => void logout()}
+            isCollapsed={isSidebarCollapsed}
+            onToggleCollapsed={() => setIsSidebarCollapsed((value) => !value)}
           />
 
-          <main className="min-w-0 animate-fade-in p-4 md:p-6 lg:ml-72 lg:p-8">
+          <main
+            className={`min-w-0 animate-fade-in p-4 md:p-6 lg:p-8 ${
+              isSidebarCollapsed ? SIDEBAR_MARGIN_COLLAPSED_CLASS : SIDEBAR_MARGIN_EXPANDED_CLASS
+            }`}
+          >
             <div className="mx-auto flex min-h-[70vh] max-w-[720px] items-center justify-center">
               <div className="space-y-4 text-center">
                 <Loader2 className={`mx-auto h-8 w-8 text-primary ${isFetching ? 'animate-spin' : ''}`} />
@@ -582,12 +636,17 @@ export default function Dashboard() {
         isRefreshing={isFetching || isBackgroundSyncing}
         isBackgroundSyncing={isBackgroundSyncing}
         lastUpdatedAt={lastUpdatedAt}
-        userName={user?.name}
         onLogout={() => void logout()}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapsed={() => setIsSidebarCollapsed((value) => !value)}
       />
 
-      <main className="min-w-0 animate-fade-in p-4 md:p-6 lg:ml-72 lg:p-8">
-        <div className={`mx-auto space-y-5 ${activeView === 'calendar' ? 'max-w-none' : 'max-w-[1600px]'}`}>
+      <main
+        className={`min-w-0 animate-fade-in p-4 md:p-6 lg:p-8 ${
+          isSidebarCollapsed ? SIDEBAR_MARGIN_COLLAPSED_CLASS : SIDEBAR_MARGIN_EXPANDED_CLASS
+        }`}
+      >
+        <div className="mx-auto max-w-none space-y-5">
           {error ? (
             <Alert className="border-warning/40 bg-warning/10 text-foreground">
               <AlertDescription className="text-sm">
@@ -643,7 +702,7 @@ export default function Dashboard() {
                   </div>
                 </div>
                 </>
-              ) : activeView === 'calendar' && calendarMonthOptions.length > 0 ? (
+              ) : activeView === 'calendar' && agendaMonthOptions.length > 0 ? (
                 <div className="grid w-full gap-3 md:ml-auto md:w-auto md:grid-cols-3">
                   <div className="w-full md:w-56">
                     <label htmlFor="calendar-month-filter" className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
@@ -652,18 +711,18 @@ export default function Dashboard() {
                     <div className="relative mt-2">
                       <select
                         id="calendar-month-filter"
-                        value={selectedCalendarMonth}
+                        value={selectedAgendaMonth}
                         onChange={(event) => {
                           const nextValue = event.target.value;
-                          if (nextValue === CALENDAR_CUSTOM_RANGE_VALUE) {
-                            openCustomRangeDialog();
+                          if (nextValue === AGENDA_CUSTOM_RANGE_VALUE) {
+                            openAgendaCustomRangeDialog();
                             return;
                           }
-                          setSelectedCalendarMonth(nextValue);
+                          setSelectedAgendaMonth(nextValue);
                         }}
                         className="w-full appearance-none rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground outline-none transition-colors hover:border-primary/30 focus:border-primary/40"
                       >
-                        {calendarMonthOptions.map((option) => (
+                        {agendaMonthOptions.map((option) => (
                           <option key={option.value} value={option.value}>
                             {option.label}
                           </option>
@@ -680,11 +739,11 @@ export default function Dashboard() {
                     <div className="relative mt-2">
                       <select
                         id="calendar-designer-filter"
-                        value={selectedCalendarDesigner}
-                        onChange={(event) => setSelectedCalendarDesigner(event.target.value)}
+                        value={selectedAgendaDesigner}
+                        onChange={(event) => setSelectedAgendaDesigner(event.target.value)}
                         className="w-full appearance-none rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground outline-none transition-colors hover:border-primary/30 focus:border-primary/40"
                       >
-                        {calendarDesignerOptions.map((value) => (
+                        {agendaDesignerOptions.map((value) => (
                           <option key={value} value={value}>
                             {value}
                           </option>
@@ -701,11 +760,11 @@ export default function Dashboard() {
                     <div className="relative mt-2">
                       <select
                         id="calendar-client-filter"
-                        value={selectedCalendarClient}
-                        onChange={(event) => setSelectedCalendarClient(event.target.value)}
+                        value={selectedAgendaClient}
+                        onChange={(event) => setSelectedAgendaClient(event.target.value)}
                         className="w-full appearance-none rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground outline-none transition-colors hover:border-primary/30 focus:border-primary/40"
                       >
-                        {calendarClientOptions.map((value) => (
+                        {agendaClientOptions.map((value) => (
                           <option key={value} value={value}>
                             {value}
                           </option>
@@ -717,7 +776,7 @@ export default function Dashboard() {
 
                 </div>
               ) : activeView === 'calendars' ? (
-                <div className="grid w-full gap-3 md:ml-auto md:w-auto md:grid-cols-2">
+                <div className="grid w-full gap-3 md:ml-auto md:w-auto md:grid-cols-3">
                   <div className="w-full md:w-48">
                     <label htmlFor="calendars-month-filter" className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                       Mês
@@ -751,6 +810,27 @@ export default function Dashboard() {
                         className="w-full appearance-none rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground outline-none transition-colors hover:border-primary/30 focus:border-primary/40"
                       >
                         {calendarsFilterOptions.yearOptions.map((value) => (
+                          <option key={value} value={value}>
+                            {value}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    </div>
+                  </div>
+
+                  <div className="w-full md:w-48">
+                    <label htmlFor="calendars-designer-filter" className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                      Designer
+                    </label>
+                    <div className="relative mt-2">
+                      <select
+                        id="calendars-designer-filter"
+                        value={selectedCalendarsDesigner}
+                        onChange={(event) => setSelectedCalendarsDesigner(event.target.value)}
+                        className="w-full appearance-none rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground outline-none transition-colors hover:border-primary/30 focus:border-primary/40"
+                      >
+                        {calendarsFilterOptions.designerOptions.map((value) => (
                           <option key={value} value={value}>
                             {value}
                           </option>
@@ -805,22 +885,23 @@ export default function Dashboard() {
               adjustments={data?.adjustments ?? []}
             />
           ) : activeView === 'calendar' ? (
-            <CalendarPanel
+            <AgendaPanel
               tasks={data?.tasks ?? []}
-              selectedMonth={selectedCalendarMonth}
-              selectedDesigner={selectedCalendarDesigner}
-              selectedClient={selectedCalendarClient}
-              onEditCustomRange={openCustomRangeDialog}
-              customRange={calendarCustomRange}
+              selectedMonth={selectedAgendaMonth}
+              selectedDesigner={selectedAgendaDesigner}
+              selectedClient={selectedAgendaClient}
+              onEditCustomRange={openAgendaCustomRangeDialog}
+              customRange={agendaCustomRange}
             />
           ) : activeView === 'calendars' ? (
             <CalendarsPanel
               selectedMonth={selectedCalendarsMonth}
               selectedYear={selectedCalendarsYear}
+              selectedDesigner={selectedCalendarsDesigner}
               onFilterOptionsChange={handleCalendarsFilterOptionsChange}
             />
           ) : activeView === 'create-cards' ? (
-            <CreateCardsPanel />
+            <CreateCardsPanel isSidebarCollapsed={isSidebarCollapsed} />
           ) : (
             <section className="space-y-4">
               <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-2 2xl:grid-cols-3">
@@ -850,7 +931,7 @@ export default function Dashboard() {
         </div>
       </main>
 
-      <Dialog open={isCalendarCustomRangeDialogOpen} onOpenChange={setIsCalendarCustomRangeDialogOpen}>
+      <Dialog open={isAgendaCustomRangeDialogOpen} onOpenChange={setIsAgendaCustomRangeDialogOpen}>
         <DialogContent className="max-w-md rounded-2xl border border-border/70 bg-card p-0">
           <DialogHeader className="border-b border-border/60 px-5 py-4">
             <DialogTitle className="text-base font-semibold text-foreground">Selecionar intervalo</DialogTitle>
@@ -864,8 +945,8 @@ export default function Dashboard() {
               <input
                 id="calendar-custom-start-modal"
                 type="date"
-                value={calendarRangeDraftStart}
-                onChange={(event) => setCalendarRangeDraftStart(event.target.value)}
+                value={agendaRangeDraftStart}
+                onChange={(event) => setAgendaRangeDraftStart(event.target.value)}
                 className="mt-2 w-full rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground outline-none transition-colors hover:border-primary/30 focus:border-primary/40 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:opacity-60 hover:[&::-webkit-calendar-picker-indicator]:opacity-80"
               />
             </div>
@@ -877,8 +958,8 @@ export default function Dashboard() {
               <input
                 id="calendar-custom-end-modal"
                 type="date"
-                value={calendarRangeDraftEnd}
-                onChange={(event) => setCalendarRangeDraftEnd(event.target.value)}
+                value={agendaRangeDraftEnd}
+                onChange={(event) => setAgendaRangeDraftEnd(event.target.value)}
                 className="mt-2 w-full rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground outline-none transition-colors hover:border-primary/30 focus:border-primary/40 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:opacity-60 hover:[&::-webkit-calendar-picker-indicator]:opacity-80"
               />
             </div>
@@ -887,14 +968,14 @@ export default function Dashboard() {
           <div className="flex items-center justify-end gap-2 border-t border-border/60 px-5 py-4">
             <button
               type="button"
-              onClick={() => setIsCalendarCustomRangeDialogOpen(false)}
+              onClick={() => setIsAgendaCustomRangeDialogOpen(false)}
               className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted/70"
             >
               Cancelar
             </button>
             <button
               type="button"
-              onClick={applyCustomRange}
+              onClick={applyAgendaCustomRange}
               className="rounded-xl border border-primary/35 bg-primary/15 px-3 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/20"
             >
               Aplicar filtro

@@ -596,6 +596,69 @@ como exceção via Excel).
   `tempoAprovadoProgramacaoDias`, `linkCalendarioEditorial` (o campo em si
   fica, só o nome específico não é lido em nenhum componente hoje).
 
+## Renomeação "Calendar" → "Agenda" no conceito 1 (2026-07-30)
+
+Com a introdução do conceito 2 ("Calendários" — board de Calendários
+Produção de Conteúdo, `CalendarsPanel.tsx`), passou a existir ambiguidade no
+código entre esse conceito de negócio e o conceito 1, que é a grade visual
+mensal da aba "Agenda" (grid de dias com posts agendados) — os nomes de
+arquivo (`CalendarPanel.tsx` vs `CalendarsPanel.tsx`) e variáveis em
+`Dashboard.tsx` (`selectedCalendarMonth` vs `selectedCalendarsMonth`) se
+diferenciavam só por um "s", risco real de troca por engano.
+
+Resolvido renomeando todo o conceito 1 para o radical "Agenda" (alinhado ao
+nome já usado na UI):
+- `src/components/CalendarPanel.tsx` → `src/components/AgendaPanel.tsx`.
+- Export principal `CalendarPanel` → `AgendaPanel`; `CalendarPanelProps` →
+  `AgendaPanelProps`; `CalendarMonthOption` → `AgendaMonthOption`;
+  `CalendarDayCell` → `AgendaDayCell`.
+- Constantes `CALENDAR_NEXT_15_DAYS_VALUE`/`CALENDAR_CUSTOM_RANGE_VALUE` →
+  `AGENDA_NEXT_15_DAYS_VALUE`/`AGENDA_CUSTOM_RANGE_VALUE`.
+- Funções `getCalendarMonthOptionsList`/`getCalendarCurrentMonth` →
+  `getAgendaMonthOptionsList`/`getAgendaCurrentMonth`.
+- Em `Dashboard.tsx`, todo o grupo de estado da Agenda ganhou o mesmo
+  prefixo: `selectedAgendaMonth`, `agendaCustomStart/End`,
+  `agendaRangeDraftStart/End`, `isAgendaCustomRangeDialogOpen`,
+  `selectedAgendaDesigner`, `selectedAgendaClient`, `agendaMonthOptions`,
+  `agendaDesignerOptions`, `agendaClientOptions`, `agendaCustomRange`,
+  `tasksInSelectedAgendaPeriod`, `openAgendaCustomRangeDialog`,
+  `applyAgendaCustomRange`.
+- O conceito 2 (board de Calendários) manteve o radical "Calendars" mesmo
+  (`CalendarsFilterOptions`, `calendarsFilterOptions`,
+  `selectedCalendarsMonth`, `selectedCalendarsYear`,
+  `handleCalendarsFilterOptionsChange`) — o usuário esclareceu em
+  2026-07-30 que a palavra "calendar"/"calendário" só era ambígua para o
+  conceito 1 (a grade visual, que por isso virou "Agenda" no código); na
+  aba "Calendários" ela pode continuar sendo usada livremente, já que ali
+  é exatamente esse o domínio.
+- `getClienteContatoForTask`/`fetchClientesContatos`/`ClienteContato`
+  (em `AgendaPanel.tsx`) não foram renomeados — não são específicos de
+  nenhum dos dois conceitos, são utilitários genéricos de lookup de cliente
+  reaproveitados também em `Dashboard.tsx`.
+- Não renomeado (fora de escopo por ora, risco menor): `calendarId`,
+  `calendarMeta*`, `buildCalendarMetaMap` em `server.js` (todos conceito 2,
+  sem cruzamento com o conceito 1 já que o server.js não implementa nada da
+  grade visual) e o campo `DesignTask.calendario` em `src/lib/data.ts`
+  (nome do Calendário de negócio ao qual a task pertence — mantido porque
+  reflete fielmente o domínio Goalfy, revisar se um dev futuro achar
+  confuso lendo `AgendaPanel.tsx`).
+
+## Ajustes na aba "Calendários" (2026-07-30)
+
+- Adicionado filtro de **Designer** (terceiro dropdown, ao lado de Mês/Ano)
+  em `CalendarsPanel.tsx`. Cruza `calendario.clienteNome` com o campo
+  `designer` retornado por `/api/clientes` (mesmo padrão de lookup por nome
+  já usado em `AgendaPanel.tsx`/`Dashboard.tsx`), não pelo `designer` do
+  próprio card de Calendário (que não existe — o board de Calendários não
+  tem esse campo, só o Cliente vinculado tem).
+- A fase **"Posts Programados"** do board de Calendários é a fase final
+  (calendário concluído — confirmado pelo texto da própria Goalfy: "e por
+  fim, a fase com os cards concluídos"). A partir de 2026-07-30, calendários
+  nessa fase são excluídos da listagem por padrão (`visibleCalendarios` em
+  `CalendarsPanel.tsx`), incluindo das opções de filtro de Mês/Ano/Designer
+  e da contagem "N/total calendários" — não faz sentido continuar
+  monitorando algo já concluído na tela operacional.
+
 ## Observações importantes para as próximas etapas
 
 - ~~O usuário está reestruturando o sistema **aos poucos**, começando por

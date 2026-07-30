@@ -14,6 +14,7 @@ type Calendario = {
   title: string;
   clienteNome: string;
   mesAno: string;
+  hasCopywriter?: boolean;
 };
 
 type PostStatus = 'pending' | 'creating' | 'created' | 'failed';
@@ -48,7 +49,7 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   return body as T;
 }
 
-export function CreateCardsPanel() {
+export function CreateCardsPanel({ isSidebarCollapsed = false }: { isSidebarCollapsed?: boolean }) {
   const [designers, setDesigners] = useState<string[]>([]);
   const [selectedDesigner, setSelectedDesigner] = useState('');
   const [loadingDesigners, setLoadingDesigners] = useState(true);
@@ -142,6 +143,7 @@ export function CreateCardsPanel() {
             dueDate,
             title: post.title,
             formato: post.formato,
+            hasCopywriter: preview?.calendar.hasCopywriter ?? false,
           }),
         });
         createdCount += 1;
@@ -175,8 +177,8 @@ export function CreateCardsPanel() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-5 md:grid-cols-2">
-        <div>
+      <div className="flex flex-wrap gap-5">
+        <div className="w-full max-w-xs">
           <label htmlFor="create-cards-designer" className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
             Designer Responsável
           </label>
@@ -200,7 +202,7 @@ export function CreateCardsPanel() {
           {designersError && <p className="mt-2 text-xs text-destructive">{designersError}</p>}
         </div>
 
-        <div>
+        <div className="w-full max-w-xs">
           <label htmlFor="create-cards-calendario" className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
             Calendário
           </label>
@@ -242,17 +244,22 @@ export function CreateCardsPanel() {
       {previewError && <p className="text-sm text-destructive">{previewError}</p>}
 
       {preview && posts.length > 0 && (
-        <div className="space-y-4 rounded-xl border border-border bg-card/40 p-4">
+        <div className="space-y-4">
           <div>
             <h3 className="text-sm font-semibold text-foreground">
               {preview.calendar.clienteNome} — {preview.calendar.mesAno}
             </h3>
             <p className="text-xs text-muted-foreground">
-              {posts.length} card{posts.length !== 1 ? 's' : ''} será{posts.length !== 1 ? 'ão' : ''} criado{posts.length !== 1 ? 's' : ''} no board "Posts Produção de Conteúdo".
+              {posts.length} card{posts.length !== 1 ? 's' : ''} {posts.length !== 1 ? 'serão' : 'será'} criado{posts.length !== 1 ? 's' : ''} no board "Posts Produção de Conteúdo"
+              {preview.calendar.hasCopywriter ? ' já na fase "Criação das artes" (cliente com Copywriter Dedicado)' : ''}.
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+          <div
+            className={`grid grid-cols-2 gap-3 sm:grid-cols-3 ${
+              isSidebarCollapsed ? 'lg:grid-cols-6 xl:grid-cols-8' : 'lg:grid-cols-6'
+            }`}
+          >
             {posts.map((post) => (
               <div
                 key={post.index}
@@ -292,28 +299,30 @@ export function CreateCardsPanel() {
             ))}
           </div>
 
-          <div className="max-w-xs">
-            <label htmlFor="create-cards-due-date" className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-              Data de entrega (aplicada a todos os cards)
-            </label>
-            <input
-              id="create-cards-due-date"
-              type="datetime-local"
-              value={dueDate}
-              onChange={(event) => setDueDate(event.target.value)}
-              className="mt-2 w-full rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground outline-none transition-colors hover:border-primary/30 focus:border-primary/40"
-            />
-          </div>
+          <div className="flex flex-wrap items-start gap-3 rounded-xl border border-border bg-card/40 p-4">
+            <div className="flex w-fit flex-col">
+              <label htmlFor="create-cards-due-date" className="block whitespace-nowrap text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                Data de entrega
+              </label>
+              <input
+                id="create-cards-due-date"
+                type="datetime-local"
+                value={dueDate}
+                onChange={(event) => setDueDate(event.target.value)}
+                className="mt-2 w-56 rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground outline-none transition-colors [color-scheme:dark] hover:border-primary/30 focus:border-primary/40"
+              />
+            </div>
 
-          <button
-            type="button"
-            onClick={handleCreate}
-            disabled={!canCreate}
-            className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {creating && <Loader2 className="h-4 w-4 animate-spin" />}
-            Criar Cards
-          </button>
+            <button
+              type="button"
+              onClick={handleCreate}
+              disabled={!canCreate}
+              className="mt-[1.375rem] inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {creating && <Loader2 className="h-4 w-4 animate-spin" />}
+              Criar Cards
+            </button>
+          </div>
 
           {createError && <p className="text-sm text-destructive">{createError}</p>}
 
