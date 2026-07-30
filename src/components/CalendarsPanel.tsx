@@ -24,7 +24,7 @@ async function fetchJson<T>(url: string): Promise<T> {
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-2 text-sm">
+    <div className="flex items-center justify-between gap-2 text-xs">
       <span className="text-muted-foreground">{label}</span>
       <span className="text-right font-medium text-foreground">{value}</span>
     </div>
@@ -169,7 +169,7 @@ export function CalendarsPanel({ selectedMonth, selectedYear, onFilterOptionsCha
                 {group.items.map((calendario) => (
                   <div key={calendario.id} className="space-y-2 rounded-xl border border-border bg-card p-3">
                     <div>
-                      <h3 className="text-base font-semibold text-foreground">{calendario.title}</h3>
+                      <h3 className="text-sm font-semibold text-foreground">{calendario.title}</h3>
                       <div className="mt-1.5 flex flex-wrap gap-1.5">
                         <span
                           className="rounded border px-2 py-0.5 text-[11px] font-bold uppercase"

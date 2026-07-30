@@ -39,12 +39,12 @@ interface CachedGoalfyStatisticsData {
 // Produção de Conteúdo" — sem chaves antigas na lista de leitura, para que
 // o cache velho (outro board) seja ignorado automaticamente, sem o usuário
 // precisar limpar localStorage/IndexedDB manualmente.
-const GOALFY_CACHE_KEYS = ['hapo-goalfy-data:v13'];
+const GOALFY_CACHE_KEYS = ['hapo-goalfy-data:v14'];
 const GOALFY_STATISTICS_CACHE_KEY = 'hapo-goalfy-statistics:v6';
 const CACHE_DB_NAME = 'hapo-dashboard-cache';
 const CACHE_DB_VERSION = 1;
 const CACHE_STORE_NAME = 'payloads';
-const DASHBOARD_CACHE_IDB_KEY = 'goalfy-dashboard:v10';
+const DASHBOARD_CACHE_IDB_KEY = 'goalfy-dashboard:v11';
 const STATISTICS_CACHE_IDB_KEY = 'goalfy-statistics:v6';
 
 function openCacheDb(): Promise<IDBDatabase> {

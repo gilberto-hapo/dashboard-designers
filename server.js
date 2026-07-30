@@ -5,7 +5,6 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
-import * as XLSX from 'xlsx';
 import { createServer as createViteServer } from 'vite';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -16,9 +15,6 @@ const SESSION_COOKIE = 'hapo_session';
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 const GOALFY_FETCH_TIMEOUT_MS = 180000;
 const GOALFY_CACHE_TTL_MS = 1000 * 60 * 5;
-const GOALFY_BOARD_CACHE_TTL_MS = 1000 * 60 * 5;
-const GOALFY_CLIENTS_CACHE_TTL_MS = 1000 * 60 * 60 * 6;
-const GOALFY_ADJUSTMENTS_CACHE_TTL_MS = 1000 * 60 * 15;
 const AI_RECOMMENDATIONS_TTL_MS = 1000 * 60 * 15;
 const GOALFY_PERSISTENCE_DIR = path.join(__dirname, 'data');
 const GOALFY_PERSISTENCE_FILE = path.join(GOALFY_PERSISTENCE_DIR, 'goalfy-cache.json');
@@ -31,19 +27,6 @@ const app = express();
 let cachedGoalfyData = null;
 let cachedGoalfyDataAt = 0;
 let inflightGoalfyDataPromise = null;
-let cachedGoalfyBoard = null;
-let cachedGoalfyBoardAt = 0;
-let inflightGoalfyBoardPromise = null;
-let cachedGoalfyBoardTaskSnapshot = new Map();
-let cachedClientDesignerMap = null;
-let cachedClientDesignerMapAt = 0;
-let inflightClientDesignerMapPromise = null;
-let cachedGoalfyAdjustments = null;
-let cachedGoalfyAdjustmentsAt = 0;
-let inflightGoalfyAdjustmentsPromise = null;
-let cachedCalendarLinksMap = null;
-let cachedCalendarLinksMapAt = 0;
-let inflightCalendarLinksMapPromise = null;
 let inflightBackgroundRefreshPromise = null;
 let goalfyRefreshState = {
   inProgress: false,
@@ -323,26 +306,6 @@ function parseStatusTags(tags) {
   return parsed;
 }
 
-function parseDate(value) {
-  if (!value) return new Date();
-  if (value instanceof Date) return value;
-
-  const text = String(value);
-  const match = text.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
-  if (match) {
-    return new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1]), 8, 0);
-  }
-
-  const parsed = new Date(text);
-  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
-}
-
-function parseOptionalDate(value) {
-  if (!value) return null;
-  const parsed = parseDate(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
-
 function normalizeDesignerName(name) {
   if (!name) return 'Sem designer';
   const normalized = String(name).trim();
@@ -358,95 +321,6 @@ function normalizeDesignerName(name) {
   return parts.join(', ');
 }
 
-function collectDesignerNames(tasks = [], clientDesignerMap = null) {
-  const names = new Set();
-
-  const registerDesigner = (value) => {
-    const normalized = normalizeDesignerName(value);
-    normalized
-      .split(/[;,/]+/)
-      .map((item) => item.trim())
-      .filter((item) => item && item !== 'Sem designer')
-      .forEach((item) => names.add(item));
-  };
-
-  if (clientDesignerMap) {
-    const seenClients = new Set();
-
-    for (const clientMeta of clientDesignerMap.values()) {
-      const clientKey = normalizeLookupKey(clientMeta?.clientName);
-      if (!clientKey || seenClients.has(clientKey)) {
-        continue;
-      }
-
-      seenClients.add(clientKey);
-
-      const hasActiveClient = clientMeta?.ativo === true;
-      const hasProductionContract =
-        typeof clientMeta?.postsPerMonth === 'number'
-        && Number.isFinite(clientMeta.postsPerMonth)
-        && clientMeta.postsPerMonth > 0;
-
-      if (hasActiveClient && hasProductionContract) {
-        registerDesigner(clientMeta.designer);
-      }
-    }
-  }
-
-  for (const task of tasks) {
-    const hasActiveClient = task?.clienteAtivo === true;
-    const hasProductionContract = typeof task?.clientePostsMes === 'number' && task.clientePostsMes > 0;
-
-    if (!hasActiveClient || !hasProductionContract) {
-      continue;
-    }
-
-    registerDesigner(task.responsavelCliente || task.designerResponsavel1 || task.responsavel);
-  }
-
-  return [...names].sort((left, right) => left.localeCompare(right, 'pt-BR'));
-}
-
-function collectActiveClientNames(tasks = [], clientDesignerMap = null) {
-  const clients = new Map();
-
-  const registerClient = (clientName) => {
-    const normalizedClientName = String(clientName || '').trim();
-    const clientKey = normalizeLookupKey(normalizedClientName);
-
-    if (!normalizedClientName || !clientKey || clients.has(clientKey)) {
-      return;
-    }
-
-    clients.set(clientKey, normalizedClientName);
-  };
-
-  if (clientDesignerMap) {
-    for (const clientMeta of clientDesignerMap.values()) {
-      const hasActiveClient = clientMeta?.ativo === true;
-      const hasProductionContract =
-        typeof clientMeta?.postsPerMonth === 'number'
-        && Number.isFinite(clientMeta.postsPerMonth)
-        && clientMeta.postsPerMonth > 0;
-
-      if (hasActiveClient && hasProductionContract) {
-        registerClient(clientMeta.clientName);
-      }
-    }
-  }
-
-  for (const task of tasks) {
-    const hasActiveClient = task?.clienteAtivo === true;
-    const hasProductionContract = typeof task?.clientePostsMes === 'number' && task.clientePostsMes > 0;
-
-    if (hasActiveClient && hasProductionContract) {
-      registerClient(task.clienteRelacionado);
-    }
-  }
-
-  return [...clients.values()].sort((left, right) => left.localeCompare(right, 'pt-BR'));
-}
-
 function normalizeLookupKey(value) {
   return String(value || '')
     .normalize('NFD')
@@ -457,659 +331,163 @@ function normalizeLookupKey(value) {
     .toLowerCase();
 }
 
-function extractClientAliases(value) {
-  const rawValue = String(value || '').trim();
-  const aliases = new Set();
+// Deriva os marcos de tempo por fase a partir do historico bruto de fases da
+// Goalfy (GET /cards/{id} -> phasesHistory), em vez das colunas agregadas do
+// export Excel antigo. Cada entrada representa uma passagem por uma fase:
+// createdAt = quando entrou, updatedAt = quando saiu (bate com o createdAt da
+// entrada seguinte). Suporta reentradas de fase (usa a primeira ocorrencia).
+function deriveStageTimings(phasesHistory) {
+  const entries = Array.isArray(phasesHistory) ? phasesHistory : [];
+  const findByTitle = (title) => entries.find((entry) => normalizeLookupKey(entry.phase?.title) === title);
 
-  if (!rawValue) {
-    return [];
-  }
+  const executando = findByTitle('criacao das artes');
+  const montagem = findByTitle('montagem da apresentacao');
+  const validacao = findByTitle('validacao do cliente');
+  const aprovado = findByTitle('aprovado para programacao');
+  const programado = findByTitle('post programado');
 
-  aliases.add(rawValue);
-  aliases.add(rawValue.replace(/\b(LTDA|LIMITADA|S\.?\s*A\.?|S\/A|ME|EIRELI|EPP)\b\.?$/i, '').trim());
-
-  for (const match of rawValue.matchAll(/\(([^)]+)\)/g)) {
-    const alias = String(match[1] || '').trim();
-    if (alias) {
-      aliases.add(alias);
-    }
-  }
-
-  const bracketPrefix = rawValue.match(/^\s*\[([^\]]+)\]/);
-  if (bracketPrefix?.[1]) {
-    aliases.add(bracketPrefix[1].trim());
-  }
-
-  return [...aliases].filter(Boolean);
-}
-
-function resolveClientMeta(clientDesignerMap, candidates = []) {
-  if (!clientDesignerMap) {
-    return null;
-  }
-
-  for (const candidate of candidates) {
-    for (const alias of extractClientAliases(candidate)) {
-      const key = normalizeLookupKey(alias);
-      if (!key) {
-        continue;
-      }
-
-      const clientMeta = clientDesignerMap.get(key);
-      if (clientMeta) {
-        return clientMeta;
-      }
-    }
-  }
-
-  return null;
-}
-
-function normalizeRow(row) {
-  return Object.fromEntries(
-    Object.entries(row || {}).map(([key, value]) => [normalizeLookupKey(key), value]),
-  );
-}
-
-function getRowValue(row, keys, fallback = '') {
-  for (const key of keys) {
-    const value = row[normalizeLookupKey(key)];
-    if (value !== undefined && value !== null && String(value).trim() !== '') {
-      return value;
-    }
-  }
-
-  return fallback;
-}
-
-function getClientMetaPriority(clientMeta) {
-  if (!clientMeta) return -1;
-
-  const hasProductionContract =
-    typeof clientMeta.postsPerMonth === 'number'
-    && Number.isFinite(clientMeta.postsPerMonth)
-    && clientMeta.postsPerMonth > 0;
-  const hasDesigner = Boolean(String(clientMeta.designer || '').trim());
-
-  if (clientMeta.ativo && hasProductionContract && hasDesigner) return 6;
-  if (clientMeta.ativo && hasProductionContract) return 5;
-  if (clientMeta.ativo && hasDesigner) return 4;
-  if (clientMeta.ativo) return 3;
-  if (hasProductionContract && hasDesigner) return 2;
-  if (hasProductionContract || hasDesigner) return 1;
-  return 0;
-}
-
-function shouldReplaceClientMeta(currentMeta, nextMeta) {
-  const currentPriority = getClientMetaPriority(currentMeta);
-  const nextPriority = getClientMetaPriority(nextMeta);
-
-  if (nextPriority !== currentPriority) {
-    return nextPriority > currentPriority;
-  }
-
-  const currentUpdatedAt = currentMeta?.updatedAt?.getTime?.() ?? 0;
-  const nextUpdatedAt = nextMeta?.updatedAt?.getTime?.() ?? 0;
-  return nextUpdatedAt >= currentUpdatedAt;
-}
-
-function formatDatePtBr(date) {
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = String(date.getFullYear());
-  return `${day}/${month}/${year}`;
-}
-
-function buildTaskTitle({ rawTitle, partner, dueDate }) {
-  const normalizedTitle = String(rawTitle || '').trim();
-  const normalizedPartner = String(partner || '').trim();
-
-  if (
-    normalizedTitle &&
-    normalizeLookupKey(normalizedTitle) !== normalizeLookupKey(normalizedPartner)
-  ) {
-    return normalizedTitle;
-  }
-
-  if (normalizedPartner) {
-    return `[${normalizedPartner.toUpperCase()}] POST ${formatDatePtBr(dueDate)}`;
-  }
-
-  return `POST ${formatDatePtBr(dueDate)}`;
-}
-
-async function loadClientDesignerMapFromSource() {
-  logServerEvent('Fetching Goalfy clients');
-  const response = await fetch(getRequiredEnv('GOALFY_CLIENTS_URL'), {
-    signal: AbortSignal.timeout(GOALFY_FETCH_TIMEOUT_MS),
-  });
-  if (!response.ok) {
-    throw new Error(`Goalfy Clients API error: ${response.status}`);
-  }
-
-  const buffer = await response.arrayBuffer();
-  const workbook = XLSX.read(buffer, { type: 'array' });
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(sheet);
-
-  const map = new Map();
-
-  for (const row of rows) {
-    const normalizedRow = normalizeRow(row);
-    const companyName = String(getRowValue(normalizedRow, ['empresa', 'parceiro', 'cliente'])).trim();
-    const titleName = String(getRowValue(normalizedRow, ['titulo', 'parceiro', 'cliente'])).trim();
-    const clientName = companyName || titleName;
-    const designer = String(getRowValue(normalizedRow, ['designer responsavel 1', 'responsavel 1', 'responsavel'])).trim();
-    const disabledValue = String(getRowValue(normalizedRow, ['desabilitado'])).trim().toUpperCase();
-    const postsPerMonthRaw = String(getRowValue(normalizedRow, ['quantidade de posts por mes'])).trim();
-    const postsPerMonth = postsPerMonthRaw === '' ? null : Number(postsPerMonthRaw.replace(',', '.'));
-    const ativo = disabledValue !== 'VERDADEIRO';
-
-    if (clientName) {
-      const clientMeta = {
-        clientName,
-        designer: designer ? normalizeDesignerName(designer) : '',
-        ativo,
-        postsPerMonth: Number.isFinite(postsPerMonth) ? postsPerMonth : null,
-        updatedAt: parseOptionalDate(getRowValue(normalizedRow, ['atualizado em'])),
-      };
-
-      [companyName, titleName]
-        .filter(Boolean)
-        .flatMap((alias) => extractClientAliases(alias))
-        .forEach((alias) => {
-          const key = normalizeLookupKey(alias);
-          if (shouldReplaceClientMeta(map.get(key), clientMeta)) {
-            map.set(key, clientMeta);
-          }
-        });
-    }
-  }
-
-  logServerEvent('Fetched Goalfy clients', { totalClients: map.size });
-  return map;
-}
-
-async function fetchClientDesignerMap({ forceRefresh = false } = {}) {
-  if (!forceRefresh && shouldUseCache(cachedClientDesignerMap, cachedClientDesignerMapAt, GOALFY_CLIENTS_CACHE_TTL_MS)) {
-    logServerEvent('Returning cached Goalfy clients', {
-      ageMs: nowMs() - cachedClientDesignerMapAt,
-      totalClients: cachedClientDesignerMap.size,
-    });
-    return cachedClientDesignerMap;
-  }
-
-  if (!forceRefresh && inflightClientDesignerMapPromise) {
-    logServerEvent('Awaiting inflight Goalfy clients request');
-    return inflightClientDesignerMapPromise;
-  }
-
-  inflightClientDesignerMapPromise = loadClientDesignerMapFromSource()
-    .then((map) => {
-      cachedClientDesignerMap = map;
-      cachedClientDesignerMapAt = nowMs();
-      return map;
-    })
-    .finally(() => {
-      inflightClientDesignerMapPromise = null;
-    });
-
-  return inflightClientDesignerMapPromise;
-}
-
-// Board "Posts Produção de Conteúdo" não tem os links de Drive/Editorial —
-// esses campos moram no card de Calendário. Mapeamos por nome do Calendário
-// (normalizado) para anexar esses links de volta em cada Post.
-async function loadCalendarLinksMapFromSource() {
-  logServerEvent('Fetching calendar links map');
-  const response = await fetch(getRequiredEnv('GOALFY_CARDS_CALENDAR_BOARD_URL'), {
-    signal: AbortSignal.timeout(GOALFY_FETCH_TIMEOUT_MS),
-  });
-  if (!response.ok) {
-    throw new Error(`Goalfy Calendar board API error: ${response.status}`);
-  }
-
-  const buffer = await response.arrayBuffer();
-  const workbook = XLSX.read(buffer, { type: 'array' });
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(sheet);
-
-  const map = new Map();
-  for (const row of rows) {
-    const normalizedRow = normalizeRow(row);
-    const calendarTitle = String(getRowValue(normalizedRow, ['titulo', 'calendario'])).trim();
-    if (!calendarTitle) continue;
-
-    map.set(normalizeLookupKey(calendarTitle), {
-      linkDriveArtes: String(getRowValue(normalizedRow, ['link do drive das artes'])).trim(),
-      linkCalendarioEditorial: String(getRowValue(normalizedRow, ['link do calendario editorial'])).trim(),
-    });
-  }
-
-  logServerEvent('Fetched calendar links map', { totalCalendars: map.size });
-  return map;
-}
-
-async function fetchCalendarLinksMap({ forceRefresh = false } = {}) {
-  if (!forceRefresh && shouldUseCache(cachedCalendarLinksMap, cachedCalendarLinksMapAt, GOALFY_CLIENTS_CACHE_TTL_MS)) {
-    return cachedCalendarLinksMap;
-  }
-
-  if (!forceRefresh && inflightCalendarLinksMapPromise) {
-    return inflightCalendarLinksMapPromise;
-  }
-
-  inflightCalendarLinksMapPromise = loadCalendarLinksMapFromSource()
-    .then((map) => {
-      cachedCalendarLinksMap = map;
-      cachedCalendarLinksMapAt = nowMs();
-      return map;
-    })
-    .finally(() => {
-      inflightCalendarLinksMapPromise = null;
-    });
-
-  return inflightCalendarLinksMapPromise;
-}
-
-function buildAdjustmentDedupKey(row) {
-  const rawId = String(getRowValue(row, ['id'])).trim();
-  if (rawId) {
-    return `id:${rawId}`;
-  }
-
-  const cliente = String(getRowValue(row, ['cliente'])).trim();
-  const tituloDemanda = String(getRowValue(row, ['titulo da demanda', 'titulo'])).trim();
-  const tipoEntrega = String(getRowValue(row, ['tipo de entrega'])).trim();
-  const criadoEm = String(getRowValue(row, ['criado em'])).trim();
-  return `fallback:${cliente}|${tituloDemanda}|${tipoEntrega}|${criadoEm}`;
-}
-
-function normalizeOptionalText(value) {
-  return String(value || '').trim();
-}
-
-function getBoardTaskSnapshotKey(row, index) {
-  const identificador = normalizeOptionalText(getRowValue(row, ['identificador'], index));
-  const updatedAt = parseOptionalDate(getRowValue(row, ['atualizado em']))
-    || parseOptionalDate(getRowValue(row, ['data na fase atual']))
-    || parseOptionalDate(getRowValue(row, ['criado em']));
-  return `${identificador || index}|${updatedAt?.toISOString() || 'no-date'}`;
-}
-
-function buildTaskFromBoardRow(row, index, clientDesignerMap, calendarLinksMap) {
-  const currentStage = String(getRowValue(row, ['fase atual'], 'Fazer')).trim();
-  const tags = String(getRowValue(row, ['etiquetas']));
-  const partner = String(getRowValue(row, ['parceiro'], 'Sem parceiro'));
-  // Board "Posts Produção de Conteúdo" (2026-07-29): não tem coluna "Cliente"
-  // nem "Parceiro" — o cliente é resolvido via "Calendário" (título do
-  // calendário, geralmente "Cliente - Mês/Ano").
-  const calendarioRaw = String(getRowValue(row, ['calendario'], '')).trim();
-  const relatedClient = String(getRowValue(row, ['cliente'], calendarioRaw || partner)).trim();
-  // "Conteúdo" é o campo de título no board novo; "Titulo da demanda"/"Titulo"
-  // eram usados no board antigo.
-  const rawTitle = String(getRowValue(row, ['conteudo', 'titulo']));
-  const rawResponsible = normalizeDesignerName(getRowValue(row, ['responsaveis', 'responsavel']));
-  const createdByResponsible = normalizeDesignerName(
-    getRowValue(row, ['criado por', 'criador', 'created by', 'autor']),
-  );
-  const clientMeta = resolveClientMeta(clientDesignerMap, [relatedClient, calendarioRaw, partner, rawTitle]);
-  const designerFromClient = clientMeta?.designer;
-  const dueDate = parseDate(getRowValue(row, ['data de entrega', 'data de vencimento']));
-  const resolvedDesigner = designerFromClient
-    || (rawResponsible !== 'Sem designer' ? rawResponsible : 'Sem designer');
-  const validationStartedAt = parseOptionalDate(
-    getRowValue(row, ['primeira vez que entrou na fase validacao do cliente']),
-  );
-  const startedExecutingAt = parseOptionalDate(
-    getRowValue(row, [
-      'primeira vez que entrou na fase executando',
-      'entrou na fase executando',
-    ]),
-  );
-  const startedAssemblyAt = parseOptionalDate(
-    getRowValue(row, [
-      'primeira vez que entrou na fase montagem da apresentacao',
-      'primeira vez que entrou na fase montagem',
-      'entrou na fase montagem da apresentacao',
-      'entrou na fase montagem',
-    ]),
-  );
-  const currentStageStartedAt = parseOptionalDate(getRowValue(row, ['data na fase atual']));
-  const validationTimeRaw = String(
-    getRowValue(row, ['tempo total na fase validacao do cliente']),
-  ).trim();
-  const validationTimeDays = validationTimeRaw === '' ? null : Number(validationTimeRaw.replace(',', '.'));
-  const approvedTimeRaw = String(
-    getRowValue(row, ['tempo total na fase aprovado para programacao']),
-  ).trim();
-  const approvedTimeDays = approvedTimeRaw === '' ? null : Number(approvedTimeRaw.replace(',', '.'));
-  const hadAdjustmentsValue = String(getRowValue(row, ['esta entrega teve ajustes?'])).trim().toUpperCase();
-  const adjustmentLog = String(getRowValue(row, ['registro de ajustes'])).trim();
-  const taskId = String(getRowValue(row, ['identificador'], index));
+  const daysBetween = (start, end) => {
+    if (!start || !end) return null;
+    const ms = new Date(end).getTime() - new Date(start).getTime();
+    return Number.isFinite(ms) ? Math.round((ms / (1000 * 60 * 60 * 24)) * 100) / 100 : null;
+  };
 
   return {
-    id: taskId,
+    entrouExecutandoEm: executando ? new Date(executando.createdAt) : null,
+    entrouMontagemEm: montagem ? new Date(montagem.createdAt) : null,
+    entrouValidacaoEm: validacao ? new Date(validacao.createdAt) : null,
+    tempoValidacaoDias: validacao ? daysBetween(validacao.createdAt, validacao.updatedAt) : null,
+    tempoAprovadoProgramacaoDias: aprovado ? daysBetween(aprovado.createdAt, aprovado.updatedAt) : null,
+    concluidoEm: programado ? new Date(programado.createdAt) : null,
+  };
+}
+
+// Resolve a cadeia Post -> Calendario -> Cliente via ID (lookup nativo da
+// Goalfy), em vez de matching por nome. calendarMetaById deve ser construido
+// a partir da database de Clientes + board de Calendarios antes de chamar.
+function buildTaskFromPostCard(card, cardDetail, calendarMetaById) {
+  const fields = cardDetail.form?.fields || [];
+  const calendarIds = findFieldTagIds(fields, CARDS_POST_CALENDARIO_FIELD_ID);
+  const calendarMeta = calendarIds[0] ? calendarMetaById.get(calendarIds[0]) : null;
+
+  const tags = (card.tags || []).map((tag) => tag.text).join(', ');
+  const responsavel = normalizeDesignerName(
+    calendarMeta?.designer || (card.responsibles || []).map((r) => r.name).join(', '),
+  );
+  const stageTimings = deriveStageTimings(cardDetail.phasesHistory);
+  const currentPhaseTitle = cardDetail.phase?.title || card.phase || 'Criação textual';
+
+  return {
+    id: card.id,
     contentType: parseContentType(tags),
     statusTags: parseStatusTags(tags),
-    title: buildTaskTitle({ rawTitle, partner: relatedClient || partner, dueDate }),
-    parceiro: partner,
-    calendario: calendarioRaw,
-    clienteRelacionado: clientMeta?.clientName || relatedClient || partner,
-    // "Link do Drive" não existe direto no board de Posts novo — vem do
-    // Calendário vinculado (cruzado por nome via calendarLinksMap).
-    linkDrive:
-      String(getRowValue(row, ['link do drive', 'link drive'])).trim()
-      || calendarLinksMap?.get(normalizeLookupKey(calendarioRaw))?.linkDriveArtes
-      || '',
-    linkCalendarioEditorial: calendarLinksMap?.get(normalizeLookupKey(calendarioRaw))?.linkCalendarioEditorial || '',
-    responsavel: resolvedDesigner,
-    responsavelHistorico: createdByResponsible || rawResponsible || '',
-    responsavelCliente: designerFromClient || resolvedDesigner,
-    designerResponsavel1: designerFromClient || '',
-    dataVencimento: dueDate,
-    stage: stageMap[normalizeLookupKey(currentStage)] || 'fazer',
+    title: card.title,
+    parceiro: calendarMeta?.clienteNome || 'Sem parceiro',
+    calendario: calendarMeta?.calendarTitle || '',
+    clienteRelacionado: calendarMeta?.clienteNome || '',
+    linkDrive: calendarMeta?.linkDriveArtes || '',
+    linkCalendarioEditorial: calendarMeta?.linkCalendarioEditorial || '',
+    responsavel,
+    responsavelHistorico: '',
+    responsavelCliente: calendarMeta?.designer || responsavel,
+    designerResponsavel1: calendarMeta?.designer || '',
+    dataVencimento: card.dueDate ? new Date(card.dueDate) : new Date(),
+    stage: stageMap[normalizeLookupKey(currentPhaseTitle)] || 'fazer',
     tempoEstimadoHoras: 3,
     tempoGastoHoras: 0,
-    criadoEm: parseOptionalDate(getRowValue(row, ['criado em'])),
-    concluidoEm: parseOptionalDate(getRowValue(row, ['concluido em'])),
-    dataNaFaseAtual: currentStageStartedAt,
-    entrouExecutandoEm: startedExecutingAt,
-    entrouMontagemEm: startedAssemblyAt,
-    entrouValidacaoEm: validationStartedAt,
-    tempoValidacaoDias: Number.isFinite(validationTimeDays) ? validationTimeDays : null,
-    tempoAprovadoProgramacaoDias: Number.isFinite(approvedTimeDays) ? approvedTimeDays : null,
-    teveAjustes: hadAdjustmentsValue === 'SIM' || adjustmentLog !== '',
-    registroAjustes: adjustmentLog,
-    clienteAtivo: clientMeta ? clientMeta.ativo : null,
-    clientePostsMes: clientMeta?.postsPerMonth ?? null,
+    criadoEm: card.createdAt ? new Date(card.createdAt) : null,
+    concluidoEm: stageTimings.concluidoEm,
+    dataNaFaseAtual: card.dateInCurrentPhase ? new Date(card.dateInCurrentPhase) : null,
+    entrouExecutandoEm: stageTimings.entrouExecutandoEm,
+    entrouMontagemEm: stageTimings.entrouMontagemEm,
+    entrouValidacaoEm: stageTimings.entrouValidacaoEm,
+    tempoValidacaoDias: stageTimings.tempoValidacaoDias,
+    tempoAprovadoProgramacaoDias: stageTimings.tempoAprovadoProgramacaoDias,
+    teveAjustes: false,
+    registroAjustes: '',
+    clienteAtivo: calendarMeta ? calendarMeta.clienteAtivo : null,
+    clientePostsMes: calendarMeta?.postsContratados ?? null,
   };
 }
 
-async function loadGoalfyAdjustmentsFromSource() {
-  logServerEvent('Fetching Goalfy adjustments');
-  const response = await fetch(getRequiredEnv('GOALFY_ADJUSTMENTS_URL'), {
-    signal: AbortSignal.timeout(GOALFY_FETCH_TIMEOUT_MS),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Goalfy Adjustments API error: ${response.status}`);
-  }
-
-  const buffer = await response.arrayBuffer();
-  const workbook = XLSX.read(buffer, { type: 'array' });
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(sheet);
-  const normalizedRows = rows.map((row) => normalizeRow(row));
-
-  const deduped = new Map();
-
-  for (const row of normalizedRows) {
-    const dedupKey = buildAdjustmentDedupKey(row);
-    const createdAt = parseOptionalDate(getRowValue(row, ['criado em']));
-    const updatedAt = parseOptionalDate(getRowValue(row, ['atualizado em'])) || createdAt;
-    const createdBy = normalizeDesignerName(
-      getRowValue(row, ['criado por', 'criador', 'created by', 'autor']),
-    );
-
-    const currentItem = {
-      id: String(getRowValue(row, ['id'])).trim(),
-      identificador: String(getRowValue(row, ['identificador'])).trim(),
-      tipoEntrega: String(getRowValue(row, ['tipo de entrega'])).trim(),
-      cliente: String(getRowValue(row, ['cliente', 'titulo'])).trim() || 'Sem cliente',
-      criadoPor: createdBy,
-      responsavel: normalizeDesignerName(getRowValue(row, ['responsavel', 'designer responsavel 1'])),
-      titulo: String(getRowValue(row, ['titulo'])).trim(),
-      tituloDemanda: String(getRowValue(row, ['titulo da demanda', 'titulo'])).trim(),
-      board: String(getRowValue(row, ['board da entrega'])).trim(),
-      motivoAjuste: String(getRowValue(row, ['qual o motivo do ajuste?'])).trim(),
-      classificacaoExecucao: String(getRowValue(row, ['classifique a execucao desta demanda:'])).trim(),
-      linkDrive: String(getRowValue(row, ['link drive'])).trim(),
-      criadoEm: createdAt,
-      atualizadoEm: updatedAt,
-    };
-
-    const existing = deduped.get(dedupKey);
-    const currentTimestamp = updatedAt?.getTime() ?? createdAt?.getTime() ?? 0;
-    const existingTimestamp = existing?.atualizadoEm?.getTime?.() ?? existing?.criadoEm?.getTime?.() ?? 0;
-
-    if (!existing || currentTimestamp >= existingTimestamp) {
-      deduped.set(dedupKey, currentItem);
-    }
-  }
-
-  const adjustments = [...deduped.values()].filter((item) => item.tipoEntrega);
-  logServerEvent('Fetched Goalfy adjustments', { totalAdjustments: adjustments.length });
-  return adjustments;
-}
-
-async function fetchGoalfyAdjustments({ forceRefresh = false } = {}) {
-  if (!forceRefresh && shouldUseCache(cachedGoalfyAdjustments, cachedGoalfyAdjustmentsAt, GOALFY_ADJUSTMENTS_CACHE_TTL_MS)) {
-    logServerEvent('Returning cached Goalfy adjustments', {
-      ageMs: nowMs() - cachedGoalfyAdjustmentsAt,
-      totalAdjustments: cachedGoalfyAdjustments.length,
-    });
-    return cachedGoalfyAdjustments;
-  }
-
-  if (!forceRefresh && inflightGoalfyAdjustmentsPromise) {
-    logServerEvent('Awaiting inflight Goalfy adjustments request');
-    return inflightGoalfyAdjustmentsPromise;
-  }
-
-  inflightGoalfyAdjustmentsPromise = loadGoalfyAdjustmentsFromSource()
-    .then((adjustments) => {
-      cachedGoalfyAdjustments = adjustments;
-      cachedGoalfyAdjustmentsAt = nowMs();
-      return adjustments;
-    })
-    .finally(() => {
-      inflightGoalfyAdjustmentsPromise = null;
-    });
-
-  return inflightGoalfyAdjustmentsPromise;
-}
-
-async function loadGoalfyBoardFromSource() {
-  logServerEvent('Fetching Goalfy board');
-  const response = await fetch(getRequiredEnv('GOALFY_BOARD_URL'), {
-    signal: AbortSignal.timeout(GOALFY_FETCH_TIMEOUT_MS),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Goalfy API error: ${response.status}`);
-  }
-
-  const buffer = await response.arrayBuffer();
-  const workbook = XLSX.read(buffer, { type: 'array' });
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(sheet);
-  return rows.map((row) => normalizeRow(row)).filter(
-    (row) => normalizeLookupKey(getRowValue(row, ['fase atual'], 'Fazer')) !== 'arquivado',
-  );
-}
-
-async function fetchGoalfyBoard({ forceRefresh = false } = {}) {
-  if (!forceRefresh && shouldUseCache(cachedGoalfyBoard, cachedGoalfyBoardAt, GOALFY_BOARD_CACHE_TTL_MS)) {
-    logServerEvent('Returning cached Goalfy board', {
-      ageMs: nowMs() - cachedGoalfyBoardAt,
-      totalRows: cachedGoalfyBoard.length,
-    });
-    return cachedGoalfyBoard;
-  }
-
-  if (!forceRefresh && inflightGoalfyBoardPromise) {
-    logServerEvent('Awaiting inflight Goalfy board request');
-    return inflightGoalfyBoardPromise;
-  }
-
-  inflightGoalfyBoardPromise = loadGoalfyBoardFromSource()
-    .then((rows) => {
-      cachedGoalfyBoard = rows;
-      cachedGoalfyBoardAt = nowMs();
-      return rows;
-    })
-    .finally(() => {
-      inflightGoalfyBoardPromise = null;
-    });
-
-  return inflightGoalfyBoardPromise;
-}
-
-function buildClientDesignerMapFromCachedData(data) {
-  const map = new Map();
-
-  for (const task of data?.tasks || []) {
-    const clientName = String(task.clienteRelacionado || task.parceiro || '').trim();
-    if (!clientName) continue;
-
-    const clientMeta = {
-      clientName,
-      designer: normalizeDesignerName(task.responsavelCliente || task.designerResponsavel1 || task.responsavel),
-      ativo: task.clienteAtivo === true,
-      postsPerMonth: typeof task.clientePostsMes === 'number' ? task.clientePostsMes : null,
-    };
-
-    [
-      task.clienteRelacionado,
-      task.parceiro,
-    ]
-      .map((value) => String(value || '').trim())
-      .filter(Boolean)
-      .flatMap((alias) => extractClientAliases(alias))
-      .forEach((alias) => {
-        map.set(normalizeLookupKey(alias), clientMeta);
-      });
-  }
-
-  return map;
-}
-
-function applyClientMetadataToData(data, clientDesignerMap) {
-  if (!data || !clientDesignerMap) {
-    return data;
-  }
-
-  return {
-    ...data,
-    tasks: (data.tasks || []).map((task) => {
-      const clientMeta = resolveClientMeta(clientDesignerMap, [
-        task.clienteRelacionado,
-        task.parceiro,
-        task.title,
-      ]);
-
-      if (!clientMeta) {
-        return task;
-      }
-
-      const designerFromClient = clientMeta.designer;
-      const resolvedDesigner = designerFromClient
-        || (task.responsavel && task.responsavel !== 'Sem designer' ? task.responsavel : 'Sem designer');
-
-      return {
-        ...task,
-        clienteRelacionado: clientMeta.clientName || task.clienteRelacionado || task.parceiro,
-        responsavel: resolvedDesigner,
-        responsavelCliente: designerFromClient || resolvedDesigner,
-        designerResponsavel1: designerFromClient || '',
-        clienteAtivo: clientMeta.ativo,
-        clientePostsMes: clientMeta.postsPerMonth ?? null,
-      };
-    }),
-  };
-}
-
-async function refreshCachedGoalfyClientMetadata({ forceRefresh = true } = {}) {
-  if (!cachedGoalfyData) {
-    return null;
-  }
-
-  const clientDesignerMap = await fetchClientDesignerMap({ forceRefresh });
-  cachedGoalfyData = applyClientMetadataToData(cachedGoalfyData, clientDesignerMap);
-  cachedGoalfyData = {
-    ...cachedGoalfyData,
-    designers: collectDesignerNames(cachedGoalfyData.tasks, clientDesignerMap),
-    clients: collectActiveClientNames(cachedGoalfyData.tasks, clientDesignerMap),
-  };
-  cachedGoalfyDataAt = nowMs();
-  void persistGoalfyData(cachedGoalfyData, cachedGoalfyDataAt);
-
-  logServerEvent('Goalfy client metadata refreshed before board sync', {
-    ...getGoalfyRefreshStatus(),
-    tasks: cachedGoalfyData.tasks.length,
-    designers: cachedGoalfyData.designers.length,
-    clients: cachedGoalfyData.clients.length,
-  });
-
-  return cachedGoalfyData;
-}
-
-async function loadGoalfyDataFromSource({ forceBoardRefresh = false, forceAuxiliaryRefresh = false } = {}) {
-  const startedAt = nowMs();
-  const clientDesignerMapPromise = fetchClientDesignerMap({ forceRefresh: forceAuxiliaryRefresh })
-    .catch((error) => {
-      if (cachedGoalfyData) {
-        logServerEvent('Falling back to cached Goalfy client metadata', {
-          error: error?.message || String(error),
-        });
-        return buildClientDesignerMapFromCachedData(cachedGoalfyData);
-      }
-
-      throw error;
-    });
-  const adjustmentsPromise = !forceAuxiliaryRefresh && cachedGoalfyData
-    ? Promise.resolve(cachedGoalfyData.adjustments || [])
-    : fetchGoalfyAdjustments({ forceRefresh: forceAuxiliaryRefresh });
-
-  const calendarLinksMapPromise = fetchCalendarLinksMap({ forceRefresh: forceAuxiliaryRefresh }).catch((error) => {
-    logServerEvent('Calendar links map fetch failed, continuing without it', {
-      error: error?.message || String(error),
-    });
-    return new Map();
-  });
-
-  const [activeRows, clientDesignerMap, adjustments, calendarLinksMap] = await Promise.all([
-    fetchGoalfyBoard({ forceRefresh: forceBoardRefresh }),
-    clientDesignerMapPromise,
-    adjustmentsPromise,
-    calendarLinksMapPromise,
+// Constroi o mapa calendarCardId -> metadados resolvidos (cliente, designer,
+// links, ativo) cruzando a database de Clientes com o board de Calendarios
+// via lookup por ID (nao por nome). Usado para hidratar cada Post.
+async function buildCalendarMetaMap({ writeToken }) {
+  const [clients, calendarCards] = await Promise.all([
+    fetchCardsClients({ writeToken }),
+    fetchAllGoalfyCardsInBoard({ boardId: CARDS_CALENDAR_BOARD_ID, writeToken }),
   ]);
 
-  const nextSnapshot = new Map();
-  const tasks = activeRows.map((row, index) => {
-    const snapshotKey = getBoardTaskSnapshotKey(row, index);
-    const task = buildTaskFromBoardRow(row, index, clientDesignerMap, calendarLinksMap);
-    nextSnapshot.set(task.id, {
-      snapshotKey,
-      task,
+  const clientsById = new Map(clients.map((client) => [client.id, client]));
+  const calendarMetaById = new Map();
+
+  const calendarDetails = await mapWithConcurrency(calendarCards, 8, (card) =>
+    goalfyApiFetch(`/cards/${card.id}`, { writeToken }));
+
+  calendarCards.forEach((card, index) => {
+    const detail = calendarDetails[index];
+    const fields = detail.form?.fields || [];
+    const clientIds = findFieldTagIds(fields, CARDS_CALENDAR_FIELD_CLIENTE_ID);
+    const client = clientIds[0] ? clientsById.get(clientIds[0]) : null;
+
+    calendarMetaById.set(card.id, {
+      calendarTitle: card.title,
+      clienteNome: client?.nome || findFieldValue(fields, CARDS_CALENDAR_FIELD_CLIENTE_ID) || '',
+      clienteAtivo: client ? client.ativo : null,
+      postsContratados: client?.postsContratados ?? null,
+      designer: client?.designer || '',
+      linkDriveArtes: findFieldValue(fields, CARDS_CALENDAR_FIELD_LINK_DRIVE_ARTES_ID) || '',
+      linkCalendarioEditorial: findFieldValue(fields, CARDS_CALENDAR_FIELD_LINK_EDITORIAL_ID) || '',
     });
-
-    const cachedSnapshot = cachedGoalfyBoardTaskSnapshot.get(task.id);
-    if (!forceAuxiliaryRefresh && cachedSnapshot && cachedSnapshot.snapshotKey === snapshotKey) {
-      return cachedSnapshot.task;
-    }
-
-    return task;
   });
-  cachedGoalfyBoardTaskSnapshot = nextSnapshot;
+
+  return calendarMetaById;
+}
+
+// Lista todos os posts do board "Posts Produção de Conteúdo" via API REST
+// (substitui o export Excel de GOALFY_BOARD_URL). Filtra fora a fase
+// "Arquivado" (mesmo comportamento do fluxo antigo).
+async function fetchAllPostsViaRest({ writeToken }) {
+  const [postCards, calendarMetaById] = await Promise.all([
+    fetchAllGoalfyCardsInBoard({ boardId: CARDS_POSTS_BOARD_ID, writeToken }),
+    buildCalendarMetaMap({ writeToken }),
+  ]);
+
+  const activeCards = postCards.filter((card) => normalizeLookupKey(card.phase) !== 'arquivado');
+  const postDetails = await mapWithConcurrency(activeCards, 8, (card) =>
+    goalfyApiFetch(`/cards/${card.id}`, { writeToken }));
+
+  return activeCards.map((card, index) => buildTaskFromPostCard(card, postDetails[index], calendarMetaById));
+}
+
+async function loadGoalfyDataFromSource() {
+  const startedAt = nowMs();
+  const writeToken = getGoalfyCardsWriteToken();
+
+  const [tasks, clients] = await Promise.all([
+    fetchAllPostsViaRest({ writeToken }),
+    fetchCardsClients({ writeToken }),
+  ]);
 
   logServerEvent('Goalfy source aggregation finished', {
     durationMs: getDurationMs(startedAt),
     tasks: tasks.length,
-    adjustments: adjustments.length,
-    clients: clientDesignerMap.size,
+    clients: clients.length,
   });
+
+  const activeClients = clients.filter((client) => client.ativo && client.postsContratados > 0);
 
   return {
     tasks,
-    designers: collectDesignerNames(tasks, clientDesignerMap),
-    adjustments,
-    clients: collectActiveClientNames(tasks, clientDesignerMap),
+    designers: [...new Set(activeClients.map((client) => client.designer).filter(Boolean))].sort((a, b) =>
+      a.localeCompare(b, 'pt-BR')),
+    adjustments: [],
+    clients: activeClients.map((client) => client.nome).filter(Boolean).sort((a, b) => a.localeCompare(b, 'pt-BR')),
   };
 }
 
-function triggerGoalfyBackgroundRefresh({ forceBoardRefresh = true, forceAuxiliaryRefresh = false } = {}) {
+function triggerGoalfyBackgroundRefresh() {
   if (inflightBackgroundRefreshPromise) {
     logServerEvent('Goalfy background refresh already in progress', getGoalfyRefreshStatus());
     return inflightBackgroundRefreshPromise;
@@ -1123,10 +501,7 @@ function triggerGoalfyBackgroundRefresh({ forceBoardRefresh = true, forceAuxilia
     error: '',
   };
 
-  inflightBackgroundRefreshPromise = loadGoalfyDataFromSource({
-    forceBoardRefresh,
-    forceAuxiliaryRefresh: false,
-  })
+  inflightBackgroundRefreshPromise = loadGoalfyDataFromSource()
     .then((data) => {
       cachedGoalfyData = data;
       cachedGoalfyDataAt = nowMs();
@@ -1135,20 +510,7 @@ function triggerGoalfyBackgroundRefresh({ forceBoardRefresh = true, forceAuxilia
         ...getGoalfyRefreshStatus(),
         tasks: data.tasks.length,
       });
-
-      if (!forceAuxiliaryRefresh) {
-        return data;
-      }
-
-      return loadGoalfyDataFromSource({
-        forceBoardRefresh: false,
-        forceAuxiliaryRefresh: true,
-      }).then((refinedData) => {
-        cachedGoalfyData = refinedData;
-        cachedGoalfyDataAt = nowMs();
-        void persistGoalfyData(refinedData, cachedGoalfyDataAt);
-        return refinedData;
-      });
+      return data;
     })
     .then((data) => {
       goalfyRefreshState = {
@@ -1188,8 +550,8 @@ function triggerGoalfyBackgroundRefresh({ forceBoardRefresh = true, forceAuxilia
   return inflightBackgroundRefreshPromise;
 }
 
-function startGoalfyBackgroundRefresh(options, source) {
-  void triggerGoalfyBackgroundRefresh(options).catch((error) => {
+function startGoalfyBackgroundRefresh(source) {
+  void triggerGoalfyBackgroundRefresh().catch((error) => {
     console.error(`Goalfy ${source} failed`, error);
   });
 }
@@ -1260,13 +622,7 @@ async function fetchGoalfyData({ forceRefresh = false } = {}) {
       ageMs,
       tasks: cachedGoalfyData.tasks.length,
     });
-    startGoalfyBackgroundRefresh(
-      {
-        forceBoardRefresh: true,
-        forceAuxiliaryRefresh: false,
-      },
-      'stale cache refresh',
-    );
+    startGoalfyBackgroundRefresh('stale cache refresh');
     return cachedGoalfyData;
   }
 
@@ -1275,10 +631,7 @@ async function fetchGoalfyData({ forceRefresh = false } = {}) {
     return inflightGoalfyDataPromise;
   }
 
-  inflightGoalfyDataPromise = loadGoalfyDataFromSource({
-    forceBoardRefresh: forceRefresh,
-    forceAuxiliaryRefresh: forceRefresh,
-  })
+  inflightGoalfyDataPromise = loadGoalfyDataFromSource()
     .then((data) => {
       cachedGoalfyData = data;
       cachedGoalfyDataAt = Date.now();
@@ -2035,14 +1388,7 @@ app.post('/api/goalfy-refresh', requireAuth, async (req, res) => {
       }
     }
 
-    if (cachedGoalfyData) {
-      await refreshCachedGoalfyClientMetadata({ forceRefresh: true });
-    }
-
-    startGoalfyBackgroundRefresh({
-      forceBoardRefresh: true,
-      forceAuxiliaryRefresh: true,
-    }, 'manual refresh');
+    startGoalfyBackgroundRefresh('manual refresh');
 
     res.json({
       started: true,
@@ -2238,6 +1584,9 @@ const CARDS_CALENDAR_PHASES = {
 };
 const CARDS_CALENDAR_FIELD_PRIMEIRO_DIA_ID = '5c0802d8-cf18-4f62-836a-fb0a64663b9b';
 const CARDS_CALENDAR_FIELD_CLIENTE_ID = '161d97db-7214-4d95-bc02-a332e607e6d9';
+const CARDS_CALENDAR_FIELD_LINK_DRIVE_ARTES_ID = '9e66b7f1-1e79-45b2-93eb-8c730f6cf65c';
+const CARDS_CALENDAR_FIELD_LINK_EDITORIAL_ID = '7cc2a9ee-bafc-4675-ac5d-fd07eef9fe08';
+const CARDS_POSTS_BOARD_ID = 'e9d22a5a-8263-41da-9784-3e77589e8469';
 const CARDS_CLIENTS_DATABASE_ID = '652cab0e-7792-409c-81a0-b3cba1447209';
 const CARDS_CLIENT_FIELD_NOME_ID = 'b794bfc5-f574-4b39-94b1-4c3b55345cdc';
 const CARDS_CLIENT_FIELD_DESIGNER_ID = '460d3f59-8038-43a9-a05e-b96b9e523d4a';
@@ -2248,6 +1597,22 @@ const CARDS_CLIENT_FIELD_LOCAIS_PUBLICACAO_ID = '9c3920b7-fd9e-460f-ac48-d21110f
 const CARDS_CLIENT_FIELD_LINK_APRESENTACAO_ID = '72f4bb34-de63-4116-a8a0-ebc79c4acdf6';
 const CARDS_CLIENT_FIELD_LINK_DRIVE_ID = 'e9603c0d-1b97-4e66-9f52-d5caacab8379';
 const CARDS_POST_FORMATO_OPTIONS = ['Estático', 'Carrossel', 'Vídeo'];
+
+async function mapWithConcurrency(items, limit, mapFn) {
+  const results = new Array(items.length);
+  let cursor = 0;
+
+  async function worker() {
+    while (cursor < items.length) {
+      const index = cursor;
+      cursor += 1;
+      results[index] = await mapFn(items[index], index);
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
 
 function getGoalfyCardsWriteToken() {
   const writeToken = process.env.GOALFY_CARDS_WRITE_TOKEN;
@@ -2340,6 +1705,7 @@ async function loadCardsClientsFromSource({ writeToken }) {
       .filter(Boolean),
     linkApresentacao: findFieldValue(register.fields, CARDS_CLIENT_FIELD_LINK_APRESENTACAO_ID),
     linkDriveGeral: findFieldValue(register.fields, CARDS_CLIENT_FIELD_LINK_DRIVE_ID),
+    ativo: !register.disabled,
   }));
 
   logServerEvent('Fetched Criar Cards clients database', { totalClients: clients.length });

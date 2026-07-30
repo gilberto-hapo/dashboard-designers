@@ -613,9 +613,9 @@ function CalendarDayCell({
               <div className={`pointer-events-none absolute left-2 bottom-[calc(100%+0.45rem)] z-30 rounded-xl border px-3 py-1.5 text-[10px] font-semibold tracking-[0.01em] opacity-0 shadow-[0_14px_32px_rgba(0,0,0,0.42)] transition-opacity duration-75 group-hover:opacity-100 group-focus-within:opacity-100 ${tone.tooltipClass}`}>
                 {tone.label}
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className={`h-1.5 w-1.5 rounded-full ${tone.accent}`} />
-                <p className="truncate text-[11px] font-semibold text-foreground">{task.title}</p>
+              <div className="flex items-start gap-1.5">
+                <span className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${tone.accent}`} />
+                <p className="line-clamp-2 text-[11px] font-semibold leading-snug text-foreground">{task.title}</p>
               </div>
             </button>
           );

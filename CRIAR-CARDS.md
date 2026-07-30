@@ -498,12 +498,112 @@ e continuam válidas/úteis:
       (título completo do cliente/mês fica só no cabeçalho, não repetido em
       cada célula).
 
+## Migração do dashboard principal (Agenda/Estatísticas) para API REST — 2026-07-30
+
+**Indicação contrária confirmada**: a partir de 2026-07-30 o usuário decidiu
+migrar também o dashboard principal (não só a aba Criar Cards) do padrão
+Excel para a API REST. Motivo: o botão "Atualizar dados" da Agenda estava
+demorando ~12s porque `loadGoalfyDataFromSource` (server.js) baixa e parseia
+4 exports XLSX em paralelo a cada refresh forçado, sendo o maior gargalo o
+Excel de "Ajustes" (15.003 linhas de histórico).
+
+### Descoberta importante: não são boards diferentes
+
+`GOALFY_BOARD_URL` (board de tasks "antigo") e `GOALFY_CARDS_POSTS_BOARD_URL`
+(board de Posts Produção de Conteúdo) apontam para o **mesmo relatório**
+(`c93e53b9-8a54-498c-bd4d-c3a69b733d67` no `.env`). A migração de fases já
+aconteceu em 2026-07-29 (`stageMap` em server.js já usa as fases novas). Ou
+seja, a migração desta etapa é uma troca de **transporte** (XLSX → REST) do
+mesmo board de Posts, não uma troca de fonte de dados. Isso também corrige a
+seção "Fluxo de fases... diferente do board de produção principal" mais
+acima neste documento — não é mais verdade, é o mesmo board.
+
+### Escopo definido pelo usuário (2026-07-30)
+
+O botão "Atualizar" do dashboard passa a sincronizar **apenas** estas 3
+fontes, todas via API REST (nunca mais via Excel):
+1. Database "Clientes Produção de Conteúdo" (`CARDS_CLIENTS_DATABASE_ID`).
+2. Board "Posts Produção de Conteúdo" (mesmo board de `GOALFY_BOARD_URL` /
+   `GOALFY_CARDS_POSTS_BOARD_URL` — usar só um nome de variável depois).
+3. Board "Calendários Produção de Conteúdo" (`CARDS_CALENDAR_BOARD_ID`).
+
+**O Excel de "Ajustes" (`GOALFY_ADJUSTMENTS_URL`, database
+`8ec9ca7b-f1c4-45cb-951c-f08576a42360`, 15k registros) foi decidido pelo
+usuário como fora de escopo — não migrar para REST, remover.** Isso implica
+remover/simplificar tudo que dependia dele: `reworkRate`/% retrabalho no
+Score de Cliente, blocos de "ajustes" em Estatísticas, índice de responsável
+histórico por ajuste. Não é uma perda acidental — foi decisão explícita do
+usuário ao ser perguntado (rejeitou migrar essa database e rejeitou mantê-la
+como exceção via Excel).
+
+### Descobertas técnicas confirmadas por teste real em 2026-07-30
+
+- `GET /cards/board/{postsBoardId}/filter?limit=200&offset=0` retorna todos
+  os cards de Posts (paginação confirmada suficiente, sem exceder 200/mês
+  hoje). Campos por card: `createdAt, dateInCurrentPhase, dueDate, formId,
+  id, index, phaseId, responsibles[], tags[], title, updatedAt`. Não traz
+  `form.fields` (Calendário/Formato/Conteúdo) — precisa de `GET /cards/{id}`
+  por card (N+1), mesmo padrão já usado em `fetchAllCalendarsWithPhase`.
+- `GET /cards/{id}` retorna `phasesHistory`: array cronológico
+  `{id, createdAt, updatedAt, phase: {id, title, index}, form}`, uma entrada
+  por passagem de fase. `createdAt` = quando entrou, `updatedAt` = quando
+  saiu (bate com o `createdAt` da entrada seguinte). Isso substitui as
+  colunas agregadas do Excel (`entrouExecutandoEm`, `tempoValidacaoDias`
+  etc.) com uma fonte melhor — inclusive suporta reentradas de fase, que o
+  Excel não suportava (só tinha "primeira vez"/"última vez").
+- Campo "Cliente" do card de Calendário (`fieldInfoId: 161d97db-…`) retorna
+  `value: ["<registerId>"]` — o **ID do registro** na database de Clientes,
+  não texto. Cadeia de lookup correta: Post → campo Calendário (id do card)
+  → `GET /cards/{calendarId}` → campo Cliente (id do registro) → cliente.
+  Elimina o matching por nome (`resolveClientMeta`/`normalizeLookupKey`) como
+  caminho principal — mantê-lo só como fallback para cards órfãos sem lookup.
+- Novos `fieldInfoId` do card de Calendário, ainda não documentados acima:
+  `Link do Drive das Artes` = `9e66b7f1-1e79-45b2-93eb-8c730f6cf65c`,
+  `Link do Calendário Editorial` = `7cc2a9ee-bafc-4675-ac5d-fd07eef9fe08`,
+  `Calendário` (shortText, título do próprio card) =
+  `49c8f084-6343-41a5-83d2-e8d3bc127396`.
+- `GET /databases/{clientsDbId}/filter` retorna, fora do array `fields`:
+  `id, title, disabled, createdAt, updatedAt, createdBy, modelId, name`.
+  `register.disabled` é o equivalente de `clienteAtivo` — hoje
+  `fetchCardsClients` (server.js) não lê esse campo, precisa passar a ler.
+- Nomes de designer divergem entre Excel antigo e API REST (ex: `"Gustavo"`
+  vs `"Gustavo Grein"`, `"vitorya"` vs nome de usuário completo). Decisão do
+  usuário (2026-07-30): padronizar em todo o dashboard para o nome que vem
+  da API REST (campo "Designer Responsável" da database de Clientes via
+  `valueTitle`), não o nome truncado do Excel antigo.
+
+### Riscos identificados (verificar ao implementar)
+
+- `insights.ts` e `Dashboard.tsx` resolvem o designer de uma task em ordens
+  opostas hoje (`responsavelCliente → designerResponsavel1 → responsavel`
+  vs. o inverso) — mascarado porque os 3 campos recebem o mesmo valor no
+  fluxo atual. Ao migrar, alinhar a ordem nos dois lados.
+- Sem cache hoje em `fetchCardsClients`/`fetchAllCalendarsWithPhase`
+  (decisão de código existente, ver comentários no server.js). Somado ao
+  N+1 de `GET /cards/{id}` por post, um refresh completo pode fazer bastante
+  requisições sequenciais — usar concorrência limitada (~5-10 paralelas) em
+  vez de loop sequencial ao implementar a listagem de posts.
+- `loadGoalfyBoardFromSource` hoje filtra fora cards na fase "Arquivado"; a
+  listagem via `/cards/board/{id}/filter` não filtra isso automaticamente —
+  reaplicar o filtro por `phaseId`/`phase.title` no servidor, senão cards
+  arquivados contam como "concluído" (o `stageMap` mapeia arquivado →
+  concluido).
+- Bump nas chaves de cache do frontend (`GOALFY_CACHE_KEYS`,
+  `DASHBOARD_CACHE_IDB_KEY` em `src/lib/goalfy.ts`) ao trocar o formato do
+  payload, para não deixar usuários com cache antigo intercalado com o novo.
+- Campos confirmados sem nenhuma leitura no frontend, não portar:
+  `responsavelHistorico`, `teveAjustes`, `registroAjustes`,
+  `tempoAprovadoProgramacaoDias`, `linkCalendarioEditorial` (o campo em si
+  fica, só o nome específico não é lido em nenhum componente hoje).
+
 ## Observações importantes para as próximas etapas
 
-- O usuário está reestruturando o sistema **aos poucos**, começando por esta
-  aba. Não assumir que o restante do dashboard (StatisticsPanel, CalendarPanel,
-  etc.) deve ser alterado — o escopo é isolado nesta aba até indicação
-  contrária.
+- ~~O usuário está reestruturando o sistema **aos poucos**, começando por
+  esta aba. Não assumir que o restante do dashboard (StatisticsPanel,
+  CalendarPanel, etc.) deve ser alterado — o escopo é isolado nesta aba até
+  indicação contrária.~~ **Superado em 2026-07-30** — ver seção acima, a
+  indicação contrária aconteceu: o dashboard principal também está sendo
+  migrado agora.
 - O fluxo exato da aba (o que o usuário vai criar/visualizar) ainda **não foi
   definido** — o usuário optou por primeiro estabelecer as conexões de dados e
   só depois explicar o que a aba vai fazer. Não implementar formulários de
