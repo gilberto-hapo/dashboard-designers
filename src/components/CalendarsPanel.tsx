@@ -172,8 +172,12 @@ export function CalendarsPanel({ selectedMonth, selectedYear, onFilterOptionsCha
                       <h3 className="text-base font-semibold text-foreground">{calendario.title}</h3>
                       <div className="mt-1.5 flex flex-wrap gap-1.5">
                         <span
-                          className="rounded px-2 py-0.5 text-[11px] font-bold uppercase text-white"
-                          style={{ backgroundColor: calendario.phaseColor }}
+                          className="rounded border px-2 py-0.5 text-[11px] font-bold uppercase"
+                          style={{
+                            borderColor: calendario.phaseColor,
+                            backgroundColor: `${calendario.phaseColor}1a`,
+                            color: calendario.phaseColor,
+                          }}
                         >
                           {calendario.phaseTitle}
                         </span>

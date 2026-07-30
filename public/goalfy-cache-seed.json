@@ -1,5 +1,5 @@
 {
-  "updatedAt": 1785412541819,
+  "updatedAt": 1785414700098,
   "data": {
     "tasks": [
       {
@@ -150,7 +150,7 @@
         "entrouExecutandoEm": null,
         "entrouMontagemEm": "2026-07-29T11:00:00.000Z",
         "entrouValidacaoEm": "2026-07-29T11:00:00.000Z",
-        "tempoValidacaoDias": 0.6922801041666666,
+        "tempoValidacaoDias": 0.7182347222222222,
         "tempoAprovadoProgramacaoDias": 0,
         "teveAjustes": false,
         "registroAjustes": "",
@@ -182,7 +182,7 @@
         "entrouMontagemEm": "2026-07-29T11:00:00.000Z",
         "entrouValidacaoEm": "2026-07-29T11:00:00.000Z",
         "tempoValidacaoDias": 0.00014,
-        "tempoAprovadoProgramacaoDias": 0.6927199189814814,
+        "tempoAprovadoProgramacaoDias": 0.7186745486111111,
         "teveAjustes": false,
         "registroAjustes": "",
         "clienteAtivo": null,
@@ -367,7 +367,7 @@
         "entrouExecutandoEm": null,
         "entrouMontagemEm": "2026-07-29T11:00:00.000Z",
         "entrouValidacaoEm": "2026-07-29T11:00:00.000Z",
-        "tempoValidacaoDias": 0.6909259490740741,
+        "tempoValidacaoDias": 0.7168805671296297,
         "tempoAprovadoProgramacaoDias": 0,
         "teveAjustes": false,
         "registroAjustes": "",

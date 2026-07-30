@@ -11,6 +11,7 @@ import { useAuth } from '@/lib/auth';
 
 const REFRESH_POLL_INTERVAL_MS = 2500;
 const REFRESH_POLL_MAX_ATTEMPTS = 36;
+const AUTO_REFRESH_INTERVAL_MS = 30_000;
 
 export function useGoalfyData() {
   const [data, setData] = useState<GoalfyDataPayload | null>(null);
@@ -208,6 +209,30 @@ export function useGoalfyData() {
       isActive = false;
     };
   }, [data, isAuthLoading, isAuthenticated, isBackgroundSyncing, isCacheLoading, isFetching]);
+
+  useEffect(() => {
+    if (isAuthLoading || !isAuthenticated) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      if (document.hidden || isFetching || isBackgroundSyncing) {
+        return;
+      }
+
+      fetchGoalfyData(false)
+        .then((nextData) => {
+          applyData(nextData);
+        })
+        .catch(() => {
+          // Falha silenciosa: mantem os dados atuais em tela, o proximo tick tenta de novo.
+        });
+    }, AUTO_REFRESH_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [isAuthLoading, isAuthenticated, isFetching, isBackgroundSyncing]);
 
   const insights: DashboardInsights | null = useMemo(() => {
     if (!data) {
