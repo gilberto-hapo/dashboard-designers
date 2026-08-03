@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   fetchGoalfyData,
   fetchGoalfyRefreshStatus,
@@ -177,6 +177,8 @@ export function useGoalfyData() {
     }
   }, [isAuthenticated, isAuthLoading]);
 
+  const hasAttemptedHydrateMissingClientsRef = useRef(false);
+
   useEffect(() => {
     if (isAuthLoading || !isAuthenticated || isCacheLoading || isFetching || isBackgroundSyncing) {
       return;
@@ -188,6 +190,15 @@ export function useGoalfyData() {
     if (hasClients && hasDriveLinks) {
       return;
     }
+
+    // Sem isso, dados legitimamente incompletos (ex: nenhuma task tem
+    // linkDrive preenchido ainda) fariam este efeito rodar em loop infinito
+    // a cada applyData — já causou queda de produção por esgotar o servidor
+    // com requisições repetidas em looping (ver git blame/incidente).
+    if (hasAttemptedHydrateMissingClientsRef.current) {
+      return;
+    }
+    hasAttemptedHydrateMissingClientsRef.current = true;
 
     let isActive = true;
 
