@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Check, ChevronDown, Loader2, X } from 'lucide-react';
+import { Check, ChevronDown, Loader2, RotateCcw, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   Select,
@@ -40,6 +40,17 @@ type CreateSummary = {
   calendarMoved: boolean;
 };
 
+// Espelha buildPostTitles do server.js — o total aparece no próprio título
+// (#NN/TOTAL), então mudar o total exige recalcular todos os títulos, não só
+// adicionar/remover o excedente.
+function buildPostTitles({ clienteNome, mesAno, total }: { clienteNome: string; mesAno: string; total: number }) {
+  const paddedTotal = String(total).padStart(2, '0');
+  return Array.from({ length: total }, (_, index) => {
+    const sequencial = String(index + 1).padStart(2, '0');
+    return `[${clienteNome.toUpperCase()}] ${mesAno} #${sequencial}/${paddedTotal}`;
+  });
+}
+
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, { credentials: 'include', ...options });
   const body = await response.json().catch(() => null);
@@ -62,6 +73,8 @@ export function CreateCardsPanel({ isSidebarCollapsed = false }: { isSidebarColl
 
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [posts, setPosts] = useState<PreviewPost[]>([]);
+  const [totalPosts, setTotalPosts] = useState(0);
+  const [defaultTotalPosts, setDefaultTotalPosts] = useState(0);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
 
@@ -111,6 +124,8 @@ export function CreateCardsPanel({ isSidebarCollapsed = false }: { isSidebarColl
       .then((data) => {
         setPreview(data);
         setPosts(data.posts.map((post) => ({ ...post, status: 'pending' as PostStatus })));
+        setTotalPosts(data.posts.length);
+        setDefaultTotalPosts(data.posts.length);
       })
       .catch((error) => setPreviewError(error.message))
       .finally(() => setLoadingPreview(false));
@@ -118,6 +133,27 @@ export function CreateCardsPanel({ isSidebarCollapsed = false }: { isSidebarColl
 
   const handleFormatoChange = (index: number, formato: string) => {
     setPosts((prev) => prev.map((post) => (post.index === index ? { ...post, formato } : post)));
+  };
+
+  const handleTotalPostsChange = (nextTotal: number) => {
+    if (!preview || !Number.isFinite(nextTotal) || nextTotal < 1) return;
+
+    setTotalPosts(nextTotal);
+    const titles = buildPostTitles({ clienteNome: preview.calendar.clienteNome, mesAno: preview.calendar.mesAno, total: nextTotal });
+
+    setPosts((prev) =>
+      titles.map((title, arrayIndex) => {
+        const index = arrayIndex + 1;
+        const existing = prev.find((post) => post.index === index);
+        return {
+          index,
+          total: nextTotal,
+          title,
+          formato: existing?.formato ?? preview.formatoOptions[0],
+          status: 'pending' as PostStatus,
+        };
+      }),
+    );
   };
 
   const handleCreate = async () => {
@@ -233,6 +269,34 @@ export function CreateCardsPanel({ isSidebarCollapsed = false }: { isSidebarColl
           )}
         </div>
       </div>
+
+      {preview && posts.length > 0 && (
+        <div className="w-fit">
+          <label htmlFor="create-cards-total-posts" className="block whitespace-nowrap text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+            Selecione a Quantidade
+          </label>
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              id="create-cards-total-posts"
+              type="number"
+              min={1}
+              value={totalPosts}
+              onChange={(event) => handleTotalPostsChange(Number(event.target.value))}
+              disabled={creating}
+              className="w-24 rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground outline-none transition-colors hover:border-primary/30 focus:border-primary/40 disabled:opacity-60"
+            />
+            <button
+              type="button"
+              onClick={() => handleTotalPostsChange(defaultTotalPosts)}
+              disabled={creating || totalPosts === defaultTotalPosts}
+              title={`Restaurar para ${defaultTotalPosts} (padrão contratado)`}
+              className="rounded-xl border border-border bg-card p-3 text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {loadingPreview && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">

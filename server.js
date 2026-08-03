@@ -1597,7 +1597,42 @@ const CARDS_CLIENT_FIELD_POSTS_CONTRATADOS_ID = 'f019b499-0cd3-4d95-a2a2-ed8223a
 const CARDS_CLIENT_FIELD_LOCAIS_PUBLICACAO_ID = '9c3920b7-fd9e-460f-ac48-d21110fa969c';
 const CARDS_CLIENT_FIELD_LINK_APRESENTACAO_ID = '72f4bb34-de63-4116-a8a0-ebc79c4acdf6';
 const CARDS_CLIENT_FIELD_LINK_DRIVE_ID = 'e9603c0d-1b97-4e66-9f52-d5caacab8379';
-const CARDS_POST_FORMATO_OPTIONS = ['Estático', 'Carrossel', 'Vídeo'];
+const CARDS_FORMATO_OPTIONS_TTL_MS = 1000 * 60 * 60;
+let cachedFormatoOptions = null;
+let cachedFormatoOptionsAt = 0;
+let inflightFormatoOptionsPromise = null;
+
+// Busca as opções reais do campo "Formato de entrega" no modelo do formulário
+// de Posts na Goalfy, em vez de manter uma lista fixa no código (que já ficou
+// desatualizada quando "Stories" foi adicionado na Goalfy sem atualizar aqui).
+async function fetchCardsFormatoOptions({ writeToken }) {
+  const now = Date.now();
+  if (cachedFormatoOptions && now - cachedFormatoOptionsAt < CARDS_FORMATO_OPTIONS_TTL_MS) {
+    return cachedFormatoOptions;
+  }
+  if (inflightFormatoOptionsPromise) {
+    return inflightFormatoOptionsPromise;
+  }
+
+  inflightFormatoOptionsPromise = (async () => {
+    const modelFields = await goalfyApiFetch(`/models/${CARDS_POSTS_MODEL_ID}`, { writeToken });
+    const fields = Array.isArray(modelFields) ? modelFields : modelFields?.fields || [];
+    const formatoField = fields.find((f) => (f.infoId || f.fieldInfoId || f.id) === CARDS_POST_FORMATO_FIELD_ID);
+    const options = (formatoField?.options || [])
+      .map((option) => String(option?.value ?? option?.label ?? '').trim())
+      .filter(Boolean);
+
+    cachedFormatoOptions = options.length > 0 ? options : cachedFormatoOptions;
+    cachedFormatoOptionsAt = Date.now();
+    return cachedFormatoOptions || [];
+  })();
+
+  try {
+    return await inflightFormatoOptionsPromise;
+  } finally {
+    inflightFormatoOptionsPromise = null;
+  }
+}
 
 async function mapWithConcurrency(items, limit, mapFn) {
   const results = new Array(items.length);
@@ -2030,6 +2065,7 @@ app.get('/api/criar-cards/preview', requireAuth, async (req, res) => {
       return;
     }
 
+    const formatoOptions = await fetchCardsFormatoOptions({ writeToken });
     const mesAno = formatMonthYear(primeiroDia);
     const totalPosts = client.postsContratados;
     const titles = buildPostTitles({ clienteNome: client.nome, mesAno, totalPosts });
@@ -2038,7 +2074,7 @@ app.get('/api/criar-cards/preview', requireAuth, async (req, res) => {
       index: index + 1,
       total: totalPosts,
       title,
-      formato: CARDS_POST_FORMATO_OPTIONS[0],
+      formato: formatoOptions[0],
     }));
 
     res.json({
@@ -2050,7 +2086,7 @@ app.get('/api/criar-cards/preview', requireAuth, async (req, res) => {
         hasCopywriter: Boolean(String(client.copywriter || '').trim()),
       },
       posts,
-      formatoOptions: CARDS_POST_FORMATO_OPTIONS,
+      formatoOptions,
     });
   } catch (error) {
     console.error('Criar Cards preview request failed', error);
@@ -2079,13 +2115,19 @@ app.post('/api/criar-cards/create-one', requireAuth, async (req, res) => {
     res.status(400).json({ error: 'dueDate is required' });
     return;
   }
-  if (!title || !CARDS_POST_FORMATO_OPTIONS.includes(formato)) {
+  if (!title) {
     res.status(400).json({ error: 'Invalid title or formato' });
     return;
   }
 
   try {
     const writeToken = getGoalfyCardsWriteToken();
+    const formatoOptions = await fetchCardsFormatoOptions({ writeToken });
+    if (!formatoOptions.includes(formato)) {
+      res.status(400).json({ error: 'Invalid title or formato' });
+      return;
+    }
+
     const card = await goalfyApiFetch('/cards/form?visibleEvent=true', {
       method: 'POST',
       writeToken,
@@ -2166,6 +2208,7 @@ app.post('/api/criar-cards/create-batch', requireAuth, async (req, res) => {
 
   try {
     const writeToken = getGoalfyCardsWriteToken();
+    const formatoOptions = await fetchCardsFormatoOptions({ writeToken });
     const created = [];
     const failed = [];
 
@@ -2173,7 +2216,7 @@ app.post('/api/criar-cards/create-batch', requireAuth, async (req, res) => {
       const title = String(post?.title || '').trim();
       const formato = String(post?.formato || '').trim();
 
-      if (!title || !CARDS_POST_FORMATO_OPTIONS.includes(formato)) {
+      if (!title || !formatoOptions.includes(formato)) {
         failed.push({ title: title || '(sem título)', error: 'Invalid title or formato' });
         continue;
       }
