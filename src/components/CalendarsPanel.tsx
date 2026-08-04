@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { CheckCircle2, Loader2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 type CalendarioInfo = {
   id: string;
@@ -13,8 +23,8 @@ type CalendarioInfo = {
   postsConcluidos: number;
 };
 
-async function fetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, { credentials: 'include' });
+async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
+  const response = await fetch(url, { credentials: 'include', ...options });
   const body = await response.json().catch(() => null);
   if (!response.ok) {
     throw new Error(body?.error || `Erro na requisição (status ${response.status})`);
@@ -87,6 +97,9 @@ export function CalendarsPanel({ selectedMonth, selectedYear, selectedDesigner, 
   const [clientes, setClientes] = useState<ClienteInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [calendarToConclude, setCalendarToConclude] = useState<CalendarioInfo | null>(null);
+  const [concluding, setConcluding] = useState(false);
+  const [concludeError, setConcludeError] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -164,6 +177,25 @@ export function CalendarsPanel({ selectedMonth, selectedYear, selectedDesigner, 
     });
   }, [visibleCalendarios, selectedMonth, selectedYear, selectedDesigner, designerByClientName]);
 
+  async function handleConfirmConclude() {
+    if (!calendarToConclude) return;
+    setConcluding(true);
+    setConcludeError(null);
+    try {
+      await fetchJson('/api/criar-cards/move-calendar-to-posts-programados', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ calendarId: calendarToConclude.id }),
+      });
+      setCalendarios((prev) => prev.filter((c) => c.id !== calendarToConclude.id));
+      setCalendarToConclude(null);
+    } catch (err) {
+      setConcludeError(err instanceof Error ? err.message : 'Erro ao concluir calendário');
+    } finally {
+      setConcluding(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -203,9 +235,22 @@ export function CalendarsPanel({ selectedMonth, selectedYear, selectedDesigner, 
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
                 {group.items.map((calendario) => (
-                  <div key={calendario.id} className="space-y-2 rounded-xl border border-border bg-card p-3">
+                  <div key={calendario.id} className="group relative space-y-2 rounded-xl border border-border bg-card p-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConcludeError(null);
+                        setCalendarToConclude(calendario);
+                      }}
+                      title="Concluir calendário"
+                      aria-label="Concluir calendário"
+                      className="absolute right-2 top-2 rounded-full p-1 text-muted-foreground opacity-0 transition-opacity hover:text-emerald-500 focus-visible:opacity-100 focus-visible:outline-none group-hover:opacity-100"
+                    >
+                      <CheckCircle2 className="h-4 w-4" />
+                    </button>
+
                     <div>
-                      <h3 className="text-sm font-semibold text-foreground">{calendario.title}</h3>
+                      <h3 className="pr-5 text-sm font-semibold text-foreground">{calendario.title}</h3>
                       <div className="mt-1.5 flex flex-wrap gap-1.5">
                         <span
                           className="rounded border px-2 py-0.5 text-[11px] font-bold uppercase"
@@ -232,6 +277,42 @@ export function CalendarsPanel({ selectedMonth, selectedYear, selectedDesigner, 
           ))}
         </div>
       )}
+
+      <AlertDialog
+        open={calendarToConclude != null}
+        onOpenChange={(open) => {
+          if (!open && !concluding) {
+            setCalendarToConclude(null);
+            setConcludeError(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Concluir calendário?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {calendarToConclude
+                ? `"${calendarToConclude.title}" será movido para Posts Programados e deixará de aparecer nesta lista.`
+                : ''}
+              {concludeError && (
+                <span className="mt-2 block text-destructive">{concludeError}</span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={concluding}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                handleConfirmConclude();
+              }}
+              disabled={concluding}
+            >
+              {concluding ? 'Concluindo...' : 'Concluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

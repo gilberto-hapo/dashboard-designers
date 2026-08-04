@@ -2188,6 +2188,27 @@ app.post('/api/criar-cards/move-calendar-to-em-andamento', requireAuth, async (r
   }
 });
 
+app.post('/api/criar-cards/move-calendar-to-posts-programados', requireAuth, async (req, res) => {
+  const calendarId = String(req.body?.calendarId || '').trim();
+  if (!calendarId) {
+    res.status(400).json({ error: 'calendarId is required' });
+    return;
+  }
+
+  try {
+    const writeToken = getGoalfyCardsWriteToken();
+    await goalfyApiFetch(`/cards/moveTo/${calendarId}`, {
+      method: 'PUT',
+      writeToken,
+      body: { phaseId: CARDS_CALENDAR_PHASE_POSTS_PROGRAMADOS_ID },
+    });
+    res.json({ ok: true });
+  } catch (error) {
+    logServerEvent('Criar Cards: calendar move to Posts Programados failed', { calendarId, error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/criar-cards/create-batch', requireAuth, async (req, res) => {
   const calendarId = String(req.body?.calendarId || '').trim();
   const dueDate = String(req.body?.dueDate || '').trim();
