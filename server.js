@@ -380,6 +380,7 @@ function buildTaskFromPostCard(card, cardDetail, calendarMetaById) {
   return {
     id: card.id,
     contentType: parseContentType(tags),
+    formatoEntrega: findFieldValue(fields, CARDS_POST_FORMATO_FIELD_ID) || '',
     statusTags: parseStatusTags(tags),
     title: card.title,
     parceiro: calendarMeta?.clienteNome || 'Sem parceiro',
@@ -1902,6 +1903,7 @@ async function fetchAllCalendarsWithPhase({ writeToken }) {
     const cardDetail = await goalfyApiFetch(`/cards/${card.id}`, { writeToken });
     const clienteNome = findFieldValue(cardDetail.form?.fields, CARDS_CALENDAR_FIELD_CLIENTE_ID);
     const primeiroDia = findFieldDateValue(cardDetail.form?.fields, CARDS_CALENDAR_FIELD_PRIMEIRO_DIA_ID);
+    const linkCalendarioEditorial = findFieldValue(cardDetail.form?.fields, CARDS_CALENDAR_FIELD_LINK_EDITORIAL_ID);
     const phase = CARDS_CALENDAR_PHASES[card.phaseId] || { title: card.phase || 'Sem fase', color: '#71717a' };
 
     calendarios.push({
@@ -1911,6 +1913,7 @@ async function fetchAllCalendarsWithPhase({ writeToken }) {
       mesAno: formatMonthYear(primeiroDia),
       phaseTitle: phase.title,
       phaseColor: phase.color,
+      linkCalendarioEditorial: linkCalendarioEditorial || '',
     });
   }
 
@@ -1942,6 +1945,7 @@ app.get('/api/calendarios', requireAuth, async (_req, res) => {
         mesAno: calendario.mesAno,
         phaseTitle: calendario.phaseTitle,
         phaseColor: calendario.phaseColor,
+        linkCalendarioEditorial: calendario.linkCalendarioEditorial,
         postsContratados: client?.postsContratados ?? 0,
         postsConectados: linkedTasks.length,
         postsConcluidos,
@@ -1949,7 +1953,7 @@ app.get('/api/calendarios', requireAuth, async (_req, res) => {
           id: task.id,
           title: task.title,
           stage: task.stage,
-          contentType: task.contentType,
+          formatoEntrega: task.formatoEntrega,
           dataVencimento: task.dataVencimento,
           concluidoEm: task.concluidoEm,
         })),

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Loader2 } from 'lucide-react';
+import { CheckCircle2, ExternalLink, Loader2 } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,7 +26,7 @@ type CalendarioPost = {
   id: string;
   title: string;
   stage: Stage;
-  contentType: string;
+  formatoEntrega: string;
   dataVencimento: string | null;
   concluidoEm: string | null;
 };
@@ -48,6 +48,7 @@ type CalendarioInfo = {
   mesAno: string;
   phaseTitle: string;
   phaseColor: string;
+  linkCalendarioEditorial: string;
   postsContratados: number;
   postsConectados: number;
   postsConcluidos: number;
@@ -311,7 +312,7 @@ export function CalendarsPanel({ selectedMonth, selectedYear, selectedDesigner, 
       )}
 
       <Dialog open={selectedCalendar != null} onOpenChange={(open) => !open && setSelectedCalendar(null)}>
-        <DialogContent className="max-h-[85vh] max-w-xl overflow-y-auto">
+        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
           {selectedCalendar && (
             <>
               <DialogHeader>
@@ -349,7 +350,14 @@ export function CalendarsPanel({ selectedMonth, selectedYear, selectedDesigner, 
                         key={post.id}
                         className="flex items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm"
                       >
-                        <span className="truncate text-xs font-medium text-foreground">{post.title}</span>
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <span className="truncate text-xs font-medium text-foreground">{post.title}</span>
+                          {post.formatoEntrega && (
+                            <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
+                              {post.formatoEntrega}
+                            </span>
+                          )}
+                        </div>
                         <span
                           className={`shrink-0 rounded border px-2 py-0.5 text-[11px] font-bold uppercase ${
                             stageBadgeClasses[post.stage] ?? 'border-zinc-400/25 bg-zinc-900 text-zinc-200'
@@ -363,7 +371,17 @@ export function CalendarsPanel({ selectedMonth, selectedYear, selectedDesigner, 
                 )}
               </div>
 
-              <DialogFooter>
+              <DialogFooter className="sm:justify-between">
+                {selectedCalendar.linkCalendarioEditorial ? (
+                  <Button variant="outline" className="gap-2" asChild>
+                    <a href={selectedCalendar.linkCalendarioEditorial} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="h-4 w-4" />
+                      Calendário editorial
+                    </a>
+                  </Button>
+                ) : (
+                  <span />
+                )}
                 <Button
                   variant="outline"
                   className="gap-2 text-muted-foreground hover:text-foreground"
