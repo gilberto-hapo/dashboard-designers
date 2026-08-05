@@ -13,7 +13,6 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -55,6 +54,19 @@ type CalendarioInfo = {
   posts: CalendarioPost[];
 };
 
+function getConclusionProgress(calendario: CalendarioInfo) {
+  const total = calendario.postsConectados;
+  const percent = total > 0 ? Math.round((calendario.postsConcluidos / total) * 100) : 0;
+  const clampedPercent = Math.min(100, Math.max(0, percent));
+
+  const barColor =
+    clampedPercent >= 67 ? 'bg-emerald-500' : clampedPercent >= 34 ? 'bg-yellow-400' : 'bg-red-500';
+  const textColor =
+    clampedPercent >= 67 ? 'text-emerald-500' : clampedPercent >= 34 ? 'text-yellow-400' : 'text-red-500';
+
+  return { percent: clampedPercent, barColor, textColor };
+}
+
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, { credentials: 'include', ...options });
   const body = await response.json().catch(() => null);
@@ -62,6 +74,21 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
     throw new Error(body?.error || `Erro na requisição (status ${response.status})`);
   }
   return body as T;
+}
+
+function ConclusionPercentLabel({ progress }: { progress: ReturnType<typeof getConclusionProgress> }) {
+  return <span className={`shrink-0 text-xs font-bold ${progress.textColor}`}>{progress.percent}%</span>;
+}
+
+function ConclusionBar({ progress }: { progress: ReturnType<typeof getConclusionProgress> }) {
+  return (
+    <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+      <div
+        className={`h-full rounded-full transition-all ${progress.barColor}`}
+        style={{ width: `${progress.percent}%` }}
+      />
+    </div>
+  );
 }
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -268,43 +295,55 @@ export function CalendarsPanel({ selectedMonth, selectedYear, selectedDesigner, 
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
-                {group.items.map((calendario) => (
-                  <div
-                    key={calendario.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => setSelectedCalendar(calendario)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        setSelectedCalendar(calendario);
-                      }
-                    }}
-                    className="group relative space-y-2 rounded-xl border border-border bg-card p-3 cursor-pointer transition-colors hover:border-primary/50"
-                  >
-                    <div>
-                      <h3 className="text-sm font-semibold text-foreground">{calendario.title}</h3>
-                      <div className="mt-1.5 flex flex-wrap gap-1.5">
-                        <span
-                          className="rounded border px-2 py-0.5 text-[11px] font-bold uppercase"
-                          style={{
-                            borderColor: calendario.phaseColor,
-                            backgroundColor: `${calendario.phaseColor}1a`,
-                            color: calendario.phaseColor,
-                          }}
-                        >
-                          {calendario.phaseTitle}
-                        </span>
+                {group.items.map((calendario) => {
+                  const progress = getConclusionProgress(calendario);
+
+                  return (
+                    <div
+                      key={calendario.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setSelectedCalendar(calendario)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          setSelectedCalendar(calendario);
+                        }
+                      }}
+                      className={`group relative space-y-2 rounded-xl border p-3 cursor-pointer transition-colors ${
+                        progress?.percent === 100
+                          ? 'border-emerald-500/40 bg-emerald-500/15 hover:border-emerald-500/60'
+                          : 'border-border bg-card hover:border-primary/50'
+                      }`}
+                    >
+                      <div>
+                        <h3 className="text-sm font-semibold text-foreground">{calendario.title}</h3>
+                        <div className="mt-1.5 flex items-center justify-between gap-1.5">
+                          <span
+                            className="rounded border px-2 py-0.5 text-[11px] font-bold uppercase"
+                            style={{
+                              borderColor: calendario.phaseColor,
+                              backgroundColor: `${calendario.phaseColor}1a`,
+                              color: calendario.phaseColor,
+                            }}
+                          >
+                            {calendario.phaseTitle}
+                          </span>
+                          <ConclusionPercentLabel progress={progress} />
+                        </div>
+                        <div className="mt-3">
+                          <ConclusionBar progress={progress} />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1 pt-1">
+                        <InfoRow label="Posts Contratados" value={calendario.postsContratados} />
+                        <InfoRow label="Posts Criados" value={calendario.postsConectados} />
+                        <InfoRow label="Posts Concluídos" value={calendario.postsConcluidos} />
                       </div>
                     </div>
-
-                    <div className="space-y-1 border-t border-border pt-2">
-                      <InfoRow label="Posts Contratados" value={calendario.postsContratados} />
-                      <InfoRow label="Posts Criados" value={calendario.postsConectados} />
-                      <InfoRow label="Posts Concluídos" value={calendario.postsConcluidos} />
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ))}
@@ -317,9 +356,9 @@ export function CalendarsPanel({ selectedMonth, selectedYear, selectedDesigner, 
             <>
               <DialogHeader>
                 <DialogTitle>{selectedCalendar.title}</DialogTitle>
-                <DialogDescription>
+                <div className="flex items-center justify-between gap-1.5">
                   <span
-                    className="mt-1 inline-flex rounded border px-2 py-0.5 text-[11px] font-bold uppercase"
+                    className="inline-flex rounded border px-2 py-0.5 text-[11px] font-bold uppercase"
                     style={{
                       borderColor: selectedCalendar.phaseColor,
                       backgroundColor: `${selectedCalendar.phaseColor}1a`,
@@ -328,7 +367,11 @@ export function CalendarsPanel({ selectedMonth, selectedYear, selectedDesigner, 
                   >
                     {selectedCalendar.phaseTitle}
                   </span>
-                </DialogDescription>
+                  <ConclusionPercentLabel progress={getConclusionProgress(selectedCalendar)} />
+                </div>
+                <div className="!mt-5">
+                  <ConclusionBar progress={getConclusionProgress(selectedCalendar)} />
+                </div>
               </DialogHeader>
 
               <div className="space-y-1 rounded-lg border border-border bg-muted/30 p-3">
