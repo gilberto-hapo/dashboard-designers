@@ -10,6 +10,36 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { stageLabels } from '@/lib/data';
+import type { Stage } from '@/lib/data';
+
+type CalendarioPost = {
+  id: string;
+  title: string;
+  stage: Stage;
+  contentType: string;
+  dataVencimento: string | null;
+  concluidoEm: string | null;
+};
+
+const stageBadgeClasses: Record<Stage, string> = {
+  fazer: 'border-red-500/70 bg-red-950 text-red-50',
+  executando: 'border-yellow-300/70 bg-yellow-700/55 text-yellow-50',
+  direcao_arte: 'border-purple-500/70 bg-purple-950 text-purple-50',
+  montagem: 'border-orange-400/95 bg-[rgb(182_75_0_/_35%)] text-orange-50',
+  validacao: 'border-sky-400/70 bg-sky-950 text-sky-50',
+  aprovado_programacao: 'border-lime-400/70 bg-lime-950 text-lime-50',
+  concluido: 'border-zinc-500/20 bg-zinc-900 text-zinc-200',
+};
 
 type CalendarioInfo = {
   id: string;
@@ -21,6 +51,7 @@ type CalendarioInfo = {
   postsContratados: number;
   postsConectados: number;
   postsConcluidos: number;
+  posts: CalendarioPost[];
 };
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
@@ -100,6 +131,7 @@ export function CalendarsPanel({ selectedMonth, selectedYear, selectedDesigner, 
   const [calendarToConclude, setCalendarToConclude] = useState<CalendarioInfo | null>(null);
   const [concluding, setConcluding] = useState(false);
   const [concludeError, setConcludeError] = useState<string | null>(null);
+  const [selectedCalendar, setSelectedCalendar] = useState<CalendarioInfo | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -189,6 +221,7 @@ export function CalendarsPanel({ selectedMonth, selectedYear, selectedDesigner, 
       });
       setCalendarios((prev) => prev.filter((c) => c.id !== calendarToConclude.id));
       setCalendarToConclude(null);
+      setSelectedCalendar((prev) => (prev?.id === calendarToConclude.id ? null : prev));
     } catch (err) {
       setConcludeError(err instanceof Error ? err.message : 'Erro ao concluir calendário');
     } finally {
@@ -235,22 +268,21 @@ export function CalendarsPanel({ selectedMonth, selectedYear, selectedDesigner, 
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
                 {group.items.map((calendario) => (
-                  <div key={calendario.id} className="group relative space-y-2 rounded-xl border border-border bg-card p-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setConcludeError(null);
-                        setCalendarToConclude(calendario);
-                      }}
-                      title="Concluir calendário"
-                      aria-label="Concluir calendário"
-                      className="absolute right-2 top-2 rounded-full p-1 text-muted-foreground opacity-0 transition-opacity hover:text-emerald-500 focus-visible:opacity-100 focus-visible:outline-none group-hover:opacity-100"
-                    >
-                      <CheckCircle2 className="h-4 w-4" />
-                    </button>
-
+                  <div
+                    key={calendario.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setSelectedCalendar(calendario)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        setSelectedCalendar(calendario);
+                      }
+                    }}
+                    className="group relative space-y-2 rounded-xl border border-border bg-card p-3 cursor-pointer transition-colors hover:border-primary/50"
+                  >
                     <div>
-                      <h3 className="pr-5 text-sm font-semibold text-foreground">{calendario.title}</h3>
+                      <h3 className="text-sm font-semibold text-foreground">{calendario.title}</h3>
                       <div className="mt-1.5 flex flex-wrap gap-1.5">
                         <span
                           className="rounded border px-2 py-0.5 text-[11px] font-bold uppercase"
@@ -277,6 +309,77 @@ export function CalendarsPanel({ selectedMonth, selectedYear, selectedDesigner, 
           ))}
         </div>
       )}
+
+      <Dialog open={selectedCalendar != null} onOpenChange={(open) => !open && setSelectedCalendar(null)}>
+        <DialogContent className="max-h-[85vh] max-w-xl overflow-y-auto">
+          {selectedCalendar && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{selectedCalendar.title}</DialogTitle>
+                <DialogDescription>
+                  <span
+                    className="mt-1 inline-flex rounded border px-2 py-0.5 text-[11px] font-bold uppercase"
+                    style={{
+                      borderColor: selectedCalendar.phaseColor,
+                      backgroundColor: `${selectedCalendar.phaseColor}1a`,
+                      color: selectedCalendar.phaseColor,
+                    }}
+                  >
+                    {selectedCalendar.phaseTitle}
+                  </span>
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-1 rounded-lg border border-border bg-muted/30 p-3">
+                <InfoRow label="Posts Contratados" value={selectedCalendar.postsContratados} />
+                <InfoRow label="Posts Criados" value={selectedCalendar.postsConectados} />
+                <InfoRow label="Posts Concluídos" value={selectedCalendar.postsConcluidos} />
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Posts conectados ({(selectedCalendar.posts ?? []).length})
+                </h4>
+                {(selectedCalendar.posts ?? []).length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Nenhum post conectado a este calendário.</p>
+                ) : (
+                  <ul className="max-h-64 space-y-1.5 overflow-y-auto">
+                    {(selectedCalendar.posts ?? []).map((post) => (
+                      <li
+                        key={post.id}
+                        className="flex items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm"
+                      >
+                        <span className="truncate text-xs font-medium text-foreground">{post.title}</span>
+                        <span
+                          className={`shrink-0 rounded border px-2 py-0.5 text-[11px] font-bold uppercase ${
+                            stageBadgeClasses[post.stage] ?? 'border-zinc-400/25 bg-zinc-900 text-zinc-200'
+                          }`}
+                        >
+                          {stageLabels[post.stage] ?? post.stage}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  className="gap-2 text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    setConcludeError(null);
+                    setCalendarToConclude(selectedCalendar);
+                  }}
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  Concluir calendário
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog
         open={calendarToConclude != null}

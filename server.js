@@ -1945,6 +1945,14 @@ app.get('/api/calendarios', requireAuth, async (_req, res) => {
         postsContratados: client?.postsContratados ?? 0,
         postsConectados: linkedTasks.length,
         postsConcluidos,
+        posts: linkedTasks.map((task) => ({
+          id: task.id,
+          title: task.title,
+          stage: task.stage,
+          contentType: task.contentType,
+          dataVencimento: task.dataVencimento,
+          concluidoEm: task.concluidoEm,
+        })),
       };
     });
 
