@@ -1946,6 +1946,7 @@ app.get('/api/calendarios', requireAuth, async (_req, res) => {
         phaseTitle: calendario.phaseTitle,
         phaseColor: calendario.phaseColor,
         linkCalendarioEditorial: calendario.linkCalendarioEditorial,
+        designer: client?.designer || '',
         postsContratados: client?.postsContratados ?? 0,
         postsConectados: linkedTasks.length,
         postsConcluidos,

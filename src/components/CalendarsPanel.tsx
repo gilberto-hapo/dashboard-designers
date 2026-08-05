@@ -48,6 +48,7 @@ type CalendarioInfo = {
   phaseTitle: string;
   phaseColor: string;
   linkCalendarioEditorial: string;
+  designer: string;
   postsContratados: number;
   postsConectados: number;
   postsConcluidos: number;
@@ -65,6 +66,10 @@ function getConclusionProgress(calendario: CalendarioInfo) {
     clampedPercent >= 67 ? 'text-emerald-500' : clampedPercent >= 34 ? 'text-yellow-400' : 'text-red-500';
 
   return { percent: clampedPercent, barColor, textColor };
+}
+
+function getFirstName(fullName: string) {
+  return fullName.trim().split(/\s+/)[0] || '';
 }
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
@@ -319,16 +324,23 @@ export function CalendarsPanel({ selectedMonth, selectedYear, selectedDesigner, 
                       <div>
                         <h3 className="text-sm font-semibold text-foreground">{calendario.title}</h3>
                         <div className="mt-1.5 flex items-center justify-between gap-1.5">
-                          <span
-                            className="rounded border px-2 py-0.5 text-[11px] font-bold uppercase"
-                            style={{
-                              borderColor: calendario.phaseColor,
-                              backgroundColor: `${calendario.phaseColor}1a`,
-                              color: calendario.phaseColor,
-                            }}
-                          >
-                            {calendario.phaseTitle}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className="rounded border px-2 py-0.5 text-[11px] font-bold uppercase"
+                              style={{
+                                borderColor: calendario.phaseColor,
+                                backgroundColor: `${calendario.phaseColor}1a`,
+                                color: calendario.phaseColor,
+                              }}
+                            >
+                              {calendario.phaseTitle}
+                            </span>
+                            {calendario.designer && (
+                              <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
+                                {getFirstName(calendario.designer)}
+                              </span>
+                            )}
+                          </div>
                           <ConclusionPercentLabel progress={progress} />
                         </div>
                         <div className="mt-3">
@@ -357,16 +369,23 @@ export function CalendarsPanel({ selectedMonth, selectedYear, selectedDesigner, 
               <DialogHeader>
                 <DialogTitle>{selectedCalendar.title}</DialogTitle>
                 <div className="flex items-center justify-between gap-1.5">
-                  <span
-                    className="inline-flex rounded border px-2 py-0.5 text-[11px] font-bold uppercase"
-                    style={{
-                      borderColor: selectedCalendar.phaseColor,
-                      backgroundColor: `${selectedCalendar.phaseColor}1a`,
-                      color: selectedCalendar.phaseColor,
-                    }}
-                  >
-                    {selectedCalendar.phaseTitle}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className="inline-flex rounded border px-2 py-0.5 text-[11px] font-bold uppercase"
+                      style={{
+                        borderColor: selectedCalendar.phaseColor,
+                        backgroundColor: `${selectedCalendar.phaseColor}1a`,
+                        color: selectedCalendar.phaseColor,
+                      }}
+                    >
+                      {selectedCalendar.phaseTitle}
+                    </span>
+                    {selectedCalendar.designer && (
+                      <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
+                        {getFirstName(selectedCalendar.designer)}
+                      </span>
+                    )}
+                  </div>
                   <ConclusionPercentLabel progress={getConclusionProgress(selectedCalendar)} />
                 </div>
                 <div className="!mt-5">
