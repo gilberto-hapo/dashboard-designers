@@ -5,9 +5,23 @@ const DRIVE_FOLDER_TTL_MS = 1000 * 60 * 5;
 const cache = new Map();
 
 function getAuth() {
+  const credentialsJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  if (credentialsJson) {
+    let credentials;
+    try {
+      credentials = JSON.parse(credentialsJson);
+    } catch (error) {
+      throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON');
+    }
+    return new google.auth.GoogleAuth({
+      credentials,
+      scopes: ['https://www.googleapis.com/auth/drive.readonly'],
+    });
+  }
+
   const keyFile = process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE;
   if (!keyFile) {
-    throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY_FILE not configured');
+    throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_SERVICE_ACCOUNT_KEY_FILE must be configured');
   }
   return new google.auth.GoogleAuth({
     keyFile,
