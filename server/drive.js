@@ -4,14 +4,26 @@ import mammoth from 'mammoth';
 const DRIVE_FOLDER_TTL_MS = 1000 * 60 * 5;
 const cache = new Map();
 
+function parseServiceAccountJson(raw) {
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    // Alguns paineis de hospedagem nao preservam bem aspas/quebras de linha em
+    // variaveis de ambiente coladas manualmente; aceitar Base64 evita esse problema.
+    try {
+      return JSON.parse(Buffer.from(raw, 'base64').toString('utf8'));
+    } catch (base64Error) {
+      return null;
+    }
+  }
+}
+
 function getAuth() {
   const credentialsJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
   if (credentialsJson) {
-    let credentials;
-    try {
-      credentials = JSON.parse(credentialsJson);
-    } catch (error) {
-      throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON');
+    const credentials = parseServiceAccountJson(credentialsJson);
+    if (!credentials) {
+      throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON (nem em texto puro, nem em Base64)');
     }
     return new google.auth.GoogleAuth({
       credentials,
