@@ -11,6 +11,8 @@ node_modules
 dist
 dist-ssr
 data/
+secrets/
+.claude/scheduled_tasks.lock
 *.local
 .env
 .env.*

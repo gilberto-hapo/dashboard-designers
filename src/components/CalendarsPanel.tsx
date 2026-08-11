@@ -1,44 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, ExternalLink, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { stageLabels } from '@/lib/data';
-import type { Stage } from '@/lib/data';
-
-type CalendarioPost = {
-  id: string;
-  title: string;
-  stage: Stage;
-  formatoEntrega: string;
-  dataVencimento: string | null;
-  concluidoEm: string | null;
-};
-
-const stageBadgeClasses: Record<Stage, string> = {
-  fazer: 'border-red-500/70 bg-red-950 text-red-50',
-  executando: 'border-yellow-300/70 bg-yellow-700/55 text-yellow-50',
-  direcao_arte: 'border-purple-500/70 bg-purple-950 text-purple-50',
-  montagem: 'border-orange-400/95 bg-[rgb(182_75_0_/_35%)] text-orange-50',
-  validacao: 'border-sky-400/70 bg-sky-950 text-sky-50',
-  aprovado_programacao: 'border-lime-400/70 bg-lime-950 text-lime-50',
-  concluido: 'border-zinc-500/20 bg-zinc-900 text-zinc-200',
-};
+  ConclusionBar,
+  ConclusionPercentLabel,
+  fetchJson,
+  getConclusionProgress,
+  getFirstName,
+  InfoRow,
+} from '@/lib/calendarUi';
 
 type CalendarioInfo = {
   id: string;
@@ -52,58 +22,7 @@ type CalendarioInfo = {
   postsContratados: number;
   postsConectados: number;
   postsConcluidos: number;
-  posts: CalendarioPost[];
 };
-
-function getConclusionProgress(calendario: CalendarioInfo) {
-  const total = calendario.postsConectados;
-  const percent = total > 0 ? Math.round((calendario.postsConcluidos / total) * 100) : 0;
-  const clampedPercent = Math.min(100, Math.max(0, percent));
-
-  const barColor =
-    clampedPercent >= 67 ? 'bg-emerald-500' : clampedPercent >= 34 ? 'bg-yellow-400' : 'bg-red-500';
-  const textColor =
-    clampedPercent >= 67 ? 'text-emerald-500' : clampedPercent >= 34 ? 'text-yellow-400' : 'text-red-500';
-
-  return { percent: clampedPercent, barColor, textColor };
-}
-
-function getFirstName(fullName: string) {
-  return fullName.trim().split(/\s+/)[0] || '';
-}
-
-async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(url, { credentials: 'include', ...options });
-  const body = await response.json().catch(() => null);
-  if (!response.ok) {
-    throw new Error(body?.error || `Erro na requisição (status ${response.status})`);
-  }
-  return body as T;
-}
-
-function ConclusionPercentLabel({ progress }: { progress: ReturnType<typeof getConclusionProgress> }) {
-  return <span className={`shrink-0 text-xs font-bold ${progress.textColor}`}>{progress.percent}%</span>;
-}
-
-function ConclusionBar({ progress }: { progress: ReturnType<typeof getConclusionProgress> }) {
-  return (
-    <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-      <div
-        className={`h-full rounded-full transition-all ${progress.barColor}`}
-        style={{ width: `${progress.percent}%` }}
-      />
-    </div>
-  );
-}
-
-function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-2 text-xs">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="text-right font-medium text-foreground">{value}</span>
-    </div>
-  );
-}
 
 const MONTH_ORDER = [
   'JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO',
@@ -152,19 +71,23 @@ type CalendarsPanelProps = {
   selectedYear: string;
   selectedDesigner: string;
   onFilterOptionsChange?: (options: CalendarsFilterOptions) => void;
+  refreshSignal?: number;
 };
 
 type ClienteInfo = { nome?: string; designer?: string };
 
-export function CalendarsPanel({ selectedMonth, selectedYear, selectedDesigner, onFilterOptionsChange }: CalendarsPanelProps) {
+export function CalendarsPanel({
+  selectedMonth,
+  selectedYear,
+  selectedDesigner,
+  onFilterOptionsChange,
+  refreshSignal,
+}: CalendarsPanelProps) {
+  const navigate = useNavigate();
   const [calendarios, setCalendarios] = useState<CalendarioInfo[]>([]);
   const [clientes, setClientes] = useState<ClienteInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [calendarToConclude, setCalendarToConclude] = useState<CalendarioInfo | null>(null);
-  const [concluding, setConcluding] = useState(false);
-  const [concludeError, setConcludeError] = useState<string | null>(null);
-  const [selectedCalendar, setSelectedCalendar] = useState<CalendarioInfo | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -177,7 +100,7 @@ export function CalendarsPanel({ selectedMonth, selectedYear, selectedDesigner, 
     fetchJson<{ clients: ClienteInfo[] }>('/api/clientes')
       .then((data) => setClientes(data.clients))
       .catch(() => setClientes([]));
-  }, []);
+  }, [refreshSignal]);
 
   const totalClientes = clientes.length || null;
 
@@ -242,26 +165,6 @@ export function CalendarsPanel({ selectedMonth, selectedYear, selectedDesigner, 
     });
   }, [visibleCalendarios, selectedMonth, selectedYear, selectedDesigner, designerByClientName]);
 
-  async function handleConfirmConclude() {
-    if (!calendarToConclude) return;
-    setConcluding(true);
-    setConcludeError(null);
-    try {
-      await fetchJson('/api/criar-cards/move-calendar-to-posts-programados', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ calendarId: calendarToConclude.id }),
-      });
-      setCalendarios((prev) => prev.filter((c) => c.id !== calendarToConclude.id));
-      setCalendarToConclude(null);
-      setSelectedCalendar((prev) => (prev?.id === calendarToConclude.id ? null : prev));
-    } catch (err) {
-      setConcludeError(err instanceof Error ? err.message : 'Erro ao concluir calendário');
-    } finally {
-      setConcluding(false);
-    }
-  }
-
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -308,11 +211,11 @@ export function CalendarsPanel({ selectedMonth, selectedYear, selectedDesigner, 
                       key={calendario.id}
                       role="button"
                       tabIndex={0}
-                      onClick={() => setSelectedCalendar(calendario)}
+                      onClick={() => navigate(`/calendarios/${calendario.id}`)}
                       onKeyDown={(event) => {
                         if (event.key === 'Enter' || event.key === ' ') {
                           event.preventDefault();
-                          setSelectedCalendar(calendario);
+                          navigate(`/calendarios/${calendario.id}`);
                         }
                       }}
                       className={`group relative space-y-2 rounded-xl border p-3 cursor-pointer transition-colors ${
@@ -361,141 +264,6 @@ export function CalendarsPanel({ selectedMonth, selectedYear, selectedDesigner, 
           ))}
         </div>
       )}
-
-      <Dialog open={selectedCalendar != null} onOpenChange={(open) => !open && setSelectedCalendar(null)}>
-        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
-          {selectedCalendar && (
-            <>
-              <DialogHeader>
-                <DialogTitle>{selectedCalendar.title}</DialogTitle>
-                <div className="flex items-center justify-between gap-1.5">
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      className="inline-flex rounded border px-2 py-0.5 text-[11px] font-bold uppercase"
-                      style={{
-                        borderColor: selectedCalendar.phaseColor,
-                        backgroundColor: `${selectedCalendar.phaseColor}1a`,
-                        color: selectedCalendar.phaseColor,
-                      }}
-                    >
-                      {selectedCalendar.phaseTitle}
-                    </span>
-                    {selectedCalendar.designer && (
-                      <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
-                        {getFirstName(selectedCalendar.designer)}
-                      </span>
-                    )}
-                  </div>
-                  <ConclusionPercentLabel progress={getConclusionProgress(selectedCalendar)} />
-                </div>
-                <div className="!mt-5">
-                  <ConclusionBar progress={getConclusionProgress(selectedCalendar)} />
-                </div>
-              </DialogHeader>
-
-              <div className="space-y-1 rounded-lg border border-border bg-muted/30 p-3">
-                <InfoRow label="Posts Contratados" value={selectedCalendar.postsContratados} />
-                <InfoRow label="Posts Criados" value={selectedCalendar.postsConectados} />
-                <InfoRow label="Posts Concluídos" value={selectedCalendar.postsConcluidos} />
-              </div>
-
-              <div className="space-y-2">
-                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Posts conectados ({(selectedCalendar.posts ?? []).length})
-                </h4>
-                {(selectedCalendar.posts ?? []).length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Nenhum post conectado a este calendário.</p>
-                ) : (
-                  <ul className="max-h-64 space-y-1.5 overflow-y-auto">
-                    {(selectedCalendar.posts ?? []).map((post) => (
-                      <li
-                        key={post.id}
-                        className="flex items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm"
-                      >
-                        <div className="flex min-w-0 items-center gap-1.5">
-                          <span className="truncate text-xs font-medium text-foreground">{post.title}</span>
-                          {post.formatoEntrega && (
-                            <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
-                              {post.formatoEntrega}
-                            </span>
-                          )}
-                        </div>
-                        <span
-                          className={`shrink-0 rounded border px-2 py-0.5 text-[11px] font-bold uppercase ${
-                            stageBadgeClasses[post.stage] ?? 'border-zinc-400/25 bg-zinc-900 text-zinc-200'
-                          }`}
-                        >
-                          {stageLabels[post.stage] ?? post.stage}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              <DialogFooter className="sm:justify-between">
-                {selectedCalendar.linkCalendarioEditorial ? (
-                  <Button variant="outline" className="gap-2" asChild>
-                    <a href={selectedCalendar.linkCalendarioEditorial} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink className="h-4 w-4" />
-                      Calendário editorial
-                    </a>
-                  </Button>
-                ) : (
-                  <span />
-                )}
-                <Button
-                  variant="outline"
-                  className="gap-2 text-muted-foreground hover:text-foreground"
-                  onClick={() => {
-                    setConcludeError(null);
-                    setCalendarToConclude(selectedCalendar);
-                  }}
-                >
-                  <CheckCircle2 className="h-4 w-4" />
-                  Concluir calendário
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog
-        open={calendarToConclude != null}
-        onOpenChange={(open) => {
-          if (!open && !concluding) {
-            setCalendarToConclude(null);
-            setConcludeError(null);
-          }
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Concluir calendário?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {calendarToConclude
-                ? `"${calendarToConclude.title}" será movido para Posts Programados e deixará de aparecer nesta lista.`
-                : ''}
-              {concludeError && (
-                <span className="mt-2 block text-destructive">{concludeError}</span>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={concluding}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(event) => {
-                event.preventDefault();
-                handleConfirmConclude();
-              }}
-              disabled={concluding}
-            >
-              {concluding ? 'Concluindo...' : 'Concluir'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

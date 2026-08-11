@@ -6,6 +6,15 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 import { createServer as createViteServer } from 'vite';
+import {
+  insertPostDecision,
+  markDecisionSyncStatus,
+  getLatestDecisionsForCalendar,
+  getDecisionHistoryForPost,
+  markAdjustmentsResolvedForPost,
+  getAdjustmentResolvedAtForPost,
+} from './server/db.js';
+import { listCalendarPostFolders, getDriveFileStream, getDriveFileMetadata } from './server/drive.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -248,6 +257,42 @@ function verifySessionToken(token) {
   return payload.user;
 }
 
+// Token de acesso público a um calendário (portal do cliente) — mesmo esquema
+// HMAC do token de sessão, mas sem usuário e sem expiração curta (o link é
+// enviado ao cliente para uso ao longo de todo o mês do calendário).
+function createCalendarShareToken(calendarId) {
+  const secret = getRequiredEnv('SESSION_SECRET');
+  const payload = { calendarId };
+  const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const signature = crypto
+    .createHmac('sha256', secret)
+    .update(encodedPayload)
+    .digest('base64url');
+
+  return `${encodedPayload}.${signature}`;
+}
+
+function verifyCalendarShareToken(token) {
+  const secret = getRequiredEnv('SESSION_SECRET');
+  const [encodedPayload, signature] = String(token || '').split('.');
+
+  if (!encodedPayload || !signature) {
+    return null;
+  }
+
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(encodedPayload)
+    .digest('base64url');
+
+  if (signature !== expectedSignature) {
+    return null;
+  }
+
+  const payload = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8'));
+  return payload?.calendarId ? payload : null;
+}
+
 function getSessionUser(req) {
   const token = req.cookies[SESSION_COOKIE];
   if (!token) {
@@ -385,6 +430,7 @@ function buildTaskFromPostCard(card, cardDetail, calendarMetaById) {
     title: card.title,
     parceiro: calendarMeta?.clienteNome || 'Sem parceiro',
     calendario: calendarMeta?.calendarTitle || '',
+    calendarioId: calendarIds[0] || null,
     clienteRelacionado: calendarMeta?.clienteNome || '',
     linkDrive: calendarMeta?.linkDriveArtes || '',
     linkCalendarioEditorial: calendarMeta?.linkCalendarioEditorial || '',
@@ -449,17 +495,23 @@ async function buildCalendarMetaMap({ writeToken }) {
 // Lista todos os posts do board "Posts Produção de Conteúdo" via API REST
 // (substitui o export Excel de GOALFY_BOARD_URL). Filtra fora a fase
 // "Arquivado" (mesmo comportamento do fluxo antigo).
+//
+// Usa GET /cards/board/:id (sem /filter, sem limit/offset) — confirmado com
+// o suporte da Goalfy que essa é a rota sem limite de resultados. A rota
+// /cards/board/:id/filter (usada antes, com paginação limit/offset) trunca
+// silenciosamente em 100 cards quando o board tem mais que isso, fazendo
+// alguns posts desaparecerem da listagem sem erro nenhum. Essa rota também
+// já retorna o form completo de cada card, então não precisa mais de uma
+// segunda chamada por card para buscar detalhes.
 async function fetchAllPostsViaRest({ writeToken }) {
   const [postCards, calendarMetaById] = await Promise.all([
-    fetchAllGoalfyCardsInBoard({ boardId: CARDS_POSTS_BOARD_ID, writeToken }),
+    goalfyApiFetch(`/cards/board/${CARDS_POSTS_BOARD_ID}`, { writeToken }),
     buildCalendarMetaMap({ writeToken }),
   ]);
 
-  const activeCards = postCards.filter((card) => normalizeLookupKey(card.phase) !== 'arquivado');
-  const postDetails = await mapWithConcurrency(activeCards, 8, (card) =>
-    goalfyApiFetch(`/cards/${card.id}`, { writeToken }));
+  const activeCards = postCards.filter((card) => normalizeLookupKey(card.phase?.title) !== 'arquivado');
 
-  return activeCards.map((card, index) => buildTaskFromPostCard(card, postDetails[index], calendarMetaById));
+  return activeCards.map((card) => buildTaskFromPostCard(card, card, calendarMetaById));
 }
 
 async function loadGoalfyDataFromSource() {
@@ -1589,6 +1641,20 @@ const CARDS_CALENDAR_FIELD_LINK_DRIVE_ARTES_ID = '9e66b7f1-1e79-45b2-93eb-8c730f
 const CARDS_CALENDAR_FIELD_LINK_EDITORIAL_ID = '7cc2a9ee-bafc-4675-ac5d-fd07eef9fe08';
 const CARDS_POSTS_BOARD_ID = 'e9d22a5a-8263-41da-9784-3e77589e8469';
 const CARDS_POSTS_PHASE_CRIACAO_DAS_ARTES_ID = 'be275650-93bf-424a-b4d3-cfa815bb0100';
+// Todas as fases do board de Posts. GET /cards/board/:id/filter trunca em
+// 100 resultados sem aviso quando o board tem mais cards que isso — alguns
+// cards somem silenciosamente da listagem geral. GET /cards/phase/:phaseId
+// não tem esse limite, então listamos fase por fase e somamos os resultados.
+const CARDS_POSTS_ALL_PHASE_IDS = [
+  'a19bef65-cc3f-4418-8016-4c04efa8e602', // Criação textual
+  'be275650-93bf-424a-b4d3-cfa815bb0100', // Criação das artes
+  'd83420e6-5add-4d5c-9d62-ff0d05b802cb', // Direção de arte
+  '41968cc9-6fc2-4dbe-881b-b522d6018de5', // Montagem da apresentação
+  '8380cb38-f9d4-4e65-a414-8d02daa12d80', // Validação do Cliente
+  '9f9c1a44-3abb-4779-8948-660a3c9bb293', // Aprovado para programação
+  'e0b32273-ecf8-4925-8438-6b8965f93607', // Post Programado
+  '4f819103-ac82-456a-b307-fda98812081f', // Arquivado
+];
 const CARDS_CLIENTS_DATABASE_ID = '652cab0e-7792-409c-81a0-b3cba1447209';
 const CARDS_CLIENT_FIELD_NOME_ID = 'b794bfc5-f574-4b39-94b1-4c3b55345cdc';
 const CARDS_CLIENT_FIELD_DESIGNER_ID = '460d3f59-8038-43a9-a05e-b96b9e523d4a';
@@ -1898,15 +1964,15 @@ async function fetchInboxCalendars({ writeToken }) {
 async function fetchAllCalendarsWithPhase({ writeToken }) {
   const allCalendarCards = await fetchAllGoalfyCardsInBoard({ boardId: CARDS_CALENDAR_BOARD_ID, writeToken });
 
-  const calendarios = [];
-  for (const card of allCalendarCards) {
+  return mapWithConcurrency(allCalendarCards, 8, async (card) => {
     const cardDetail = await goalfyApiFetch(`/cards/${card.id}`, { writeToken });
     const clienteNome = findFieldValue(cardDetail.form?.fields, CARDS_CALENDAR_FIELD_CLIENTE_ID);
     const primeiroDia = findFieldDateValue(cardDetail.form?.fields, CARDS_CALENDAR_FIELD_PRIMEIRO_DIA_ID);
     const linkCalendarioEditorial = findFieldValue(cardDetail.form?.fields, CARDS_CALENDAR_FIELD_LINK_EDITORIAL_ID);
+    const linkDriveArtes = findFieldValue(cardDetail.form?.fields, CARDS_CALENDAR_FIELD_LINK_DRIVE_ARTES_ID);
     const phase = CARDS_CALENDAR_PHASES[card.phaseId] || { title: card.phase || 'Sem fase', color: '#71717a' };
 
-    calendarios.push({
+    return {
       id: card.id,
       title: card.title,
       clienteNome: clienteNome || '',
@@ -1914,10 +1980,9 @@ async function fetchAllCalendarsWithPhase({ writeToken }) {
       phaseTitle: phase.title,
       phaseColor: phase.color,
       linkCalendarioEditorial: linkCalendarioEditorial || '',
-    });
-  }
-
-  return calendarios;
+      linkDriveArtes: linkDriveArtes || '',
+    };
+  });
 }
 
 app.get('/api/calendarios', requireAuth, async (_req, res) => {
@@ -1934,8 +1999,7 @@ app.get('/api/calendarios', requireAuth, async (_req, res) => {
 
     const result = calendarios.map((calendario) => {
       const client = clientsByName.get(normalizeLookupKey(calendario.clienteNome));
-      const calendarKey = normalizeLookupKey(calendario.title);
-      const linkedTasks = tasks.filter((task) => normalizeLookupKey(task.calendario) === calendarKey);
+      const linkedTasks = tasks.filter((task) => task.calendarioId === calendario.id);
       const postsConcluidos = linkedTasks.filter((task) => task.stage === 'concluido').length;
 
       return {
@@ -1950,14 +2014,6 @@ app.get('/api/calendarios', requireAuth, async (_req, res) => {
         postsContratados: client?.postsContratados ?? 0,
         postsConectados: linkedTasks.length,
         postsConcluidos,
-        posts: linkedTasks.map((task) => ({
-          id: task.id,
-          title: task.title,
-          stage: task.stage,
-          formatoEntrega: task.formatoEntrega,
-          dataVencimento: task.dataVencimento,
-          concluidoEm: task.concluidoEm,
-        })),
       };
     });
 
@@ -1966,6 +2022,364 @@ app.get('/api/calendarios', requireAuth, async (_req, res) => {
     console.error('Calendarios list request failed', error);
     res.status(500).json({ error: error.message });
   }
+});
+
+app.get('/api/calendarios/:id/share-link', requireAuth, async (req, res) => {
+  const calendarId = String(req.params.id || '').trim();
+  if (!calendarId) {
+    res.status(400).json({ error: 'calendarId is required' });
+    return;
+  }
+
+  const token = createCalendarShareToken(calendarId);
+  res.json({ token, path: `/portal/${token}` });
+});
+
+// Monta o título de exibição de um post a partir da posição da sua pasta
+// dentro do Drive do calendário (não depende mais de nenhum dado da Goalfy).
+function buildDriveFolderPostTitle(calendario, index, total) {
+  const seq = String(index + 1).padStart(2, '0');
+  const tt = String(total).padStart(2, '0');
+  const cliente = (calendario.clienteNome || '').toUpperCase();
+  const mesAno = (calendario.mesAno || '').toUpperCase();
+  return `[${cliente}] ${mesAno} #${seq}/${tt}`;
+}
+
+// Infere um rótulo de formato de entrega a partir do tipo de mídia da pasta,
+// já que esse dado não vem mais de nenhum campo da Goalfy.
+function inferFormatoEntrega(media) {
+  if (!media || !media.files?.length) return 'Post';
+  if (media.type === 'video') return 'VÍDEO';
+  if (media.files.length > 1) return 'CARROSSEL';
+  return 'ESTÁTICO';
+}
+
+// Extrai o número sequencial de um título de post no padrão "#NN/TT" (ex:
+// "[EBIO] AGOSTO/2026 #02/04" -> 2). Usado só para casar cada pasta do Drive
+// com o card correspondente na Goalfy, para saber se a fase dele já é
+// "Aprovado para Programação"/"Post Programado" — o designer pode considerar
+// um post aprovado movendo o card na Goalfy, mesmo sem o cliente clicar em
+// "Aprovar" no link. Isso NÃO é usado para decidir se o post existe (isso
+// vem só das pastas do Drive) — só para status.
+function extractPostSequenceNumber(title) {
+  const match = String(title || '').match(/#(\d+)\s*\/\s*\d+/);
+  return match ? Number(match[1]) : null;
+}
+
+// Resolve os dados de um calendário a partir de um token de compartilhamento
+// (sem exigir sessão de usuário interno). Cada post vem diretamente das
+// subpastas do Drive de artes do calendário — a Goalfy nunca decide quais
+// posts existem. Ela é consultada só para verificar se o card correspondente
+// (casado pela posição sequencial #NN/TT) já está na fase Aprovado/Programado,
+// caso em que o post é considerado aprovado mesmo sem decisão local.
+async function resolvePublicCalendarPayload(calendarId, preFetched = null) {
+  const writeToken = getGoalfyCardsWriteToken();
+  const [calendarios, clients, goalfyData] = preFetched
+    ? [preFetched.calendarios, preFetched.clients, preFetched.goalfyData]
+    : await Promise.all([
+        fetchAllCalendarsWithPhase({ writeToken }),
+        fetchCardsClients({ writeToken }),
+        fetchGoalfyData(),
+      ]);
+
+  const calendario = calendarios.find((c) => c.id === calendarId);
+  if (!calendario) return null;
+
+  const client = clients.find((c) => normalizeLookupKey(c.nome) === normalizeLookupKey(calendario.clienteNome));
+
+  let folders = [];
+  if (calendario.linkDriveArtes) {
+    try {
+      folders = await listCalendarPostFolders(calendario.linkDriveArtes);
+    } catch (error) {
+      logServerEvent('Portal cliente: falha ao listar pastas do Drive', {
+        calendarId,
+        error: error.message,
+      });
+    }
+  }
+
+  const tasks = goalfyData?.tasks || [];
+  const goalfyStageBySequence = new Map();
+  tasks
+    .filter((task) => task.calendarioId === calendario.id)
+    .forEach((task) => {
+      const sequenceNumber = extractPostSequenceNumber(task.title);
+      if (sequenceNumber == null) return;
+      if (task.stage === 'concluido') goalfyStageBySequence.set(sequenceNumber, 'published');
+      else if (task.stage === 'aprovado_programacao') goalfyStageBySequence.set(sequenceNumber, 'approved');
+    });
+
+  const decisionsByPostId = new Map(getLatestDecisionsForCalendar(calendarId).map((d) => [d.postId, d]));
+  const totalPosts = folders.length;
+
+  return {
+    id: calendario.id,
+    title: calendario.title,
+    clienteNome: calendario.clienteNome,
+    mesAno: calendario.mesAno,
+    designer: client?.designer || '',
+    linkDriveArtes: calendario.linkDriveArtes || '',
+    posts: folders.map((folder, index) => {
+      const postId = folder.folderId;
+      const sequenceNumber = index + 1;
+      const decision = decisionsByPostId.get(postId) || null;
+      const goalfyStage = goalfyStageBySequence.get(sequenceNumber) || null;
+      const published = goalfyStage === 'published';
+      const approvedByGoalfyPhase = published || goalfyStage === 'approved';
+      const resolvedAt = getAdjustmentResolvedAtForPost(postId);
+      const allAdjustments = getDecisionHistoryForPost(postId)
+        .filter((d) => !d.approved && d.feedback)
+        .map((d) => ({ feedback: d.feedback, createdAt: d.createdAt }))
+        .reverse();
+      const feedbackHistory = resolvedAt
+        ? allAdjustments.filter((entry) => entry.createdAt > resolvedAt)
+        : allAdjustments;
+      const resolvedFeedbackHistory = resolvedAt
+        ? allAdjustments.filter((entry) => entry.createdAt <= resolvedAt)
+        : [];
+
+      const approved = approvedByGoalfyPhase || Boolean(decision?.approved);
+      const decisionPayload = approved
+        ? { approved: true, feedback: null, createdAt: decision?.createdAt || null }
+        : decision
+          ? { approved: decision.approved, feedback: decision.feedback, createdAt: decision.createdAt }
+          : null;
+
+      return {
+        id: postId,
+        title: buildDriveFolderPostTitle(calendario, index, totalPosts),
+        formatoEntrega: inferFormatoEntrega(folder.media),
+        caption: folder.caption || null,
+        media: folder.media || null,
+        decision: decisionPayload,
+        published,
+        feedbackHistory: approved ? [] : feedbackHistory,
+        resolvedFeedbackHistory,
+      };
+    }),
+  };
+}
+
+app.get('/api/public/portal/:token', async (req, res) => {
+  const payload = verifyCalendarShareToken(req.params.token);
+  if (!payload) {
+    res.status(401).json({ error: 'Link inválido' });
+    return;
+  }
+
+  try {
+    const calendario = await resolvePublicCalendarPayload(payload.calendarId);
+    if (!calendario) {
+      res.status(404).json({ error: 'Calendário não encontrado' });
+      return;
+    }
+    res.json({ calendario });
+  } catch (error) {
+    console.error('Public portal request failed', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/public/portal/:token/media/:fileId', async (req, res) => {
+  const payload = verifyCalendarShareToken(req.params.token);
+  if (!payload) {
+    res.status(401).json({ error: 'Link inválido' });
+    return;
+  }
+
+  const fileId = String(req.params.fileId || '').trim();
+
+  try {
+    const calendario = await resolvePublicCalendarPayload(payload.calendarId);
+    const belongsToCalendar = (calendario?.posts || []).some(
+      (post) =>
+        (post.media?.files || []).some((file) => file.id === fileId) ||
+        post.media?.coverImageId === fileId,
+    );
+
+    if (!belongsToCalendar) {
+      res.status(404).json({ error: 'Arquivo não encontrado neste calendário' });
+      return;
+    }
+
+    const metadata = await getDriveFileMetadata(fileId);
+    const stream = await getDriveFileStream(fileId);
+
+    res.setHeader('Content-Type', metadata.mimeType || 'application/octet-stream');
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    stream.on('error', (streamError) => {
+      logServerEvent('Portal cliente: falha ao ler stream de mídia do Drive', {
+        fileId,
+        error: streamError.message,
+      });
+      if (!res.headersSent) res.status(500).end();
+    });
+    stream.pipe(res);
+  } catch (error) {
+    console.error('Public portal media request failed', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/media/:fileId', requireAuth, async (req, res) => {
+  const fileId = String(req.params.fileId || '').trim();
+  if (!fileId) {
+    res.status(400).json({ error: 'fileId is required' });
+    return;
+  }
+
+  try {
+    const metadata = await getDriveFileMetadata(fileId);
+    const stream = await getDriveFileStream(fileId);
+
+    res.setHeader('Content-Type', metadata.mimeType || 'application/octet-stream');
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    stream.on('error', (streamError) => {
+      logServerEvent('Feedback: falha ao ler stream de mídia do Drive', {
+        fileId,
+        error: streamError.message,
+      });
+      if (!res.headersSent) res.status(500).end();
+    });
+    stream.pipe(res);
+  } catch (error) {
+    console.error('Media request failed', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/public/portal/:token/posts/:postId/decision', async (req, res) => {
+  const payload = verifyCalendarShareToken(req.params.token);
+  if (!payload) {
+    res.status(401).json({ error: 'Link inválido' });
+    return;
+  }
+
+  const postId = String(req.params.postId || '').trim();
+  const approved = Boolean(req.body?.approved);
+  const feedback = approved ? null : String(req.body?.feedback || '').trim() || null;
+
+  if (!postId) {
+    res.status(400).json({ error: 'postId is required' });
+    return;
+  }
+
+  try {
+    const calendario = await resolvePublicCalendarPayload(payload.calendarId);
+    if (!calendario || !calendario.posts.some((p) => p.id === postId)) {
+      res.status(404).json({ error: 'Post não encontrado neste calendário' });
+      return;
+    }
+
+    const decisionId = insertPostDecision({ postId, calendarId: payload.calendarId, approved, feedback });
+    markDecisionSyncStatus(decisionId, 'synced');
+
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('Public portal decision request failed', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/calendarios/:id/detail', requireAuth, async (req, res) => {
+  const calendarId = String(req.params.id || '').trim();
+  if (!calendarId) {
+    res.status(400).json({ error: 'calendarId is required' });
+    return;
+  }
+
+  try {
+    const writeToken = getGoalfyCardsWriteToken();
+    const [calendarios, clients, goalfyData] = await Promise.all([
+      fetchAllCalendarsWithPhase({ writeToken }),
+      fetchCardsClients({ writeToken }),
+      fetchGoalfyData(),
+    ]);
+    const resolvedCalendario = await resolvePublicCalendarPayload(calendarId, { calendarios, clients, goalfyData });
+
+    const calendario = calendarios.find((c) => c.id === calendarId);
+    if (!calendario || !resolvedCalendario) {
+      res.status(404).json({ error: 'Calendário não encontrado' });
+      return;
+    }
+
+    const client = clients.find((c) => normalizeLookupKey(c.nome) === normalizeLookupKey(calendario.clienteNome));
+    const tasks = goalfyData?.tasks || [];
+    const linkedTasks = tasks.filter((task) => task.calendarioId === calendario.id);
+    const postsConcluidos = linkedTasks.filter((task) => task.stage === 'concluido').length;
+
+    res.json({
+      calendario: {
+        ...resolvedCalendario,
+        phaseTitle: calendario.phaseTitle,
+        phaseColor: calendario.phaseColor,
+        linkCalendarioEditorial: calendario.linkCalendarioEditorial,
+        postsContratados: client?.postsContratados ?? 0,
+        postsConectados: linkedTasks.length,
+        postsConcluidos,
+      },
+    });
+  } catch (error) {
+    console.error('Calendar detail request failed', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/feedback', requireAuth, async (_req, res) => {
+  try {
+    const writeToken = getGoalfyCardsWriteToken();
+    const [calendarios, clients, goalfyData] = await Promise.all([
+      fetchAllCalendarsWithPhase({ writeToken }),
+      fetchCardsClients({ writeToken }),
+      fetchGoalfyData(),
+    ]);
+    const preFetched = { calendarios, clients, goalfyData };
+
+    const calendarIdsWithFeedback = calendarios
+      .filter((c) => getLatestDecisionsForCalendar(c.id).some((d) => !d.approved && d.feedback))
+      .map((c) => c.id);
+
+    const resolvedCalendarios = await Promise.all(
+      calendarIdsWithFeedback.map((calendarId) => resolvePublicCalendarPayload(calendarId, preFetched)),
+    );
+
+    const posts = resolvedCalendarios
+      .filter(Boolean)
+      .flatMap((calendario) =>
+        calendario.posts
+          .filter((post) => post.feedbackHistory.length > 0)
+          .map((post) => ({
+            postId: post.id,
+            postTitle: post.title,
+            calendarId: calendario.id,
+            calendarTitle: calendario.title,
+            designer: calendario.designer || '',
+            caption: post.caption,
+            media: post.media,
+            latestCreatedAt: post.feedbackHistory[post.feedbackHistory.length - 1].createdAt,
+            feedbackHistory: post.feedbackHistory,
+            resolvedFeedbackHistory: post.resolvedFeedbackHistory,
+          })),
+      )
+      .sort((a, b) => new Date(b.latestCreatedAt) - new Date(a.latestCreatedAt));
+
+    res.json({ posts });
+  } catch (error) {
+    console.error('Feedback list request failed', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/feedback/:postId/resolve', requireAuth, async (req, res) => {
+  const postId = String(req.params.postId || '').trim();
+  if (!postId) {
+    res.status(400).json({ error: 'postId is required' });
+    return;
+  }
+
+  markAdjustmentsResolvedForPost(postId);
+  res.json({ ok: true });
 });
 
 app.get('/api/clientes', requireAuth, async (_req, res) => {
