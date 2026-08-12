@@ -13,9 +13,6 @@ import {
   getDecisionHistoryForPost,
   markAdjustmentsResolvedForPost,
   getAdjustmentResolvedAtForPost,
-  getSlugForClientId,
-  getClientIdForSlug,
-  createSlugForClientId,
 } from './server/db.js';
 import { listCalendarPostFolders, getDriveFileStream, getDriveFileMetadata } from './server/drive.js';
 
@@ -261,13 +258,14 @@ function verifySessionToken(token) {
 }
 
 // Slug de acesso público ao portal de um cliente — curto e legível (nome do
-// cliente normalizado + um sufixo curto fixo), persistido em
-// client_portal_slugs na primeira vez que é gerado, para o mesmo cliente
-// sempre reusar o mesmo link. Diferente do token de sessão, não precisa de
-// assinatura HMAC: o slug em si não carrega o clientId, é só uma chave opaca
-// mapeada no banco local. O sufixo (hash curto e determinístico do clientId)
-// só serve para o link não ficar "adivinhável" a partir do nome do cliente —
-// não é segurança real, é so um obstáculo a mais.
+// cliente normalizado + um sufixo curto), calculado de forma DETERMINÍSTICA a
+// partir do clientId, sem depender de tabela/banco: assim o link nunca muda
+// entre deploys, mesmo que o servidor seja reconstruído do zero (ex.: cada
+// deploy na Hostinger parte de um checkout novo, sem persistir data/).
+// Diferente do token de sessão, não precisa de assinatura HMAC: o sufixo
+// (hash curto e determinístico do clientId) só serve para o link não ficar
+// "adivinhável" a partir do nome do cliente — não é segurança real, é só um
+// obstáculo a mais.
 function slugifyClientName(name) {
   const slug = String(name || '')
     .normalize('NFD')
@@ -282,11 +280,15 @@ function buildClientSlugSuffix(clientId) {
   return crypto.createHash('sha256').update(String(clientId)).digest('hex').slice(0, 6);
 }
 
-function getOrCreateClientPortalSlug(clientId, clientName) {
-  const existing = getSlugForClientId(clientId);
-  if (existing) return existing;
-  const baseSlug = `${slugifyClientName(clientName)}-${buildClientSlugSuffix(clientId)}`;
-  return createSlugForClientId(clientId, baseSlug);
+function getClientPortalSlug(clientId, clientName) {
+  return `${slugifyClientName(clientName)}-${buildClientSlugSuffix(clientId)}`;
+}
+
+async function resolveClientIdFromSlug(slug) {
+  const writeToken = getGoalfyCardsWriteToken();
+  const clients = await fetchCardsClients({ writeToken });
+  const client = clients.find((c) => getClientPortalSlug(c.id, c.nome) === slug);
+  return client?.id ?? null;
 }
 
 function getSessionUser(req) {
@@ -2216,13 +2218,13 @@ async function resolvePublicClientPayload(clientId) {
 }
 
 app.get('/api/public/portal/:token', async (req, res) => {
-  const clientId = getClientIdForSlug(req.params.token);
-  if (!clientId) {
-    res.status(401).json({ error: 'Link inválido' });
-    return;
-  }
-
   try {
+    const clientId = await resolveClientIdFromSlug(req.params.token);
+    if (!clientId) {
+      res.status(401).json({ error: 'Link inválido' });
+      return;
+    }
+
     const cliente = await resolvePublicClientPayload(clientId);
     if (!cliente) {
       res.status(404).json({ error: 'Cliente não encontrado' });
@@ -2236,15 +2238,15 @@ app.get('/api/public/portal/:token', async (req, res) => {
 });
 
 app.get('/api/public/portal/:token/media/:fileId', async (req, res) => {
-  const clientId = getClientIdForSlug(req.params.token);
-  if (!clientId) {
-    res.status(401).json({ error: 'Link inválido' });
-    return;
-  }
-
   const fileId = String(req.params.fileId || '').trim();
 
   try {
+    const clientId = await resolveClientIdFromSlug(req.params.token);
+    if (!clientId) {
+      res.status(401).json({ error: 'Link inválido' });
+      return;
+    }
+
     const cliente = await resolvePublicClientPayload(clientId);
     const belongsToClient = (cliente?.calendarios || []).some((calendario) =>
       (calendario.posts || []).some(
@@ -2306,12 +2308,6 @@ app.get('/api/media/:fileId', requireAuth, async (req, res) => {
 });
 
 app.post('/api/public/portal/:token/posts/:postId/decision', async (req, res) => {
-  const clientId = getClientIdForSlug(req.params.token);
-  if (!clientId) {
-    res.status(401).json({ error: 'Link inválido' });
-    return;
-  }
-
   const postId = String(req.params.postId || '').trim();
   const approved = Boolean(req.body?.approved);
   const feedback = approved ? null : String(req.body?.feedback || '').trim() || null;
@@ -2322,6 +2318,12 @@ app.post('/api/public/portal/:token/posts/:postId/decision', async (req, res) =>
   }
 
   try {
+    const clientId = await resolveClientIdFromSlug(req.params.token);
+    if (!clientId) {
+      res.status(401).json({ error: 'Link inválido' });
+      return;
+    }
+
     const cliente = await resolvePublicClientPayload(clientId);
     const calendario = (cliente?.calendarios || []).find((c) => c.posts.some((p) => p.id === postId));
     if (!calendario) {
@@ -2472,7 +2474,7 @@ app.get('/api/clientes/:id/share-link', requireAuth, async (req, res) => {
       return;
     }
 
-    const slug = getOrCreateClientPortalSlug(clientId, client.nome);
+    const slug = getClientPortalSlug(clientId, client.nome);
     res.json({ slug, path: `/portal/${slug}` });
   } catch (error) {
     console.error('Client share link request failed', error);
