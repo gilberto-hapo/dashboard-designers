@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ExternalLink, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { fetchJson } from '@/lib/calendarUi';
 
 // Mesma paleta usada em src/lib/data.ts (buildDesigners) para manter o
 // padrão visual de avatar já existente no resto do dashboard.
@@ -41,18 +43,8 @@ type ClienteInfo = {
   copywriter: string | null;
   postsContratados: number;
   locaisPublicacao: LocalPublicacao[];
-  linkApresentacao: string | null;
   linkDriveGeral: string | null;
 };
-
-async function fetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, { credentials: 'include' });
-  const body = await response.json().catch(() => null);
-  if (!response.ok) {
-    throw new Error(body?.error || `Erro na requisição (status ${response.status})`);
-  }
-  return body as T;
-}
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -67,6 +59,7 @@ export function ClientScorePanel({ selectedDesigner = 'Todos' }: { selectedDesig
   const [clients, setClients] = useState<ClienteInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [generatingLinkForId, setGeneratingLinkForId] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -76,6 +69,19 @@ export function ClientScorePanel({ selectedDesigner = 'Todos' }: { selectedDesig
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
+
+  async function handleOpenClientLink(clientId: string) {
+    setGeneratingLinkForId(clientId);
+    try {
+      const data = await fetchJson<{ path: string }>(`/api/clientes/${clientId}/share-link`);
+      const url = `${window.location.origin}${data.path}`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao gerar link para o cliente');
+    } finally {
+      setGeneratingLinkForId(null);
+    }
+  }
 
   const filteredClients = (
     selectedDesigner === 'Todos' ? clients : clients.filter((c) => c.designer === selectedDesigner)
@@ -162,32 +168,32 @@ export function ClientScorePanel({ selectedDesigner = 'Todos' }: { selectedDesig
             <InfoRow label="Posts Contratados" value={client.postsContratados} />
           </div>
 
-          {(client.linkApresentacao || client.linkDriveGeral) && (
-            <div className="flex gap-2 border-t border-border pt-3">
-              {client.linkApresentacao && (
-                <a
-                  href={client.linkApresentacao}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-white/30 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-white/10"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  Apresentação
-                </a>
+          <div className="flex gap-2 border-t border-border pt-3">
+            <button
+              type="button"
+              disabled={generatingLinkForId === client.id}
+              onClick={() => handleOpenClientLink(client.id)}
+              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-white/30 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-white/10 disabled:opacity-60"
+            >
+              {generatingLinkForId === client.id ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <ExternalLink className="h-3.5 w-3.5" />
               )}
-              {client.linkDriveGeral && (
-                <a
-                  href={client.linkDriveGeral}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-white/30 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-white/10"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  Drive Geral
-                </a>
-              )}
-            </div>
-          )}
+              Link do Cliente
+            </button>
+            {client.linkDriveGeral && (
+              <a
+                href={client.linkDriveGeral}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-white/30 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-white/10"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                Drive Geral
+              </a>
+            )}
+          </div>
         </div>
       ))}
     </div>

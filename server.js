@@ -13,6 +13,9 @@ import {
   getDecisionHistoryForPost,
   markAdjustmentsResolvedForPost,
   getAdjustmentResolvedAtForPost,
+  getSlugForClientId,
+  getClientIdForSlug,
+  createSlugForClientId,
 } from './server/db.js';
 import { listCalendarPostFolders, getDriveFileStream, getDriveFileMetadata } from './server/drive.js';
 
@@ -257,40 +260,33 @@ function verifySessionToken(token) {
   return payload.user;
 }
 
-// Token de acesso público a um calendário (portal do cliente) — mesmo esquema
-// HMAC do token de sessão, mas sem usuário e sem expiração curta (o link é
-// enviado ao cliente para uso ao longo de todo o mês do calendário).
-function createCalendarShareToken(calendarId) {
-  const secret = getRequiredEnv('SESSION_SECRET');
-  const payload = { calendarId };
-  const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
-  const signature = crypto
-    .createHmac('sha256', secret)
-    .update(encodedPayload)
-    .digest('base64url');
-
-  return `${encodedPayload}.${signature}`;
+// Slug de acesso público ao portal de um cliente — curto e legível (nome do
+// cliente normalizado + um sufixo curto fixo), persistido em
+// client_portal_slugs na primeira vez que é gerado, para o mesmo cliente
+// sempre reusar o mesmo link. Diferente do token de sessão, não precisa de
+// assinatura HMAC: o slug em si não carrega o clientId, é só uma chave opaca
+// mapeada no banco local. O sufixo (hash curto e determinístico do clientId)
+// só serve para o link não ficar "adivinhável" a partir do nome do cliente —
+// não é segurança real, é so um obstáculo a mais.
+function slugifyClientName(name) {
+  const slug = String(name || '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return slug || 'cliente';
 }
 
-function verifyCalendarShareToken(token) {
-  const secret = getRequiredEnv('SESSION_SECRET');
-  const [encodedPayload, signature] = String(token || '').split('.');
+function buildClientSlugSuffix(clientId) {
+  return crypto.createHash('sha256').update(String(clientId)).digest('hex').slice(0, 6);
+}
 
-  if (!encodedPayload || !signature) {
-    return null;
-  }
-
-  const expectedSignature = crypto
-    .createHmac('sha256', secret)
-    .update(encodedPayload)
-    .digest('base64url');
-
-  if (signature !== expectedSignature) {
-    return null;
-  }
-
-  const payload = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8'));
-  return payload?.calendarId ? payload : null;
+function getOrCreateClientPortalSlug(clientId, clientName) {
+  const existing = getSlugForClientId(clientId);
+  if (existing) return existing;
+  const baseSlug = `${slugifyClientName(clientName)}-${buildClientSlugSuffix(clientId)}`;
+  return createSlugForClientId(clientId, baseSlug);
 }
 
 function getSessionUser(req) {
@@ -328,6 +324,16 @@ const stageMap = {
   'post programado': 'concluido',
   arquivado: 'concluido',
 };
+
+// Fases (título original do card, não o stage já colapsado) a partir das
+// quais um post pode ser exibido no portal do cliente. "Post Programado"
+// aparece, mas "Arquivado" não — por isso não pode reusar stageMap aqui, já
+// que os dois colapsam para o mesmo stage "concluido".
+const CLIENT_PORTAL_VISIBLE_PHASE_KEYS = new Set([
+  'validacao do cliente',
+  'aprovado para programacao',
+  'post programado',
+].map(normalizeLookupKey));
 
 function parseContentType(tags) {
   const normalizedTags = normalizeLookupKey(tags).toUpperCase();
@@ -440,6 +446,7 @@ function buildTaskFromPostCard(card, cardDetail, calendarMetaById) {
     designerResponsavel1: calendarMeta?.designer || '',
     dataVencimento: card.dueDate ? new Date(card.dueDate) : new Date(),
     stage: stageMap[normalizeLookupKey(currentPhaseTitle)] || 'fazer',
+    phaseTitle: currentPhaseTitle,
     tempoEstimadoHoras: 3,
     tempoGastoHoras: 0,
     criadoEm: card.createdAt ? new Date(card.createdAt) : null,
@@ -2024,17 +2031,6 @@ app.get('/api/calendarios', requireAuth, async (_req, res) => {
   }
 });
 
-app.get('/api/calendarios/:id/share-link', requireAuth, async (req, res) => {
-  const calendarId = String(req.params.id || '').trim();
-  if (!calendarId) {
-    res.status(400).json({ error: 'calendarId is required' });
-    return;
-  }
-
-  const token = createCalendarShareToken(calendarId);
-  res.json({ token, path: `/portal/${token}` });
-});
-
 // Monta o título de exibição de um post a partir da posição da sua pasta
 // dentro do Drive do calendário (não depende mais de nenhum dado da Goalfy).
 function buildDriveFolderPostTitle(calendario, index, total) {
@@ -2066,25 +2062,15 @@ function extractPostSequenceNumber(title) {
   return match ? Number(match[1]) : null;
 }
 
-// Resolve os dados de um calendário a partir de um token de compartilhamento
-// (sem exigir sessão de usuário interno). Cada post vem diretamente das
-// subpastas do Drive de artes do calendário — a Goalfy nunca decide quais
-// posts existem. Ela é consultada só para verificar se o card correspondente
-// (casado pela posição sequencial #NN/TT) já está na fase Aprovado/Programado,
-// caso em que o post é considerado aprovado mesmo sem decisão local.
-async function resolvePublicCalendarPayload(calendarId, preFetched = null) {
-  const writeToken = getGoalfyCardsWriteToken();
-  const [calendarios, clients, goalfyData] = preFetched
-    ? [preFetched.calendarios, preFetched.clients, preFetched.goalfyData]
-    : await Promise.all([
-        fetchAllCalendarsWithPhase({ writeToken }),
-        fetchCardsClients({ writeToken }),
-        fetchGoalfyData(),
-      ]);
-
-  const calendario = calendarios.find((c) => c.id === calendarId);
-  if (!calendario) return null;
-
+// Resolve os posts de UM calendário (subpastas do Drive de artes, casadas por
+// posição sequencial #NN/TT com os cards do board de Posts). A Goalfy nunca
+// decide quais posts existem — só é consultada para saber a fase do card
+// correspondente (usada para status "Aprovado"/"Publicado" e, quando
+// requireClientVisiblePhase é true, para decidir se o post pode ser exibido
+// ao cliente). Compartilhada entre a visão interna (todos os posts, qualquer
+// fase) e o portal público do cliente (só posts em fase Validação do Cliente
+// em diante, exceto Arquivado).
+async function resolveCalendarPosts(calendario, { clients, goalfyData, requireClientVisiblePhase = false }) {
   const client = clients.find((c) => normalizeLookupKey(c.nome) === normalizeLookupKey(calendario.clienteNome));
 
   let folders = [];
@@ -2093,34 +2079,29 @@ async function resolvePublicCalendarPayload(calendarId, preFetched = null) {
       folders = await listCalendarPostFolders(calendario.linkDriveArtes);
     } catch (error) {
       logServerEvent('Portal cliente: falha ao listar pastas do Drive', {
-        calendarId,
+        calendarId: calendario.id,
         error: error.message,
       });
     }
   }
 
   const tasks = goalfyData?.tasks || [];
+  const calendarTasks = tasks.filter((task) => task.calendarioId === calendario.id);
   const goalfyStageBySequence = new Map();
-  tasks
-    .filter((task) => task.calendarioId === calendario.id)
-    .forEach((task) => {
-      const sequenceNumber = extractPostSequenceNumber(task.title);
-      if (sequenceNumber == null) return;
-      if (task.stage === 'concluido') goalfyStageBySequence.set(sequenceNumber, 'published');
-      else if (task.stage === 'aprovado_programacao') goalfyStageBySequence.set(sequenceNumber, 'approved');
-    });
+  const goalfyPhaseTitleBySequence = new Map();
+  calendarTasks.forEach((task) => {
+    const sequenceNumber = extractPostSequenceNumber(task.title);
+    if (sequenceNumber == null) return;
+    if (task.stage === 'concluido') goalfyStageBySequence.set(sequenceNumber, 'published');
+    else if (task.stage === 'aprovado_programacao') goalfyStageBySequence.set(sequenceNumber, 'approved');
+    goalfyPhaseTitleBySequence.set(sequenceNumber, task.phaseTitle || '');
+  });
 
-  const decisionsByPostId = new Map(getLatestDecisionsForCalendar(calendarId).map((d) => [d.postId, d]));
+  const decisionsByPostId = new Map(getLatestDecisionsForCalendar(calendario.id).map((d) => [d.postId, d]));
   const totalPosts = folders.length;
 
-  return {
-    id: calendario.id,
-    title: calendario.title,
-    clienteNome: calendario.clienteNome,
-    mesAno: calendario.mesAno,
-    designer: client?.designer || '',
-    linkDriveArtes: calendario.linkDriveArtes || '',
-    posts: folders.map((folder, index) => {
+  const posts = folders
+    .map((folder, index) => {
       const postId = folder.folderId;
       const sequenceNumber = index + 1;
       const decision = decisionsByPostId.get(postId) || null;
@@ -2146,6 +2127,11 @@ async function resolvePublicCalendarPayload(calendarId, preFetched = null) {
           ? { approved: decision.approved, feedback: decision.feedback, createdAt: decision.createdAt }
           : null;
 
+      const goalfyPhaseTitle = goalfyPhaseTitleBySequence.get(sequenceNumber) || null;
+      const visibleToClient = Boolean(
+        goalfyPhaseTitle && CLIENT_PORTAL_VISIBLE_PHASE_KEYS.has(normalizeLookupKey(goalfyPhaseTitle)),
+      );
+
       return {
         id: postId,
         title: buildDriveFolderPostTitle(calendario, index, totalPosts),
@@ -2156,25 +2142,90 @@ async function resolvePublicCalendarPayload(calendarId, preFetched = null) {
         published,
         feedbackHistory: approved ? [] : feedbackHistory,
         resolvedFeedbackHistory,
+        visibleToClient,
       };
-    }),
+    })
+    .filter((post) => !requireClientVisiblePhase || post.visibleToClient);
+
+  return {
+    id: calendario.id,
+    title: calendario.title,
+    clienteNome: calendario.clienteNome,
+    mesAno: calendario.mesAno,
+    designer: client?.designer || '',
+    linkDriveArtes: calendario.linkDriveArtes || '',
+    posts,
+  };
+}
+
+// Resolve os dados de um calendário para a visão interna (designer/equipe) —
+// sem exigir sessão de usuário interno no shape retornado, mas usada hoje só
+// por rotas com requireAuth. Mostra todos os posts, qualquer fase.
+async function resolvePublicCalendarPayload(calendarId, preFetched = null) {
+  const writeToken = getGoalfyCardsWriteToken();
+  const [calendarios, clients, goalfyData] = preFetched
+    ? [preFetched.calendarios, preFetched.clients, preFetched.goalfyData]
+    : await Promise.all([
+        fetchAllCalendarsWithPhase({ writeToken }),
+        fetchCardsClients({ writeToken }),
+        fetchGoalfyData(),
+      ]);
+
+  const calendario = calendarios.find((c) => c.id === calendarId);
+  if (!calendario) return null;
+
+  return resolveCalendarPosts(calendario, { clients, goalfyData });
+}
+
+// Resolve o payload do portal público de um CLIENTE: todos os calendários
+// dele que estão na fase "Em Andamento", com os posts de cada um já
+// filtrados para só os visíveis ao cliente (fase Validação do Cliente em
+// diante, exceto Arquivado — ver CLIENT_PORTAL_VISIBLE_PHASE_KEYS).
+async function resolvePublicClientPayload(clientId) {
+  const writeToken = getGoalfyCardsWriteToken();
+  const [calendarios, clients, goalfyData] = await Promise.all([
+    fetchAllCalendarsWithPhase({ writeToken }),
+    fetchCardsClients({ writeToken }),
+    fetchGoalfyData(),
+  ]);
+
+  const client = clients.find((c) => c.id === clientId);
+  if (!client) return null;
+
+  const activeCalendarios = calendarios.filter(
+    (c) =>
+      c.phaseTitle &&
+      normalizeLookupKey(c.phaseTitle) === normalizeLookupKey(CARDS_CALENDAR_PHASES[CARDS_CALENDAR_PHASE_EM_ANDAMENTO_ID].title) &&
+      normalizeLookupKey(c.clienteNome) === normalizeLookupKey(client.nome),
+  );
+
+  const resolvedCalendarios = await Promise.all(
+    activeCalendarios.map((calendario) =>
+      resolveCalendarPosts(calendario, { clients, goalfyData, requireClientVisiblePhase: true }),
+    ),
+  );
+
+  return {
+    id: client.id,
+    nome: client.nome,
+    calendarios: resolvedCalendarios,
   };
 }
 
 app.get('/api/public/portal/:token', async (req, res) => {
-  const payload = verifyCalendarShareToken(req.params.token);
-  if (!payload) {
+  const clientId = getClientIdForSlug(req.params.token);
+  if (!clientId) {
     res.status(401).json({ error: 'Link inválido' });
     return;
   }
 
   try {
-    const calendario = await resolvePublicCalendarPayload(payload.calendarId);
-    if (!calendario) {
-      res.status(404).json({ error: 'Calendário não encontrado' });
+    const cliente = await resolvePublicClientPayload(clientId);
+    if (!cliente) {
+      res.status(404).json({ error: 'Cliente não encontrado' });
       return;
     }
-    res.json({ calendario });
+    res.json({ cliente });
   } catch (error) {
     console.error('Public portal request failed', error);
     res.status(500).json({ error: error.message });
@@ -2182,8 +2233,8 @@ app.get('/api/public/portal/:token', async (req, res) => {
 });
 
 app.get('/api/public/portal/:token/media/:fileId', async (req, res) => {
-  const payload = verifyCalendarShareToken(req.params.token);
-  if (!payload) {
+  const clientId = getClientIdForSlug(req.params.token);
+  if (!clientId) {
     res.status(401).json({ error: 'Link inválido' });
     return;
   }
@@ -2191,15 +2242,17 @@ app.get('/api/public/portal/:token/media/:fileId', async (req, res) => {
   const fileId = String(req.params.fileId || '').trim();
 
   try {
-    const calendario = await resolvePublicCalendarPayload(payload.calendarId);
-    const belongsToCalendar = (calendario?.posts || []).some(
-      (post) =>
-        (post.media?.files || []).some((file) => file.id === fileId) ||
-        post.media?.coverImageId === fileId,
+    const cliente = await resolvePublicClientPayload(clientId);
+    const belongsToClient = (cliente?.calendarios || []).some((calendario) =>
+      (calendario.posts || []).some(
+        (post) =>
+          (post.media?.files || []).some((file) => file.id === fileId) ||
+          post.media?.coverImageId === fileId,
+      ),
     );
 
-    if (!belongsToCalendar) {
-      res.status(404).json({ error: 'Arquivo não encontrado neste calendário' });
+    if (!belongsToClient) {
+      res.status(404).json({ error: 'Arquivo não encontrado para este cliente' });
       return;
     }
 
@@ -2250,8 +2303,8 @@ app.get('/api/media/:fileId', requireAuth, async (req, res) => {
 });
 
 app.post('/api/public/portal/:token/posts/:postId/decision', async (req, res) => {
-  const payload = verifyCalendarShareToken(req.params.token);
-  if (!payload) {
+  const clientId = getClientIdForSlug(req.params.token);
+  if (!clientId) {
     res.status(401).json({ error: 'Link inválido' });
     return;
   }
@@ -2266,13 +2319,14 @@ app.post('/api/public/portal/:token/posts/:postId/decision', async (req, res) =>
   }
 
   try {
-    const calendario = await resolvePublicCalendarPayload(payload.calendarId);
-    if (!calendario || !calendario.posts.some((p) => p.id === postId)) {
-      res.status(404).json({ error: 'Post não encontrado neste calendário' });
+    const cliente = await resolvePublicClientPayload(clientId);
+    const calendario = (cliente?.calendarios || []).find((c) => c.posts.some((p) => p.id === postId));
+    if (!calendario) {
+      res.status(404).json({ error: 'Post não encontrado para este cliente' });
       return;
     }
 
-    const decisionId = insertPostDecision({ postId, calendarId: payload.calendarId, approved, feedback });
+    const decisionId = insertPostDecision({ postId, calendarId: calendario.id, approved, feedback });
     markDecisionSyncStatus(decisionId, 'synced');
 
     res.json({ ok: true });
@@ -2389,6 +2443,30 @@ app.get('/api/clientes', requireAuth, async (_req, res) => {
     res.json({ clients });
   } catch (error) {
     console.error('Clientes list request failed', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/clientes/:id/share-link', requireAuth, async (req, res) => {
+  const clientId = String(req.params.id || '').trim();
+  if (!clientId) {
+    res.status(400).json({ error: 'clientId is required' });
+    return;
+  }
+
+  try {
+    const writeToken = getGoalfyCardsWriteToken();
+    const clients = await fetchCardsClients({ writeToken });
+    const client = clients.find((c) => c.id === clientId);
+    if (!client) {
+      res.status(404).json({ error: 'Cliente não encontrado' });
+      return;
+    }
+
+    const slug = getOrCreateClientPortalSlug(clientId, client.nome);
+    res.json({ slug, path: `/portal/${slug}` });
+  } catch (error) {
+    console.error('Client share link request failed', error);
     res.status(500).json({ error: error.message });
   }
 });

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, CheckCircle2, Copy, ExternalLink, FolderOpen, Loader2, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CheckCircle2, ExternalLink, FolderOpen, Loader2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth';
 import Login from './Login';
@@ -250,7 +250,6 @@ function CalendarDetailContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [openPostId, setOpenPostId] = useState<string | null>(null);
-  const [generatingShareLink, setGeneratingShareLink] = useState(false);
   const [confirmingConclude, setConfirmingConclude] = useState(false);
   const [concluding, setConcluding] = useState(false);
   const [concludeError, setConcludeError] = useState<string | null>(null);
@@ -273,21 +272,6 @@ function CalendarDetailContent() {
   }, [loadCalendario]);
 
   const openPost = calendario?.posts.find((post) => post.id === openPostId) ?? null;
-
-  async function handleCopyClientLink() {
-    if (!calendario) return;
-    setGeneratingShareLink(true);
-    try {
-      const data = await fetchJson<{ path: string }>(`/api/calendarios/${calendario.id}/share-link`);
-      const url = `${window.location.origin}${data.path}`;
-      await navigator.clipboard.writeText(url);
-      toast.success('Link do cliente copiado para a área de transferência.');
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Erro ao gerar link para o cliente');
-    } finally {
-      setGeneratingShareLink(false);
-    }
-  }
 
   async function handleConfirmConclude() {
     if (!calendario) return;
@@ -340,19 +324,6 @@ function CalendarDetailContent() {
 
             {calendario && (
               <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  className="gap-2 text-white hover:text-white"
-                  disabled={generatingShareLink}
-                  onClick={handleCopyClientLink}
-                >
-                  {generatingShareLink ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Copy className="h-4 w-4" />
-                  )}
-                  Link do cliente
-                </Button>
                 {calendario.linkCalendarioEditorial && (
                   <Button variant="outline" className="gap-2 text-white hover:text-white" asChild>
                     <a href={calendario.linkCalendarioEditorial} target="_blank" rel="noopener noreferrer">

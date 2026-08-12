@@ -50,6 +50,7 @@ export type PortalPost = {
   published?: boolean;
   feedbackHistory: FeedbackEntry[];
   resolvedFeedbackHistory: FeedbackEntry[];
+  calendarLabel?: string;
 };
 
 function mediaUrl(token: string, fileId: string) {
@@ -486,11 +487,31 @@ export function ClientPortalFeed({
   const visiblePosts = posts.filter((post) => (post.media?.files?.length ?? 0) > 0);
   const openPost = visiblePosts.find((post) => post.id === openPostId) ?? null;
 
+  const groups: Array<{ label: string | null; posts: PortalPost[] }> = [];
+  visiblePosts.forEach((post) => {
+    const label = post.calendarLabel ?? null;
+    const lastGroup = groups[groups.length - 1];
+    if (lastGroup && lastGroup.label === label) {
+      lastGroup.posts.push(post);
+    } else {
+      groups.push({ label, posts: [post] });
+    }
+  });
+
   return (
     <>
-      <div className="mx-auto grid w-full max-w-6xl grid-cols-3 gap-1 px-1 sm:gap-2 sm:px-4">
-        {visiblePosts.map((post) => (
-          <GridThumb key={post.id} token={token} post={post} onOpen={() => setOpenPostId(post.id)} />
+      <div className="mx-auto w-full max-w-6xl space-y-4 px-1 sm:px-4">
+        {groups.map((group, index) => (
+          <div key={group.label ?? index} className="space-y-2">
+            {group.label && (
+              <h2 className="px-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">{group.label}</h2>
+            )}
+            <div className="grid grid-cols-3 gap-1 sm:gap-2">
+              {group.posts.map((post) => (
+                <GridThumb key={post.id} token={token} post={post} onOpen={() => setOpenPostId(post.id)} />
+              ))}
+            </div>
+          </div>
         ))}
       </div>
 

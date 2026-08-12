@@ -4,18 +4,23 @@ import { AlertTriangle, ExternalLink, Loader2 } from 'lucide-react';
 import { ClientPortalFeed, type PortalPost } from '@/components/ClientPortalFeed';
 import hapoLogo from '@/assets/hapo-logo.svg';
 
-type PortalCalendario = {
+type PortalCalendarioResumo = {
   id: string;
   title: string;
-  clienteNome: string;
   mesAno: string;
   linkDriveArtes: string;
   posts: PortalPost[];
 };
 
+type PortalCliente = {
+  id: string;
+  nome: string;
+  calendarios: PortalCalendarioResumo[];
+};
+
 export default function ClientPortal() {
   const { token } = useParams<{ token: string }>();
-  const [calendario, setCalendario] = useState<PortalCalendario | null>(null);
+  const [cliente, setCliente] = useState<PortalCliente | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,28 +37,31 @@ export default function ClientPortal() {
         }
         return body;
       })
-      .then((data) => setCalendario(data.calendario))
+      .then((data) => setCliente(data.cliente))
       .catch((err) => setError(err instanceof Error ? err.message : 'Erro ao carregar'))
       .finally(() => setLoading(false));
   }, [token]);
 
   function handleDecided(postId: string, decision: PortalPost['decision']) {
-    setCalendario((prev) =>
+    setCliente((prev) =>
       prev
         ? {
             ...prev,
-            posts: prev.posts.map((post) =>
-              post.id === postId
-                ? {
-                    ...post,
-                    decision,
-                    feedbackHistory:
-                      decision && !decision.approved && decision.feedback
-                        ? [...post.feedbackHistory, { feedback: decision.feedback, createdAt: decision.createdAt }]
-                        : post.feedbackHistory,
-                  }
-                : post,
-            ),
+            calendarios: prev.calendarios.map((calendario) => ({
+              ...calendario,
+              posts: calendario.posts.map((post) =>
+                post.id === postId
+                  ? {
+                      ...post,
+                      decision,
+                      feedbackHistory:
+                        decision && !decision.approved && decision.feedback
+                          ? [...post.feedbackHistory, { feedback: decision.feedback, createdAt: decision.createdAt }]
+                          : post.feedbackHistory,
+                    }
+                  : post,
+              ),
+            })),
           }
         : prev,
     );
@@ -67,17 +75,22 @@ export default function ClientPortal() {
     );
   }
 
-  if (error || !calendario) {
+  if (error || !cliente) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <div className="max-w-sm space-y-3 text-center">
           <AlertTriangle className="mx-auto h-10 w-10 text-destructive" />
           <h1 className="text-lg font-semibold text-foreground">Link inválido ou expirado</h1>
-          <p className="text-sm text-muted-foreground">{error || 'Calendário não encontrado.'}</p>
+          <p className="text-sm text-muted-foreground">{error || 'Cliente não encontrado.'}</p>
         </div>
       </div>
     );
   }
+
+  const allPosts = cliente.calendarios.flatMap((calendario) =>
+    calendario.posts.map((post) => ({ ...post, calendarLabel: calendario.mesAno || calendario.title })),
+  );
+  const firstDriveLink = cliente.calendarios.find((c) => c.linkDriveArtes)?.linkDriveArtes;
 
   return (
     <div className="min-h-screen bg-background">
@@ -86,11 +99,11 @@ export default function ClientPortal() {
           <div className="flex min-w-0 items-center gap-3">
             <img src={hapoLogo} alt="hapo" className="h-6 w-auto shrink-0" />
             <div className="h-5 w-px shrink-0 bg-border" />
-            <h1 className="truncate text-base font-semibold text-foreground">{calendario.title}</h1>
+            <h1 className="truncate text-base font-semibold text-foreground">{cliente.nome}</h1>
           </div>
-          {calendario.linkDriveArtes && (
+          {firstDriveLink && (
             <a
-              href={calendario.linkDriveArtes}
+              href={firstDriveLink}
               target="_blank"
               rel="noopener noreferrer"
               className="flex shrink-0 items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
@@ -103,12 +116,12 @@ export default function ClientPortal() {
       </header>
 
       <main className="py-1">
-        {calendario.posts.length === 0 ? (
+        {allPosts.length === 0 ? (
           <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-            Nenhum post disponível neste calendário ainda.
+            Nenhum post disponível para aprovação ainda.
           </p>
         ) : (
-          <ClientPortalFeed token={token!} posts={calendario.posts} onDecided={handleDecided} />
+          <ClientPortalFeed token={token!} posts={allPosts} onDecided={handleDecided} />
         )}
       </main>
     </div>

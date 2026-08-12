@@ -32,6 +32,12 @@ db.exec(`
     post_id TEXT PRIMARY KEY,
     resolved_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
   );
+
+  CREATE TABLE IF NOT EXISTS client_portal_slugs (
+    slug TEXT PRIMARY KEY,
+    client_id TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  );
 `);
 
 const insertDecisionStmt = db.prepare(`
@@ -114,6 +120,30 @@ export function markAdjustmentsResolvedForPost(postId) {
 export function getAdjustmentResolvedAtForPost(postId) {
   const row = adjustmentResolutionByPostStmt.get(postId);
   return row?.resolved_at ?? null;
+}
+
+const slugByClientIdStmt = db.prepare('SELECT slug FROM client_portal_slugs WHERE client_id = ?');
+const clientIdBySlugStmt = db.prepare('SELECT client_id FROM client_portal_slugs WHERE slug = ?');
+const slugExistsStmt = db.prepare('SELECT 1 FROM client_portal_slugs WHERE slug = ?');
+const insertSlugStmt = db.prepare('INSERT INTO client_portal_slugs (slug, client_id) VALUES (?, ?)');
+
+export function getSlugForClientId(clientId) {
+  return slugByClientIdStmt.get(clientId)?.slug ?? null;
+}
+
+export function getClientIdForSlug(slug) {
+  return clientIdBySlugStmt.get(slug)?.client_id ?? null;
+}
+
+export function createSlugForClientId(clientId, baseSlug) {
+  let candidate = baseSlug;
+  let suffix = 2;
+  while (slugExistsStmt.get(candidate)) {
+    candidate = `${baseSlug}-${suffix}`;
+    suffix += 1;
+  }
+  insertSlugStmt.run(candidate, clientId);
+  return candidate;
 }
 
 export default db;
