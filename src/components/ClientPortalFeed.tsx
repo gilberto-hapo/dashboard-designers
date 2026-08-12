@@ -499,23 +499,31 @@ export function ClientPortalFeed({
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-4 px-1 sm:px-4">
-      {groups.map((group, index) => (
-        <div key={group.label ?? index} className="space-y-2">
-          {group.label && (
-            <h2 className="px-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">{group.label}</h2>
-          )}
-          <div className="grid grid-cols-3 gap-1 sm:gap-2">
-            {group.posts.map((post) => (
-              <GridThumb
-                key={post.id}
-                token={token}
-                post={post}
-                onOpen={() => navigate(`/portal/${token}/posts/${post.id}`)}
-              />
-            ))}
+      {groups.map((group, index) => {
+        const pendingPosts = group.posts.filter((post) => !post.published);
+
+        return (
+          <div key={group.label ?? index} className="space-y-2">
+            {group.label && (
+              <h2 className="px-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">{group.label}</h2>
+            )}
+            {pendingPosts.length === 0 ? (
+              <p className="px-1 text-xs text-muted-foreground">Nenhum post pendente.</p>
+            ) : (
+              <div className="grid grid-cols-3 gap-1 sm:gap-2">
+                {pendingPosts.map((post) => (
+                  <GridThumb
+                    key={post.id}
+                    token={token}
+                    post={post}
+                    onOpen={() => navigate(`/portal/${token}/posts/${post.id}`)}
+                  />
+                ))}
+              </div>
+            )}
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
