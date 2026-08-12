@@ -2237,6 +2237,31 @@ app.get('/api/public/portal/:token', async (req, res) => {
   }
 });
 
+// Faz proxy de um arquivo de mídia do Drive repassando o header Range do
+// cliente, para o navegador poder fazer seek em vídeos e não precisar
+// baixar o arquivo inteiro antes de começar a tocar.
+async function streamDriveMedia({ req, res, fileId, logLabel }) {
+  const metadata = await getDriveFileMetadata(fileId);
+  const range = req.headers.range;
+  const { stream, status, headers } = await getDriveFileStream(fileId, { range });
+
+  res.status(range ? status || 206 : 200);
+  res.setHeader('Content-Type', metadata.mimeType || 'application/octet-stream');
+  res.setHeader('Cache-Control', 'private, max-age=300');
+  res.setHeader('Accept-Ranges', 'bytes');
+  if (headers?.['content-range']) res.setHeader('Content-Range', headers['content-range']);
+  if (headers?.['content-length']) res.setHeader('Content-Length', headers['content-length']);
+
+  stream.on('error', (streamError) => {
+    logServerEvent(`${logLabel}: falha ao ler stream de mídia do Drive`, {
+      fileId,
+      error: streamError.message,
+    });
+    if (!res.headersSent) res.status(500).end();
+  });
+  stream.pipe(res);
+}
+
 app.get('/api/public/portal/:token/media/:fileId', async (req, res) => {
   const fileId = String(req.params.fileId || '').trim();
 
@@ -2261,19 +2286,7 @@ app.get('/api/public/portal/:token/media/:fileId', async (req, res) => {
       return;
     }
 
-    const metadata = await getDriveFileMetadata(fileId);
-    const stream = await getDriveFileStream(fileId);
-
-    res.setHeader('Content-Type', metadata.mimeType || 'application/octet-stream');
-    res.setHeader('Cache-Control', 'private, max-age=300');
-    stream.on('error', (streamError) => {
-      logServerEvent('Portal cliente: falha ao ler stream de mídia do Drive', {
-        fileId,
-        error: streamError.message,
-      });
-      if (!res.headersSent) res.status(500).end();
-    });
-    stream.pipe(res);
+    await streamDriveMedia({ req, res, fileId, logLabel: 'Portal cliente' });
   } catch (error) {
     console.error('Public portal media request failed', error);
     res.status(500).json({ error: error.message });
@@ -2288,19 +2301,7 @@ app.get('/api/media/:fileId', requireAuth, async (req, res) => {
   }
 
   try {
-    const metadata = await getDriveFileMetadata(fileId);
-    const stream = await getDriveFileStream(fileId);
-
-    res.setHeader('Content-Type', metadata.mimeType || 'application/octet-stream');
-    res.setHeader('Cache-Control', 'private, max-age=300');
-    stream.on('error', (streamError) => {
-      logServerEvent('Feedback: falha ao ler stream de mídia do Drive', {
-        fileId,
-        error: streamError.message,
-      });
-      if (!res.headersSent) res.status(500).end();
-    });
-    stream.pipe(res);
+    await streamDriveMedia({ req, res, fileId, logLabel: 'Feedback' });
   } catch (error) {
     console.error('Media request failed', error);
     res.status(500).json({ error: error.message });

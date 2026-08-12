@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { AlertTriangle, ExternalLink, Loader2 } from 'lucide-react';
+import { AlertTriangle, Loader2 } from 'lucide-react';
 import { ClientPortalFeed, type PortalPost } from '@/components/ClientPortalFeed';
 import hapoLogo from '@/assets/hapo-logo.svg';
 
@@ -65,28 +65,14 @@ export default function ClientPortal() {
   const allPosts = cliente.calendarios.flatMap((calendario) =>
     calendario.posts.map((post) => ({ ...post, calendarLabel: calendario.mesAno || calendario.title })),
   );
-  const firstDriveLink = cliente.calendarios.find((c) => c.linkDriveArtes)?.linkDriveArtes;
 
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card px-4 py-3">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <img src={hapoLogo} alt="hapo" className="h-6 w-auto shrink-0" />
-            <div className="h-5 w-px shrink-0 bg-border" />
-            <h1 className="truncate text-base font-semibold text-foreground">{cliente.nome}</h1>
-          </div>
-          {firstDriveLink && (
-            <a
-              href={firstDriveLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex shrink-0 items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-              Link do Drive
-            </a>
-          )}
+        <div className="mx-auto flex max-w-6xl items-center gap-3">
+          <img src={hapoLogo} alt="hapo" className="h-6 w-auto shrink-0" />
+          <div className="h-5 w-px shrink-0 bg-border" />
+          <h1 className="truncate text-base font-semibold text-foreground">{cliente.nome}</h1>
         </div>
       </header>
 

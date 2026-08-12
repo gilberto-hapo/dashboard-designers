@@ -1,5 +1,6 @@
 import { google } from 'googleapis';
 import mammoth from 'mammoth';
+import { Readable } from 'node:stream';
 
 const DRIVE_FOLDER_TTL_MS = 1000 * 30;
 const cache = new Map();
@@ -41,10 +42,18 @@ function getAuth() {
   });
 }
 
+let authClient = null;
+function getCachedAuth() {
+  if (!authClient) {
+    authClient = getAuth();
+  }
+  return authClient;
+}
+
 let driveClient = null;
 function getDrive() {
   if (!driveClient) {
-    driveClient = google.drive({ version: 'v3', auth: getAuth() });
+    driveClient = google.drive({ version: 'v3', auth: getCachedAuth() });
   }
   return driveClient;
 }
@@ -185,13 +194,30 @@ export async function listCalendarPostFolders(calendarFolderLink, { forceRefresh
   return result;
 }
 
-export async function getDriveFileStream(fileId) {
-  const drive = getDrive();
-  const res = await drive.files.get(
-    { fileId, alt: 'media', supportsAllDrives: true },
-    { responseType: 'stream' },
-  );
-  return res.data;
+// Usa fetch direto (em vez de drive.files.get com responseType: 'stream')
+// porque o cliente googleapis/gaxios não expõe de forma confiável o status
+// e os headers (Content-Range, Content-Length) da resposta em modo stream —
+// e são justamente esses headers que o navegador precisa para fazer seek em
+// vídeos grandes sem baixar o arquivo inteiro.
+export async function getDriveFileStream(fileId, { range } = {}) {
+  const accessToken = await getCachedAuth().getAccessToken();
+  const url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&supportsAllDrives=true`;
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      ...(range ? { Range: range } : {}),
+    },
+  });
+
+  if (!response.ok && response.status !== 206) {
+    throw new Error(`Drive media request failed with status ${response.status}`);
+  }
+
+  return {
+    stream: Readable.fromWeb(response.body),
+    status: response.status,
+    headers: Object.fromEntries(response.headers.entries()),
+  };
 }
 
 export async function getDriveFileMetadata(fileId) {
