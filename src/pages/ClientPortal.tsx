@@ -65,6 +65,7 @@ export default function ClientPortal() {
   const allPosts = cliente.calendarios.flatMap((calendario) =>
     calendario.posts.map((post) => ({ ...post, calendarLabel: calendario.mesAno || calendario.title })),
   );
+  const postsWithMedia = allPosts.filter((post) => (post.media?.files?.length ?? 0) > 0);
 
   return (
     <div className="min-h-screen bg-background">
@@ -77,9 +78,9 @@ export default function ClientPortal() {
       </header>
 
       <main className="py-1">
-        {allPosts.length === 0 ? (
+        {postsWithMedia.length === 0 ? (
           <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-            Nenhum post disponível para aprovação ainda.
+            Seus posts estão sendo produzidos e logo estarão aqui para aprovação.
           </p>
         ) : (
           <ClientPortalFeed token={token!} posts={allPosts} />
