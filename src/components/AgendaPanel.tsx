@@ -562,6 +562,110 @@ function formatCriticalDeadlineSummary(overdue: number, dueSoon: number) {
   return parts.join(' + ');
 }
 
+type AgendaTaskGroup = {
+  key: string;
+  client: string;
+  tasks: DesignTask[];
+};
+
+function buildAgendaTaskGroups(tasks: DesignTask[]): AgendaTaskGroup[] {
+  const groups: AgendaTaskGroup[] = [];
+  const groupByKey = new Map<string, AgendaTaskGroup>();
+
+  tasks.forEach((task) => {
+    const client = getTaskClient(task);
+    const key = `${client}|${task.stage}`;
+    const existing = groupByKey.get(key);
+    if (existing) {
+      existing.tasks.push(task);
+      return;
+    }
+    const group: AgendaTaskGroup = { key, client, tasks: [task] };
+    groupByKey.set(key, group);
+    groups.push(group);
+  });
+
+  return groups;
+}
+
+function AgendaTaskButton({
+  task,
+  onClick,
+}: {
+  task: DesignTask;
+  onClick: () => void;
+}) {
+  const tone = statusTone(task);
+
+  return (
+    <button
+      type="button"
+      aria-label={`${task.title} - ${tone.label}`}
+      onClick={onClick}
+      className={`group relative w-full rounded-lg border px-2 py-1.5 text-left shadow-sm transition-all duration-150 hover:-translate-y-px hover:shadow-md ${tone.className} ${tone.hoverClass}`}
+    >
+      <div className={`pointer-events-none absolute left-2 bottom-[calc(100%+0.45rem)] z-30 rounded-xl border px-3 py-1.5 text-[10px] font-semibold tracking-[0.01em] opacity-0 shadow-[0_14px_32px_rgba(0,0,0,0.42)] transition-opacity duration-75 group-hover:opacity-100 group-focus-within:opacity-100 ${tone.tooltipClass}`}>
+        {tone.label}
+      </div>
+      <div className="flex items-start gap-1.5">
+        <span className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${tone.accent}`} />
+        <p className="line-clamp-2 text-[11px] font-semibold leading-snug text-foreground">{task.title}</p>
+      </div>
+    </button>
+  );
+}
+
+function AgendaTaskGroupCard({
+  group,
+  onTaskClick,
+}: {
+  group: AgendaTaskGroup;
+  onTaskClick: (task: DesignTask) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  if (group.tasks.length === 1 || expanded) {
+    return (
+      <>
+        {group.tasks.map((task) => (
+          <AgendaTaskButton key={task.id} task={task} onClick={() => onTaskClick(task)} />
+        ))}
+        {group.tasks.length > 1 && (
+          <button
+            type="button"
+            onClick={() => setExpanded(false)}
+            className="w-full rounded-lg border border-dashed border-border/60 px-2 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Recolher
+          </button>
+        )}
+      </>
+    );
+  }
+
+  const tone = statusTone(group.tasks[0]);
+
+  return (
+    <button
+      type="button"
+      aria-label={`${group.client} - ${group.tasks.length} posts - ${tone.label}`}
+      onClick={() => setExpanded(true)}
+      className={`group relative w-full rounded-lg border px-2 py-1.5 text-left shadow-sm transition-all duration-150 hover:-translate-y-px hover:shadow-md ${tone.className} ${tone.hoverClass}`}
+    >
+      <div className={`pointer-events-none absolute left-2 bottom-[calc(100%+0.45rem)] z-30 rounded-xl border px-3 py-1.5 text-[10px] font-semibold tracking-[0.01em] opacity-0 shadow-[0_14px_32px_rgba(0,0,0,0.42)] transition-opacity duration-75 group-hover:opacity-100 group-focus-within:opacity-100 ${tone.tooltipClass}`}>
+        {tone.label}
+      </div>
+      <div className="flex items-center gap-1.5">
+        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${tone.accent}`} />
+        <p className="line-clamp-1 flex-1 text-[11px] font-semibold leading-snug text-foreground">{group.client}</p>
+        <span className="shrink-0 rounded-full bg-black/25 px-1.5 py-0.5 text-[10px] font-bold text-foreground">
+          {group.tasks.length}
+        </span>
+      </div>
+    </button>
+  );
+}
+
 function AgendaDayCell({
   cell,
   onTaskClick,
@@ -569,7 +673,7 @@ function AgendaDayCell({
   cell: MonthCell;
   onTaskClick: (task: DesignTask) => void;
 }) {
-  const visibleTasks = cell.tasks;
+  const taskGroups = useMemo(() => buildAgendaTaskGroups(cell.tasks), [cell.tasks]);
   const monthDividerLabel = new Intl.DateTimeFormat('pt-BR', { month: 'short' })
     .format(cell.date)
     .replace('.', '')
@@ -599,28 +703,9 @@ function AgendaDayCell({
       </div>
 
       <div className="mt-2 space-y-1">
-        {visibleTasks.map((task) => {
-          const tone = statusTone(task);
-
-          return (
-            <button
-              key={task.id}
-              type="button"
-              aria-label={`${task.title} - ${tone.label}`}
-              onClick={() => onTaskClick(task)}
-              className={`group relative w-full rounded-lg border px-2 py-1.5 text-left shadow-sm transition-all duration-150 hover:-translate-y-px hover:shadow-md ${tone.className} ${tone.hoverClass}`}
-            >
-              <div className={`pointer-events-none absolute left-2 bottom-[calc(100%+0.45rem)] z-30 rounded-xl border px-3 py-1.5 text-[10px] font-semibold tracking-[0.01em] opacity-0 shadow-[0_14px_32px_rgba(0,0,0,0.42)] transition-opacity duration-75 group-hover:opacity-100 group-focus-within:opacity-100 ${tone.tooltipClass}`}>
-                {tone.label}
-              </div>
-              <div className="flex items-start gap-1.5">
-                <span className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${tone.accent}`} />
-                <p className="line-clamp-2 text-[11px] font-semibold leading-snug text-foreground">{task.title}</p>
-              </div>
-            </button>
-          );
-        })}
-
+        {taskGroups.map((group) => (
+          <AgendaTaskGroupCard key={group.key} group={group} onTaskClick={onTaskClick} />
+        ))}
       </div>
     </div>
   );
