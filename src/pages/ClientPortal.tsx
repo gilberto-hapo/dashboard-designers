@@ -42,31 +42,6 @@ export default function ClientPortal() {
       .finally(() => setLoading(false));
   }, [token]);
 
-  function handleDecided(postId: string, decision: PortalPost['decision']) {
-    setCliente((prev) =>
-      prev
-        ? {
-            ...prev,
-            calendarios: prev.calendarios.map((calendario) => ({
-              ...calendario,
-              posts: calendario.posts.map((post) =>
-                post.id === postId
-                  ? {
-                      ...post,
-                      decision,
-                      feedbackHistory:
-                        decision && !decision.approved && decision.feedback
-                          ? [...post.feedbackHistory, { feedback: decision.feedback, createdAt: decision.createdAt }]
-                          : post.feedbackHistory,
-                    }
-                  : post,
-              ),
-            })),
-          }
-        : prev,
-    );
-  }
-
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -121,7 +96,7 @@ export default function ClientPortal() {
             Nenhum post disponível para aprovação ainda.
           </p>
         ) : (
-          <ClientPortalFeed token={token!} posts={allPosts} onDecided={handleDecided} />
+          <ClientPortalFeed token={token!} posts={allPosts} />
         )}
       </main>
     </div>

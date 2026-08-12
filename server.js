@@ -2070,13 +2070,16 @@ function extractPostSequenceNumber(title) {
 // ao cliente). Compartilhada entre a visão interna (todos os posts, qualquer
 // fase) e o portal público do cliente (só posts em fase Validação do Cliente
 // em diante, exceto Arquivado).
-async function resolveCalendarPosts(calendario, { clients, goalfyData, requireClientVisiblePhase = false }) {
+async function resolveCalendarPosts(
+  calendario,
+  { clients, goalfyData, requireClientVisiblePhase = false, forceRefreshDrive = false },
+) {
   const client = clients.find((c) => normalizeLookupKey(c.nome) === normalizeLookupKey(calendario.clienteNome));
 
   let folders = [];
   if (calendario.linkDriveArtes) {
     try {
-      folders = await listCalendarPostFolders(calendario.linkDriveArtes);
+      folders = await listCalendarPostFolders(calendario.linkDriveArtes, { forceRefresh: forceRefreshDrive });
     } catch (error) {
       logServerEvent('Portal cliente: falha ao listar pastas do Drive', {
         calendarId: calendario.id,
@@ -2161,7 +2164,7 @@ async function resolveCalendarPosts(calendario, { clients, goalfyData, requireCl
 // Resolve os dados de um calendário para a visão interna (designer/equipe) —
 // sem exigir sessão de usuário interno no shape retornado, mas usada hoje só
 // por rotas com requireAuth. Mostra todos os posts, qualquer fase.
-async function resolvePublicCalendarPayload(calendarId, preFetched = null) {
+async function resolvePublicCalendarPayload(calendarId, preFetched = null, { forceRefreshDrive = false } = {}) {
   const writeToken = getGoalfyCardsWriteToken();
   const [calendarios, clients, goalfyData] = preFetched
     ? [preFetched.calendarios, preFetched.clients, preFetched.goalfyData]
@@ -2174,7 +2177,7 @@ async function resolvePublicCalendarPayload(calendarId, preFetched = null) {
   const calendario = calendarios.find((c) => c.id === calendarId);
   if (!calendario) return null;
 
-  return resolveCalendarPosts(calendario, { clients, goalfyData });
+  return resolveCalendarPosts(calendario, { clients, goalfyData, forceRefreshDrive });
 }
 
 // Resolve o payload do portal público de um CLIENTE: todos os calendários
@@ -2344,13 +2347,18 @@ app.get('/api/calendarios/:id/detail', requireAuth, async (req, res) => {
   }
 
   try {
+    const forceRefreshDrive = req.query.refresh === '1';
     const writeToken = getGoalfyCardsWriteToken();
     const [calendarios, clients, goalfyData] = await Promise.all([
       fetchAllCalendarsWithPhase({ writeToken }),
       fetchCardsClients({ writeToken }),
       fetchGoalfyData(),
     ]);
-    const resolvedCalendario = await resolvePublicCalendarPayload(calendarId, { calendarios, clients, goalfyData });
+    const resolvedCalendario = await resolvePublicCalendarPayload(
+      calendarId,
+      { calendarios, clients, goalfyData },
+      { forceRefreshDrive },
+    );
 
     const calendario = calendarios.find((c) => c.id === calendarId);
     if (!calendario || !resolvedCalendario) {
@@ -2366,6 +2374,7 @@ app.get('/api/calendarios/:id/detail', requireAuth, async (req, res) => {
     res.json({
       calendario: {
         ...resolvedCalendario,
+        clientId: client?.id ?? null,
         phaseTitle: calendario.phaseTitle,
         phaseColor: calendario.phaseColor,
         linkCalendarioEditorial: calendario.linkCalendarioEditorial,

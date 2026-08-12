@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { CheckCircle2, Loader2, MessageSquareWarning, Play, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { CheckCircle2, Loader2, MessageSquareWarning, Play } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Carousel,
@@ -11,7 +12,6 @@ import {
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -131,21 +131,27 @@ export function PostMediaViewShared({
 
 export type GridThumbStatus = 'approved' | 'published' | 'adjustment' | null;
 
-const GRID_THUMB_STATUS_STYLES: Record<Exclude<GridThumbStatus, null>, { border: string; overlay: string; dot: string }> = {
+const GRID_THUMB_STATUS_STYLES: Record<
+  Exclude<GridThumbStatus, null>,
+  { border: string; overlay: string; badge: string; label: string }
+> = {
   approved: {
     border: 'border-emerald-500',
     overlay: 'bg-emerald-500/10',
-    dot: 'bg-emerald-500',
+    badge: 'bg-emerald-500 text-white',
+    label: 'Aprovado',
   },
   published: {
     border: 'border-sky-500',
     overlay: 'bg-sky-500/10',
-    dot: 'bg-sky-500',
+    badge: 'bg-sky-500 text-white',
+    label: 'Publicado',
   },
   adjustment: {
     border: 'border-amber-500',
     overlay: 'bg-amber-500/10',
-    dot: 'bg-amber-500',
+    badge: 'bg-amber-500 text-white',
+    label: 'Ajuste',
   },
 };
 
@@ -213,7 +219,11 @@ export function GridThumbShared({
         <>
           <span className={`absolute inset-0 ${statusStyle.overlay}`} />
           <span className={`pointer-events-none absolute inset-0 border-[3px] ${statusStyle.border}`} />
-          <span className={`absolute right-2 top-2 h-2.5 w-2.5 rounded-full ring-2 ring-black/40 ${statusStyle.dot}`} />
+          <span
+            className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${statusStyle.badge}`}
+          >
+            {statusStyle.label}
+          </span>
         </>
       )}
       <span className="absolute inset-0 bg-black/0 transition-colors group-hover:bg-black/10" />
@@ -222,26 +232,9 @@ export function GridThumbShared({
 }
 
 function CaptionText({ caption }: { caption: string | null }) {
-  const [expanded, setExpanded] = useState(false);
   if (!caption) return null;
 
-  const isLong = caption.length > 180;
-  const shown = expanded || !isLong ? caption : `${caption.slice(0, 180)}…`;
-
-  return (
-    <div className="whitespace-pre-wrap text-sm text-foreground">
-      {shown}
-      {isLong && (
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="ml-1 font-semibold text-muted-foreground hover:text-foreground"
-        >
-          {expanded ? 'ver menos' : 'ver mais'}
-        </button>
-      )}
-    </div>
-  );
+  return <div className="whitespace-pre-wrap text-sm text-foreground">{caption}</div>;
 }
 
 function PostMediaView({ token, media, title }: { token: string; media: PostMedia | null; title: string }) {
@@ -274,7 +267,16 @@ function ResolvedFeedbackToggle({ entries }: { entries: FeedbackEntry[] }) {
   );
 }
 
-function DecisionBadge({ decision }: { decision: PostDecision | null }) {
+function DecisionBadge({ decision, published }: { decision: PostDecision | null; published?: boolean }) {
+  if (published) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-sky-500/40 bg-sky-500/10 px-3 py-1 text-xs font-semibold text-sky-600">
+        <CheckCircle2 className="h-3.5 w-3.5" />
+        Publicado
+      </span>
+    );
+  }
+
   if (!decision) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
@@ -319,7 +321,7 @@ function GridThumb({ token, post, onOpen }: { token: string; post: PortalPost; o
   );
 }
 
-function PostDetail({
+export function PostDetail({
   token,
   post,
   onDecided,
@@ -368,7 +370,7 @@ function PostDetail({
           <span className="rounded-full border border-border px-2.5 py-0.5 text-[11px] font-medium uppercase text-muted-foreground">
             {post.formatoEntrega || 'Post'}
           </span>
-          <DecisionBadge decision={post.decision} />
+          <DecisionBadge decision={post.decision} published={post.published} />
         </div>
 
         <CaptionText caption={post.caption} />
@@ -392,7 +394,7 @@ function PostDetail({
         )}
 
         <div className="mt-auto pt-2">
-          {!isRejecting ? (
+          {post.published ? null : !isRejecting ? (
             <div className="flex flex-col gap-6 sm:flex-row">
               <Button
                 className="h-20 w-full shrink-0 gap-2 text-base bg-emerald-600 text-white hover:bg-emerald-600/90 sm:w-auto sm:flex-1"
@@ -477,15 +479,12 @@ function PostDetail({
 export function ClientPortalFeed({
   token,
   posts,
-  onDecided,
 }: {
   token: string;
   posts: PortalPost[];
-  onDecided: (postId: string, decision: PostDecision) => void;
 }) {
-  const [openPostId, setOpenPostId] = useState<string | null>(null);
+  const navigate = useNavigate();
   const visiblePosts = posts.filter((post) => (post.media?.files?.length ?? 0) > 0);
-  const openPost = visiblePosts.find((post) => post.id === openPostId) ?? null;
 
   const groups: Array<{ label: string | null; posts: PortalPost[] }> = [];
   visiblePosts.forEach((post) => {
@@ -499,39 +498,24 @@ export function ClientPortalFeed({
   });
 
   return (
-    <>
-      <div className="mx-auto w-full max-w-6xl space-y-4 px-1 sm:px-4">
-        {groups.map((group, index) => (
-          <div key={group.label ?? index} className="space-y-2">
-            {group.label && (
-              <h2 className="px-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">{group.label}</h2>
-            )}
-            <div className="grid grid-cols-3 gap-1 sm:gap-2">
-              {group.posts.map((post) => (
-                <GridThumb key={post.id} token={token} post={post} onOpen={() => setOpenPostId(post.id)} />
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <Dialog open={openPost != null} onOpenChange={(open) => !open && setOpenPostId(null)}>
-        <DialogContent className="top-[5vh] max-h-[90vh] max-w-lg translate-y-0 gap-0 overflow-y-auto overscroll-contain rounded-none p-0 [touch-action:pan-y] sm:rounded-none [&>button:last-child]:hidden">
-          {openPost && (
-            <>
-              <DialogTitle className="sr-only">{openPost.title}</DialogTitle>
-              <button
-                type="button"
-                onClick={() => setOpenPostId(null)}
-                className="sticky top-2 z-10 ml-auto mr-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70"
-              >
-                <X className="h-4 w-4" />
-              </button>
-              <PostDetail token={token} post={openPost} onDecided={onDecided} />
-            </>
+    <div className="mx-auto w-full max-w-6xl space-y-4 px-1 sm:px-4">
+      {groups.map((group, index) => (
+        <div key={group.label ?? index} className="space-y-2">
+          {group.label && (
+            <h2 className="px-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">{group.label}</h2>
           )}
-        </DialogContent>
-      </Dialog>
-    </>
+          <div className="grid grid-cols-3 gap-1 sm:gap-2">
+            {group.posts.map((post) => (
+              <GridThumb
+                key={post.id}
+                token={token}
+                post={post}
+                onOpen={() => navigate(`/portal/${token}/posts/${post.id}`)}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }

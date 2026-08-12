@@ -1,7 +1,7 @@
 import { google } from 'googleapis';
 import mammoth from 'mammoth';
 
-const DRIVE_FOLDER_TTL_MS = 1000 * 60 * 5;
+const DRIVE_FOLDER_TTL_MS = 1000 * 30;
 const cache = new Map();
 
 function parseServiceAccountJson(raw) {
@@ -153,13 +153,13 @@ async function resolvePostFolderContent(folder) {
 // Lista as subpastas de post dentro da pasta de artes do calendário, em
 // ordem (Post 01, Post 02, ...), resolvendo duplicatas ao preferir a
 // subpasta com mídia de fato quando o mesmo nome aparece mais de uma vez.
-export async function listCalendarPostFolders(calendarFolderLink) {
+export async function listCalendarPostFolders(calendarFolderLink, { forceRefresh = false } = {}) {
   const folderId = extractFolderIdFromDriveLink(calendarFolderLink);
   if (!folderId) return [];
 
   const cacheKey = folderId;
   const cached = cache.get(cacheKey);
-  if (cached && Date.now() - cached.at < DRIVE_FOLDER_TTL_MS) {
+  if (!forceRefresh && cached && Date.now() - cached.at < DRIVE_FOLDER_TTL_MS) {
     return cached.value;
   }
 
