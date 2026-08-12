@@ -1642,7 +1642,7 @@ const CARDS_CALENDAR_PHASE_POSTS_PROGRAMADOS_ID = '5dcada9c-8cab-4eeb-b3f0-5632c
 const CARDS_CALENDAR_PHASES = {
   [CARDS_CALENDAR_PHASE_CAIXA_ENTRADA_ID]: { title: 'Caixa de Entrada', color: '#ef4444' },
   [CARDS_CALENDAR_PHASE_EM_ANDAMENTO_ID]: { title: 'Em Andamento', color: '#22c55e' },
-  [CARDS_CALENDAR_PHASE_POSTS_PROGRAMADOS_ID]: { title: 'Posts Programados', color: '#22c55e' },
+  [CARDS_CALENDAR_PHASE_POSTS_PROGRAMADOS_ID]: { title: 'Posts Programados', color: '#71717a' },
 };
 const CARDS_CALENDAR_FIELD_PRIMEIRO_DIA_ID = '5c0802d8-cf18-4f62-836a-fb0a64663b9b';
 const CARDS_CALENDAR_FIELD_CLIENTE_ID = '161d97db-7214-4d95-bc02-a332e607e6d9';
@@ -1969,23 +1969,36 @@ async function fetchInboxCalendars({ writeToken }) {
 }
 
 // Todas as fases do board de Calendário (não só Caixa de Entrada), usada pela
-// aba "Calendários". Sem cache pelo mesmo motivo de fetchInboxCalendars.
+// aba "Calendários". Resolve o cliente por ID da tag (findFieldTagIds), não
+// por nome, para o vínculo cliente-calendário ficar exato mesmo quando o
+// texto do campo diverge do nome cadastrado do cliente (ex: apelidos,
+// digitação manual antiga). Sem cache pelo mesmo motivo de
+// fetchInboxCalendars.
 async function fetchAllCalendarsWithPhase({ writeToken }) {
-  const allCalendarCards = await fetchAllGoalfyCardsInBoard({ boardId: CARDS_CALENDAR_BOARD_ID, writeToken });
+  const [allCalendarCards, clients] = await Promise.all([
+    fetchAllGoalfyCardsInBoard({ boardId: CARDS_CALENDAR_BOARD_ID, writeToken }),
+    fetchCardsClients({ writeToken }),
+  ]);
+  const clientsById = new Map(clients.map((client) => [client.id, client]));
 
   return mapWithConcurrency(allCalendarCards, 8, async (card) => {
     const cardDetail = await goalfyApiFetch(`/cards/${card.id}`, { writeToken });
-    const clienteNome = findFieldValue(cardDetail.form?.fields, CARDS_CALENDAR_FIELD_CLIENTE_ID);
-    const primeiroDia = findFieldDateValue(cardDetail.form?.fields, CARDS_CALENDAR_FIELD_PRIMEIRO_DIA_ID);
-    const linkCalendarioEditorial = findFieldValue(cardDetail.form?.fields, CARDS_CALENDAR_FIELD_LINK_EDITORIAL_ID);
-    const linkDriveArtes = findFieldValue(cardDetail.form?.fields, CARDS_CALENDAR_FIELD_LINK_DRIVE_ARTES_ID);
+    const fields = cardDetail.form?.fields || [];
+    const clientIds = findFieldTagIds(fields, CARDS_CALENDAR_FIELD_CLIENTE_ID);
+    const client = clientIds[0] ? clientsById.get(clientIds[0]) : null;
+    const clienteNome = client?.nome || findFieldValue(fields, CARDS_CALENDAR_FIELD_CLIENTE_ID);
+    const primeiroDia = findFieldDateValue(fields, CARDS_CALENDAR_FIELD_PRIMEIRO_DIA_ID);
+    const linkCalendarioEditorial = findFieldValue(fields, CARDS_CALENDAR_FIELD_LINK_EDITORIAL_ID);
+    const linkDriveArtes = findFieldValue(fields, CARDS_CALENDAR_FIELD_LINK_DRIVE_ARTES_ID);
     const phase = CARDS_CALENDAR_PHASES[card.phaseId] || { title: card.phase || 'Sem fase', color: '#71717a' };
 
     return {
       id: card.id,
       title: card.title,
+      clientId: client?.id || null,
       clienteNome: clienteNome || '',
       mesAno: formatMonthYear(primeiroDia),
+      primeiroDia: primeiroDia || null,
       phaseTitle: phase.title,
       phaseColor: phase.color,
       linkCalendarioEditorial: linkCalendarioEditorial || '',
@@ -2455,6 +2468,44 @@ app.get('/api/clientes', requireAuth, async (_req, res) => {
     res.json({ clients });
   } catch (error) {
     console.error('Clientes list request failed', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/clientes/:id/detail', requireAuth, async (req, res) => {
+  const clientId = String(req.params.id || '').trim();
+  if (!clientId) {
+    res.status(400).json({ error: 'clientId is required' });
+    return;
+  }
+
+  try {
+    const writeToken = getGoalfyCardsWriteToken();
+    const [clients, calendarios] = await Promise.all([
+      fetchCardsClients({ writeToken }),
+      fetchAllCalendarsWithPhase({ writeToken }),
+    ]);
+
+    const client = clients.find((c) => c.id === clientId);
+    if (!client) {
+      res.status(404).json({ error: 'Cliente não encontrado' });
+      return;
+    }
+
+    const clientCalendarios = calendarios
+      .filter((c) => c.clientId === clientId)
+      .sort((a, b) => String(b.primeiroDia || '').localeCompare(String(a.primeiroDia || '')))
+      .map((c) => ({
+        id: c.id,
+        title: c.title,
+        mesAno: c.mesAno,
+        phaseTitle: c.phaseTitle,
+        phaseColor: c.phaseColor,
+      }));
+
+    res.json({ client, calendarios: clientCalendarios });
+  } catch (error) {
+    console.error('Client detail request failed', error);
     res.status(500).json({ error: error.message });
   }
 });

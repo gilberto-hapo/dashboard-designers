@@ -9,6 +9,7 @@ import ClientPortal from "./pages/ClientPortal.tsx";
 import PortalPostDetail from "./pages/PortalPostDetail.tsx";
 import CalendarDetail from "./pages/CalendarDetail.tsx";
 import CalendarPostDetail from "./pages/CalendarPostDetail.tsx";
+import ClientDetail from "./pages/ClientDetail.tsx";
 
 const queryClient = new QueryClient();
 
@@ -24,6 +25,7 @@ const App = () => (
           <Route path="/portal/:token/posts/:postId" element={<PortalPostDetail />} />
           <Route path="/calendarios/:id" element={<CalendarDetail />} />
           <Route path="/calendarios/:id/posts/:postId" element={<CalendarPostDetail />} />
+          <Route path="/clientes/:id" element={<ClientDetail />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

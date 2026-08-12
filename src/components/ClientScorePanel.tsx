@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ExternalLink, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchJson } from '@/lib/calendarUi';
@@ -56,6 +57,7 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 export function ClientScorePanel({ selectedDesigner = 'Todos' }: { selectedDesigner?: string }) {
+  const navigate = useNavigate();
   const [clients, setClients] = useState<ClienteInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -107,7 +109,19 @@ export function ClientScorePanel({ selectedDesigner = 'Todos' }: { selectedDesig
   return (
     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
       {filteredClients.map((client) => (
-        <div key={client.id} className="space-y-3 rounded-xl border border-border bg-card p-4">
+        <div
+          key={client.id}
+          role="button"
+          tabIndex={0}
+          onClick={() => navigate(`/clientes/${client.id}`)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              navigate(`/clientes/${client.id}`);
+            }
+          }}
+          className="cursor-pointer space-y-3 rounded-xl border border-border bg-card p-4 transition-colors hover:border-foreground/30"
+        >
           <div>
             <h3 className="text-base font-semibold text-foreground">{client.nome}</h3>
             {client.locaisPublicacao.length > 0 && (
@@ -172,7 +186,10 @@ export function ClientScorePanel({ selectedDesigner = 'Todos' }: { selectedDesig
             <button
               type="button"
               disabled={generatingLinkForId === client.id}
-              onClick={() => handleOpenClientLink(client.id)}
+              onClick={(event) => {
+                event.stopPropagation();
+                handleOpenClientLink(client.id);
+              }}
               className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-white/30 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-white/10 disabled:opacity-60"
             >
               {generatingLinkForId === client.id ? (
@@ -187,6 +204,7 @@ export function ClientScorePanel({ selectedDesigner = 'Todos' }: { selectedDesig
                 href={client.linkDriveGeral}
                 target="_blank"
                 rel="noreferrer"
+                onClick={(event) => event.stopPropagation()}
                 className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-white/30 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-white/10"
               >
                 <ExternalLink className="h-3.5 w-3.5" />
