@@ -194,7 +194,7 @@ function CalendarPostDetailContent() {
               </div>
             )}
 
-            <div className="pt-2">
+            <div className="mt-4 pt-2">
               {isPublished || isApproved ? null : hasPendingAdjustments ? (
                 <Button
                   className="h-14 w-full gap-2 text-base bg-emerald-600 text-white hover:bg-emerald-600/90"
@@ -205,8 +205,8 @@ function CalendarPostDetailContent() {
                   Ajustes finalizados
                 </Button>
               ) : (
-                <p className="text-center text-xs text-muted-foreground">
-                  Aguardando avaliação do cliente pelo link do calendário.
+                <p className="rounded-lg border border-border px-3 py-2 text-center text-xs text-muted-foreground">
+                  Aguardando aprovação
                 </p>
               )}
             </div>
