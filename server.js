@@ -14,7 +14,7 @@ import {
   markAdjustmentsResolvedForPost,
   getAdjustmentResolvedAtForPost,
 } from './server/db.js';
-import { listCalendarPostFolders, getDriveFileStream, getDriveFileMetadata } from './server/drive.js';
+import { listCalendarPostFolders, getDriveFileStream, getDriveFileMetadata, clearDriveFolderCache } from './server/drive.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1442,6 +1442,8 @@ app.get('/api/goalfy-data', requireAuth, async (req, res) => {
 
 app.post('/api/goalfy-refresh', requireAuth, async (req, res) => {
   try {
+    clearDriveFolderCache();
+
     if (!cachedGoalfyData) {
       const persistedGoalfyData = await readPersistedGoalfyData();
       if (persistedGoalfyData?.data) {
@@ -2199,7 +2201,7 @@ async function resolvePublicCalendarPayload(calendarId, preFetched = null, { for
 // dele que estão na fase "Em Andamento", com os posts de cada um já
 // filtrados para só os visíveis ao cliente (fase Validação do Cliente em
 // diante, exceto Arquivado — ver CLIENT_PORTAL_VISIBLE_PHASE_KEYS).
-async function resolvePublicClientPayload(clientId) {
+async function resolvePublicClientPayload(clientId, { forceRefreshDrive = false } = {}) {
   const writeToken = getGoalfyCardsWriteToken();
   const [calendarios, clients, goalfyData] = await Promise.all([
     fetchAllCalendarsWithPhase({ writeToken }),
@@ -2219,7 +2221,7 @@ async function resolvePublicClientPayload(clientId) {
 
   const resolvedCalendarios = await Promise.all(
     activeCalendarios.map((calendario) =>
-      resolveCalendarPosts(calendario, { clients, goalfyData, requireClientVisiblePhase: true }),
+      resolveCalendarPosts(calendario, { clients, goalfyData, requireClientVisiblePhase: true, forceRefreshDrive }),
     ),
   );
 
@@ -2238,7 +2240,8 @@ app.get('/api/public/portal/:token', async (req, res) => {
       return;
     }
 
-    const cliente = await resolvePublicClientPayload(clientId);
+    const forceRefreshDrive = req.query.refresh === '1';
+    const cliente = await resolvePublicClientPayload(clientId, { forceRefreshDrive });
     if (!cliente) {
       res.status(404).json({ error: 'Cliente não encontrado' });
       return;

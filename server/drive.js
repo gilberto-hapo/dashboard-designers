@@ -5,6 +5,13 @@ import { Readable } from 'node:stream';
 const DRIVE_FOLDER_TTL_MS = 1000 * 30;
 const cache = new Map();
 
+// Limpa o cache de pastas de post do Drive — chamado quando o usuário força
+// um refresh manual (botão "Atualizar dados"), para o link do cliente também
+// refletir correções feitas no Drive sem precisar esperar o TTL expirar.
+export function clearDriveFolderCache() {
+  cache.clear();
+}
+
 function parseServiceAccountJson(raw) {
   try {
     return JSON.parse(raw);
