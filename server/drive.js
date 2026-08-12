@@ -91,11 +91,24 @@ function isCaptionDoc(mimeType) {
   );
 }
 
+// mammoth.extractRawText gera uma linha por parágrafo do docx, inclusive
+// parágrafos vazios (espaçamento visual entre blocos no Word) — sem isso o
+// texto renderizado (com whitespace-pre-wrap) fica com espaçamento excessivo
+// entre linhas que no documento original eram só uma quebra simples.
+function normalizeCaptionWhitespace(text) {
+  return text
+    .split('\n')
+    .map((line) => line.trim())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 function extractCaptionSection(rawText) {
   const marker = /legenda\s*:/i;
   const match = rawText.match(marker);
-  if (!match) return rawText.trim();
-  return rawText.slice(match.index + match[0].length).trim();
+  const section = match ? rawText.slice(match.index + match[0].length) : rawText;
+  return normalizeCaptionWhitespace(section);
 }
 
 async function extractCaptionFromDocx(fileId) {
