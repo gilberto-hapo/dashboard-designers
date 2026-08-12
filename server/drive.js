@@ -111,8 +111,12 @@ function normalizeCaptionWhitespace(text) {
     .trim();
 }
 
+// Aceita tanto "Legenda:" quanto variações como "LEGENDA EXCLUSIVA
+// INSTAGRAM" — o marcador é a palavra "legenda" em uma linha própria,
+// cortando tudo a partir do fim dessa linha (ignora o resto do texto nela,
+// ex.: "EXCLUSIVA INSTAGRAM" ou ":").
 function extractCaptionSection(rawText) {
-  const marker = /legenda\s*:/i;
+  const marker = /^.*\blegenda\b.*$/im;
   const match = rawText.match(marker);
   const section = match ? rawText.slice(match.index + match[0].length) : rawText;
   return normalizeCaptionWhitespace(section);
