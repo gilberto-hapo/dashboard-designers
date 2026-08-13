@@ -96,7 +96,7 @@ function ClientDetailContent() {
     <div className="min-h-screen bg-background">
       <SidebarNav
         activeView="client-score"
-        onChange={(view) => navigate('/', { state: { activeView: view } })}
+        onChange={(view) => navigate(`/painel/${view}`)}
         onRefresh={loadClient}
         isRefreshing={loading}
         lastUpdatedAt={Date.now()}
@@ -116,7 +116,7 @@ function ClientDetailContent() {
               variant="ghost"
               size="sm"
               className="gap-2 -ml-2"
-              onClick={() => navigate('/', { state: { activeView: 'client-score' } })}
+              onClick={() => navigate('/painel/client-score')}
             >
               <ArrowLeft className="h-4 w-4" />
               Voltar para Clientes

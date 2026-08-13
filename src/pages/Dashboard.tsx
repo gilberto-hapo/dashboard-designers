@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Loader2, WifiOff } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
@@ -131,9 +131,13 @@ export default function Dashboard() {
     window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, isSidebarCollapsed ? '1' : '0');
   }, [isSidebarCollapsed]);
 
-  const location = useLocation();
-  const initialView = (location.state as { activeView?: ViewMode } | null)?.activeView ?? 'calendar';
-  const [activeView, setActiveView] = useState<ViewMode>(initialView);
+  const navigate = useNavigate();
+  const { view: viewParam } = useParams<{ view?: string }>();
+  const activeView = (viewParam as ViewMode | undefined) ?? 'calendar';
+  const setActiveView = useCallback(
+    (view: ViewMode) => navigate(`/painel/${view}`),
+    [navigate],
+  );
   const [selectedStatisticsMonth, setSelectedStatisticsMonth] = useState(getStatisticsCurrentMonth());
   const agendaMonthOptions = useMemo(() => getAgendaMonthOptionsList(), []);
   const [selectedAgendaMonth, setSelectedAgendaMonth] = useState(AGENDA_NEXT_15_DAYS_VALUE);

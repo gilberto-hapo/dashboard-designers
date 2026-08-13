@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
 import { FeedbackGridShared, type FeedbackPost } from '@/components/FeedbackGridShared';
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
@@ -26,7 +25,6 @@ export function ClientFeedbackPanel({
   const [posts, setPosts] = useState<FeedbackPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [resolving, setResolving] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -54,19 +52,6 @@ export function ClientFeedbackPanel({
     [posts, selectedDesigner],
   );
 
-  async function handleResolveAdjustments(postId: string) {
-    setResolving(true);
-    try {
-      await fetchJson(`/api/feedback/${postId}/resolve`, { method: 'POST' });
-      setPosts((prev) => prev.filter((post) => post.postId !== postId));
-      toast.success('Ajustes marcados como finalizados.');
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Erro ao finalizar ajustes');
-    } finally {
-      setResolving(false);
-    }
-  }
-
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -83,9 +68,8 @@ export function ClientFeedbackPanel({
   return (
     <FeedbackGridShared
       posts={filteredPosts}
-      resolving={resolving}
-      onResolve={handleResolveAdjustments}
       emptyMessage="Nenhum feedback pendente de cliente no momento."
+      linkTo={(postId) => `/feedback/posts/${postId}`}
     />
   );
 }

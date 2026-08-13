@@ -11,6 +11,7 @@ import PortalPostDetail from "./pages/PortalPostDetail.tsx";
 import CalendarDetail from "./pages/CalendarDetail.tsx";
 import CalendarPostDetail from "./pages/CalendarPostDetail.tsx";
 import ClientDetail from "./pages/ClientDetail.tsx";
+import FeedbackPostDetail from "./pages/FeedbackPostDetail.tsx";
 
 const queryClient = new QueryClient();
 
@@ -22,12 +23,14 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/painel/:view" element={<Index />} />
           <Route path="/portal/:token" element={<ClientPortal />} />
           <Route path="/portal/:token/posts/:postId" element={<PortalPostDetail />} />
           <Route path="/copywriter-portal" element={<CopywriterPortal />} />
           <Route path="/calendarios/:id" element={<CalendarDetail />} />
           <Route path="/calendarios/:id/posts/:postId" element={<CalendarPostDetail />} />
           <Route path="/clientes/:id" element={<ClientDetail />} />
+          <Route path="/feedback/posts/:postId" element={<FeedbackPostDetail />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

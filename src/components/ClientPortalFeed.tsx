@@ -245,19 +245,19 @@ function ResolvedFeedbackToggle({ entries }: { entries: FeedbackEntry[] }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-2">
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="text-xs font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+        className="text-sm font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
       >
-        {expanded ? 'ocultar ajustes concluídos' : `ver ajustes concluídos (${entries.length})`}
+        {expanded ? 'Ocultar ajustes concluídos' : `Ver ajustes concluídos (${entries.length})`}
       </button>
       {expanded && (
-        <ul className="space-y-2 rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
+        <ul className="space-y-2 rounded-xl border border-border bg-muted/30 p-4">
           {entries.map((entry, index) => (
-            <li key={`${entry.createdAt}-${index}`}>
-              <span className="mb-0.5 block text-[10px] text-muted-foreground">{formatDate(entry.createdAt)}</span>
+            <li key={`${entry.createdAt}-${index}`} className="text-sm text-muted-foreground">
+              <span className="mb-1 block text-xs font-medium text-muted-foreground/80">{formatDate(entry.createdAt)}</span>
               {entry.feedback}
             </li>
           ))}
@@ -376,13 +376,21 @@ export function PostDetail({
         <CaptionText caption={post.caption} />
 
         {post.feedbackHistory.length > 0 && (
-          <div className="space-y-1.5 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-muted-foreground">
-            <span className="font-semibold text-foreground">Ajustes:</span>
-            <ul className="space-y-2">
+          <div className="mt-3 space-y-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+            <div className="flex items-center gap-2 text-amber-600">
+              <MessageSquareWarning className="h-4 w-4" />
+              <span className="text-sm font-semibold">Ajustes solicitados</span>
+            </div>
+            <ul className="space-y-3">
               {post.feedbackHistory.map((entry, index) => (
-                <li key={`${entry.createdAt}-${index}`}>
-                  <span className="mb-0.5 block text-[10px] text-muted-foreground">{formatDate(entry.createdAt)}</span>
-                  {entry.feedback}
+                <li
+                  key={`${entry.createdAt}-${index}`}
+                  className="rounded-lg border border-amber-500/20 bg-background/60 p-3.5"
+                >
+                  <span className="mb-1.5 inline-block rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600">
+                    {formatDate(entry.createdAt)}
+                  </span>
+                  <p className="text-base leading-relaxed text-foreground">{entry.feedback}</p>
                 </li>
               ))}
             </ul>

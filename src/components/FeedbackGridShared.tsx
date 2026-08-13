@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, Loader2, MessageSquareWarning, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import {
@@ -50,6 +51,7 @@ export function FeedbackGridShared({
   emptyMessage = 'Nenhum feedback pendente de cliente no momento.',
   gridClassName = 'grid grid-cols-2 gap-3 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6',
   showCopywriterTag = false,
+  linkTo,
 }: {
   posts: FeedbackPost[];
   readOnly?: boolean;
@@ -59,7 +61,9 @@ export function FeedbackGridShared({
   emptyMessage?: string;
   gridClassName?: string;
   showCopywriterTag?: boolean;
+  linkTo?: (postId: string) => string;
 }) {
+  const navigate = useNavigate();
   const [openPostId, setOpenPostId] = useState<string | null>(null);
   const [showResolvedHistory, setShowResolvedHistory] = useState(false);
   const [confirmingResolve, setConfirmingResolve] = useState(false);
@@ -88,6 +92,10 @@ export function FeedbackGridShared({
                 title={post.postTitle}
                 status="adjustment"
                 onOpen={() => {
+                  if (linkTo) {
+                    navigate(linkTo(post.postId));
+                    return;
+                  }
                   setOpenPostId(post.postId);
                   setShowResolvedHistory(false);
                 }}
@@ -153,36 +161,42 @@ export function FeedbackGridShared({
                     <p className="whitespace-pre-wrap text-sm text-foreground">{openPost.caption}</p>
                   )}
 
-                  <div className="space-y-1.5 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-muted-foreground">
-                    <span className="font-semibold text-foreground">Ajustes:</span>
-                    <ul className="space-y-2">
+                  <div className="mt-3 space-y-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+                    <div className="flex items-center gap-2 text-amber-600">
+                      <MessageSquareWarning className="h-4 w-4" />
+                      <span className="text-sm font-semibold">Ajustes solicitados</span>
+                    </div>
+                    <ul className="space-y-3">
                       {openPost.feedbackHistory.map((entry, index) => (
-                        <li key={`${entry.createdAt}-${index}`}>
-                          <span className="mb-0.5 block text-[10px] text-muted-foreground">
+                        <li
+                          key={`${entry.createdAt}-${index}`}
+                          className="rounded-lg border border-amber-500/20 bg-background/60 p-3.5"
+                        >
+                          <span className="mb-1.5 inline-block rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600">
                             {formatDate(entry.createdAt)}
                           </span>
-                          {entry.feedback}
+                          <p className="text-base leading-relaxed text-foreground">{entry.feedback}</p>
                         </li>
                       ))}
                     </ul>
                   </div>
 
                   {openPost.resolvedFeedbackHistory.length > 0 && (
-                    <div className="space-y-1.5">
+                    <div className="space-y-2">
                       <button
                         type="button"
                         onClick={() => setShowResolvedHistory((v) => !v)}
-                        className="text-xs font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                        className="text-sm font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
                       >
                         {showResolvedHistory
-                          ? 'ocultar ajustes concluídos'
-                          : `ver ajustes concluídos (${openPost.resolvedFeedbackHistory.length})`}
+                          ? 'Ocultar ajustes concluídos'
+                          : `Ver ajustes concluídos (${openPost.resolvedFeedbackHistory.length})`}
                       </button>
                       {showResolvedHistory && (
-                        <ul className="space-y-2 rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
+                        <ul className="space-y-2 rounded-xl border border-border bg-muted/30 p-4">
                           {openPost.resolvedFeedbackHistory.map((entry, index) => (
-                            <li key={`${entry.createdAt}-${index}`}>
-                              <span className="mb-0.5 block text-[10px] text-muted-foreground">
+                            <li key={`${entry.createdAt}-${index}`} className="text-sm text-muted-foreground">
+                              <span className="mb-1 block text-xs font-medium text-muted-foreground/80">
                                 {formatDate(entry.createdAt)}
                               </span>
                               {entry.feedback}

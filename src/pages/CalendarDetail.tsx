@@ -134,7 +134,7 @@ function CalendarDetailContent() {
     <div className="min-h-screen bg-background">
       <SidebarNav
         activeView="calendars"
-        onChange={(view) => navigate('/', { state: { activeView: view } })}
+        onChange={(view) => navigate(`/painel/${view}`)}
         onRefresh={refreshCalendario}
         isRefreshing={loading}
         lastUpdatedAt={Date.now()}
@@ -154,7 +154,7 @@ function CalendarDetailContent() {
               variant="ghost"
               size="sm"
               className="gap-2 -ml-2"
-              onClick={() => navigate('/', { state: { activeView: 'calendars' } })}
+              onClick={() => navigate('/painel/calendars')}
             >
               <ArrowLeft className="h-4 w-4" />
               Voltar para Calendários
