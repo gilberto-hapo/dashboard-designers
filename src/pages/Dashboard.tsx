@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { BookOpen, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Loader2, RefreshCw, WifiOff } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Info, Loader2, RefreshCw, WifiOff } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   navItems,
@@ -25,6 +25,7 @@ import { ClientScorePanel } from '@/components/ClientScorePanel';
 import { CreateCardsPanel } from '@/components/CreateCardsPanel';
 import { TutorialPanel } from '@/components/TutorialPanel';
 import { useGoalfyData } from '@/hooks/useGoalfyData';
+import { usePendingFeedbackCount } from '@/hooks/usePendingFeedbackCount';
 import { useAuth } from '@/lib/auth';
 import type { DesignTask } from '@/lib/data';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -55,7 +56,7 @@ export default function Dashboard() {
 
   const navigate = useNavigate();
   const { view: viewParam } = useParams<{ view?: string }>();
-  const activeView = (viewParam as ViewMode | undefined) ?? 'calendar';
+  const activeView = (viewParam as ViewMode | undefined) ?? 'calendars';
   const setActiveView = useCallback(
     (view: ViewMode) => navigate(`/painel/${view}`),
     [navigate],
@@ -111,14 +112,7 @@ export default function Dashboard() {
     fetchClientesContatos().then(setClientesContatos);
   }, []);
 
-  const [pendingFeedbackCount, setPendingFeedbackCount] = useState(0);
-
-  useEffect(() => {
-    fetch('/api/feedback', { credentials: 'include' })
-      .then((response) => response.json())
-      .then((responseData) => setPendingFeedbackCount((responseData.posts ?? []).length))
-      .catch(() => setPendingFeedbackCount(0));
-  }, [lastUpdatedAt]);
+  const pendingFeedbackCount = usePendingFeedbackCount(lastUpdatedAt);
 
   const clientScoreDesignerOptions = useMemo(
     () => ['Todos', ...clientesDesigners],
@@ -253,7 +247,7 @@ export default function Dashboard() {
           />
 
           <main
-            className={`min-w-0 animate-fade-in p-4 md:p-6 lg:p-8 ${
+            className={`min-w-0 animate-fade-in p-4 pb-24 md:p-6 lg:p-8 lg:pb-8 ${
               isSidebarCollapsed ? SIDEBAR_MARGIN_COLLAPSED_CLASS : SIDEBAR_MARGIN_EXPANDED_CLASS
             }`}
           >
@@ -321,7 +315,7 @@ export default function Dashboard() {
       />
 
       <main
-        className={`min-w-0 animate-fade-in p-4 md:p-6 lg:p-8 ${
+        className={`min-w-0 animate-fade-in p-4 pb-24 md:p-6 lg:p-8 lg:pb-8 ${
           isSidebarCollapsed ? SIDEBAR_MARGIN_COLLAPSED_CLASS : SIDEBAR_MARGIN_EXPANDED_CLASS
         }`}
       >
@@ -425,7 +419,7 @@ export default function Dashboard() {
                     onClick={() => navigate('/painel/dicas')}
                     className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground transition-colors hover:border-primary/30"
                   >
-                    <BookOpen className="h-4 w-4" />
+                    <Info className="h-4 w-4" />
                     Dicas
                   </button>
 
@@ -516,17 +510,7 @@ export default function Dashboard() {
                   </div>
                 </div>
               ) : activeView === 'feedback' ? (
-                <div className="flex w-full flex-wrap items-end gap-3 md:w-auto md:justify-end">
-                  <a
-                    href="/copywriter-portal"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground transition-colors hover:border-primary/30"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    Link do Copywriter
-                  </a>
-
+                <div className="flex w-full flex-wrap items-end justify-end gap-3">
                   {feedbackFilterOptions.designerOptions.length > 1 && (
                     <div className="w-full max-w-xs">
                       <label htmlFor="feedback-designer-filter" className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
@@ -549,6 +533,16 @@ export default function Dashboard() {
                       </div>
                     </div>
                   )}
+
+                  <a
+                    href="/copywriter-portal"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground transition-colors hover:border-primary/30"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Link do Copywriter
+                  </a>
                 </div>
               ) : null}
             </div>

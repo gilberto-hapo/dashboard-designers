@@ -1,6 +1,8 @@
-import { CalendarCheck2, FileText, LogOut, MessageSquareWarning, PanelLeftClose, PanelLeftOpen, PlusSquare, RefreshCw, Users } from 'lucide-react';
+import { useState } from 'react';
+import { CalendarCheck2, FileText, LogOut, MessageSquareWarning, MoreHorizontal, PanelLeftClose, PanelLeftOpen, PlusSquare, RefreshCw, Users } from 'lucide-react';
 import hapoLogo from '@/assets/hapo-logo.svg';
 import hapoLogoSmall from '@/assets/hapo-logo-menor.svg';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 
 export const SIDEBAR_COLLAPSED_STORAGE_KEY = 'hapo:sidebar-collapsed';
 export const SIDEBAR_WIDTH_EXPANDED_CLASS = 'lg:w-60';
@@ -70,13 +72,16 @@ export function SidebarNav({
   onToggleCollapsed: () => void;
   badgeCounts?: Record<string, number>;
 }) {
+  const [isMoreOpen, setIsMoreOpen] = useState(false);
+
   return (
+    <>
     <aside
-      className={`w-full lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 ${
+      className={`hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 lg:flex ${
         isCollapsed ? SIDEBAR_WIDTH_COLLAPSED_CLASS : SIDEBAR_WIDTH_EXPANDED_CLASS
       }`}
     >
-      <div className="flex min-h-[100dvh] flex-col border-r border-border bg-card px-3 py-5 lg:h-screen lg:min-h-0">
+      <div className="flex h-screen min-h-0 w-full flex-col border-r border-border bg-card px-3 py-5">
         <div className="flex items-center gap-2 border-b border-border pb-5">
           {isCollapsed ? (
             <div className="flex w-full flex-col items-center gap-3">
@@ -190,5 +195,78 @@ export function SidebarNav({
         </div>
       </div>
     </aside>
+
+    <nav
+      className="fixed inset-x-0 bottom-0 z-30 flex items-stretch border-t border-border bg-card pb-[env(safe-area-inset-bottom)] lg:hidden"
+    >
+      {navItems.map((item) => {
+        const Icon = item.icon;
+        const isActive = activeView === item.id;
+        const badgeCount = badgeCounts?.[item.id] ?? 0;
+
+        return (
+          <button
+            key={item.id}
+            onClick={() => onChange(item.id)}
+            className={`flex flex-1 flex-col items-center gap-1 py-2.5 text-center transition-colors ${
+              isActive ? 'text-primary' : 'text-muted-foreground'
+            }`}
+          >
+            <div className="relative">
+              <Icon className="h-5 w-5" />
+              {badgeCount > 0 && (
+                <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
+                  {badgeCount > 99 ? '99+' : badgeCount}
+                </span>
+              )}
+            </div>
+            <span className="text-[10px] font-semibold leading-none">{item.label}</span>
+          </button>
+        );
+      })}
+
+      <button
+        onClick={() => setIsMoreOpen(true)}
+        className="flex flex-1 flex-col items-center gap-1 py-2.5 text-center text-muted-foreground transition-colors"
+      >
+        <MoreHorizontal className="h-5 w-5" />
+        <span className="text-[10px] font-semibold leading-none">Mais</span>
+      </button>
+    </nav>
+
+    <Sheet open={isMoreOpen} onOpenChange={setIsMoreOpen}>
+      <SheetContent side="bottom" className="rounded-t-2xl">
+        <SheetHeader>
+          <SheetTitle className="text-left">Mais opções</SheetTitle>
+        </SheetHeader>
+        <div className="mt-4 space-y-3">
+          <button
+            onClick={() => {
+              onRefresh();
+              setIsMoreOpen(false);
+            }}
+            disabled={isRefreshing}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-border px-3 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <RefreshCw className={`h-4 w-4 text-muted-foreground ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Atualizando...' : 'Atualizar dados'}
+          </button>
+          <p className="text-center text-[11px] text-muted-foreground">
+            Última atualização: <span className="text-foreground">{formatLastUpdated(lastUpdatedAt)}</span>
+          </p>
+          <button
+            onClick={() => {
+              setIsMoreOpen(false);
+              onLogout();
+            }}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-border px-3 py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+          >
+            <LogOut className="h-4 w-4" />
+            Sair
+          </button>
+        </div>
+      </SheetContent>
+    </Sheet>
+    </>
   );
 }

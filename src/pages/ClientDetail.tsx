@@ -12,6 +12,7 @@ import {
 } from '@/components/SidebarNav';
 import { fetchJson } from '@/lib/calendarUi';
 import { Button } from '@/components/ui/button';
+import { usePendingFeedbackCount } from '@/hooks/usePendingFeedbackCount';
 
 type LocalPublicacao = { nome: string; cor: string };
 
@@ -54,6 +55,8 @@ function ClientDetailContent() {
   useEffect(() => {
     window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, isSidebarCollapsed ? '1' : '0');
   }, [isSidebarCollapsed]);
+
+  const pendingFeedbackCount = usePendingFeedbackCount();
 
   const [client, setClient] = useState<ClienteDetailData | null>(null);
   const [calendarios, setCalendarios] = useState<ClienteCalendarioResumo[]>([]);
@@ -103,10 +106,11 @@ function ClientDetailContent() {
         onLogout={() => void logout()}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapsed={() => setIsSidebarCollapsed((value) => !value)}
+        badgeCounts={{ feedback: pendingFeedbackCount }}
       />
 
       <main
-        className={`min-w-0 animate-fade-in p-4 md:p-6 lg:p-8 ${
+        className={`min-w-0 animate-fade-in p-4 pb-24 md:p-6 lg:p-8 lg:pb-8 ${
           isSidebarCollapsed ? SIDEBAR_MARGIN_COLLAPSED_CLASS : SIDEBAR_MARGIN_EXPANDED_CLASS
         }`}
       >

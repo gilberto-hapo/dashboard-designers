@@ -17,6 +17,7 @@ import {
   getConclusionProgress,
   getFirstName,
 } from '@/lib/calendarUi';
+import { usePendingFeedbackCount } from '@/hooks/usePendingFeedbackCount';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -68,6 +69,8 @@ function CalendarDetailContent() {
   useEffect(() => {
     window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, isSidebarCollapsed ? '1' : '0');
   }, [isSidebarCollapsed]);
+
+  const pendingFeedbackCount = usePendingFeedbackCount();
 
   const [calendario, setCalendario] = useState<CalendarDetailData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -141,10 +144,11 @@ function CalendarDetailContent() {
         onLogout={() => void logout()}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapsed={() => setIsSidebarCollapsed((value) => !value)}
+        badgeCounts={{ feedback: pendingFeedbackCount }}
       />
 
       <main
-        className={`min-w-0 animate-fade-in p-4 md:p-6 lg:p-8 ${
+        className={`min-w-0 animate-fade-in p-4 pb-24 md:p-6 lg:p-8 lg:pb-8 ${
           isSidebarCollapsed ? SIDEBAR_MARGIN_COLLAPSED_CLASS : SIDEBAR_MARGIN_EXPANDED_CLASS
         }`}
       >

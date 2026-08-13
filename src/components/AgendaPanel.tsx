@@ -1,8 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight,
-  ArrowDownRight,
-  ArrowUpRight,
   CalendarDays,
   Check,
 } from 'lucide-react';
@@ -54,12 +52,6 @@ type MonthView = {
   weeks: MonthCell[][];
 };
 
-type TrendTone = {
-  icon: typeof ArrowRight;
-  className: string;
-  label: string;
-};
-
 type StatusTone = {
   label: string;
   className: string;
@@ -97,10 +89,6 @@ function startOfMonth(date: Date) {
 
 function endOfMonth(date: Date) {
   return new Date(date.getFullYear(), date.getMonth() + 1, 0);
-}
-
-function addMonths(date: Date, amount: number) {
-  return new Date(date.getFullYear(), date.getMonth() + amount, 1);
 }
 
 function addDays(date: Date, amount: number) {
@@ -344,18 +332,6 @@ export function getSelectedPeriodRange(selectedMonth: string, customRange?: { st
   };
 }
 
-function getPeriodTitle(selectedMonth: string) {
-  if (selectedMonth === AGENDA_NEXT_15_DAYS_VALUE) {
-    return 'Próximos 15 dias';
-  }
-
-  if (selectedMonth === AGENDA_CUSTOM_RANGE_VALUE) {
-    return 'Intervalo customizado';
-  }
-
-  return monthLabel(parseMonthValue(selectedMonth));
-}
-
 export function getAgendaCurrentMonth() {
   return monthValue(startOfMonth(new Date()));
 }
@@ -514,53 +490,6 @@ function buildMonthView(
   };
 }
 
-function getTrendTone(current: number, previous: number): TrendTone {
-  const difference = current - previous;
-
-  if (difference > 0) {
-    return {
-      icon: ArrowUpRight,
-      className: 'border-emerald-400/20 bg-emerald-400/10 text-emerald-200',
-      label: `+${difference}`,
-    };
-  }
-
-  if (difference < 0) {
-    return {
-      icon: ArrowDownRight,
-      className: 'border-rose-400/20 bg-rose-400/10 text-rose-200',
-      label: `${difference}`,
-    };
-  }
-
-  return {
-    icon: ArrowRight,
-    className: 'border-border/70 bg-background/60 text-muted-foreground',
-    label: '0',
-  };
-}
-
-function formatCriticalDeadlineSummary(overdue: number, dueSoon: number) {
-  const parts: string[] = [];
-
-  if (overdue > 0) {
-    parts.push(`${overdue} atrasado${overdue === 1 ? '' : 's'}`);
-  }
-
-  if (dueSoon > 0) {
-    parts.push(
-      dueSoon === 1
-        ? '1 vence hoje ou amanha'
-        : `${dueSoon} vencem hoje ou amanha`,
-    );
-  }
-
-  if (parts.length === 0) {
-    return 'Nenhum item critico no prazo';
-  }
-
-  return parts.join(' + ');
-}
 
 type AgendaTaskGroup = {
   key: string;
@@ -711,6 +640,46 @@ function AgendaDayCell({
   );
 }
 
+// Em telas estreitas o grid de 7 colunas comprime demais cada dia para caber
+// nome de cliente/status de forma legível — em mobile cada dia com entrega
+// vira um bloco próprio, empilhado verticalmente, com as tarefas em largura
+// cheia (mesmo AgendaTaskButton usado no grid desktop).
+function AgendaDayListItem({
+  cell,
+  onTaskClick,
+}: {
+  cell: MonthCell;
+  onTaskClick: (task: DesignTask) => void;
+}) {
+  const dateLabel = new Intl.DateTimeFormat('pt-BR', {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+  }).format(cell.date);
+
+  return (
+    <div
+      className={`rounded-xl border p-3 ${
+        cell.isToday ? 'border-primary/40 ring-1 ring-primary/25 bg-card/60' : 'border-border/70 bg-card/60'
+      }`}
+    >
+      <div className="mb-2 flex items-center gap-2">
+        {cell.isToday && (
+          <span className="inline-flex h-6 items-center rounded-full bg-primary px-2 text-xs font-bold text-primary-foreground">
+            Hoje
+          </span>
+        )}
+        <span className="text-sm font-semibold capitalize text-foreground">{dateLabel}</span>
+      </div>
+      <div className="space-y-1.5">
+        {cell.tasks.map((task) => (
+          <AgendaTaskButton key={task.id} task={task} onClick={() => onTaskClick(task)} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function AgendaPanel({
   tasks,
   selectedMonth,
@@ -760,31 +729,7 @@ export function AgendaPanel({
     ),
     [monthDate, tasks, today, selectedDesigner, selectedClient, selectedStages, clientesContatos, allPeriodRange.end, allPeriodRange.start],
   );
-  const previousPeriod = useMemo(() => {
-    if (selectedMonth === AGENDA_NEXT_15_DAYS_VALUE) {
-      const start = addDays(periodRange.start, -15);
-      const end = addDays(periodRange.start, -1);
-      return buildMonthView(monthDate, tasks, today, selectedDesigner, selectedClient, selectedStages, clientesContatos, start, end);
-    }
-
-    const previousMonthDate = addMonths(monthDate, -1);
-    return buildMonthView(previousMonthDate, tasks, today, selectedDesigner, selectedClient, selectedStages, clientesContatos, undefined, undefined);
-  }, [monthDate, periodRange.start, selectedClient, selectedDesigner, selectedMonth, selectedStages, clientesContatos, tasks, today]);
   const weekdays = weekdayShortLabels();
-  const totalTrend = getTrendTone(month.total, previousPeriod.total);
-  const concludedTrend = getTrendTone(month.concluded, previousPeriod.concluded);
-  const pendingTrend = getTrendTone(month.pending, previousPeriod.pending);
-  const overdueTrend = getTrendTone(month.overdue, previousPeriod.overdue);
-  const criticalDeadlineCount = month.overdue + month.today + month.tomorrow;
-  const previousCriticalDeadlineCount = previousPeriod.overdue + previousPeriod.today + previousPeriod.tomorrow;
-  const criticalDeadlineTrend = getTrendTone(criticalDeadlineCount, previousCriticalDeadlineCount);
-  const periodTitle = getPeriodTitle(selectedMonth);
-  const TotalTrendIcon = totalTrend.icon;
-  const ConcludedTrendIcon = concludedTrend.icon;
-  const PendingTrendIcon = pendingTrend.icon;
-  const CriticalDeadlineTrendIcon = criticalDeadlineTrend.icon;
-  const dueSoonCount = month.today + month.tomorrow;
-  const criticalDeadlineSummary = formatCriticalDeadlineSummary(month.overdue, dueSoonCount);
 
   return (
     <section className="w-full space-y-6">
@@ -804,64 +749,6 @@ export function AgendaPanel({
           </div>
         </div>
       ) : null}
-
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-2xl border border-border/60 bg-card/60 px-4 py-4">
-          <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Conteudos no periodo</p>
-          <div className="mt-3 flex items-start justify-between gap-3">
-            <div>
-              <p className="text-3xl font-semibold text-foreground">{month.total}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{periodTitle}</p>
-            </div>
-            <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-medium ${totalTrend.className}`}>
-              <TotalTrendIcon className="h-3.5 w-3.5" />
-              {totalTrend.label}
-            </span>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-border/60 bg-card/60 px-4 py-4">
-          <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Concluidos</p>
-          <div className="mt-3 flex items-start justify-between gap-3">
-            <div>
-              <p className="text-3xl font-semibold text-foreground">{month.concluded}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{month.pending} ainda em aberto</p>
-            </div>
-            <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-medium ${concludedTrend.className}`}>
-              <ConcludedTrendIcon className="h-3.5 w-3.5" />
-              {concludedTrend.label}
-            </span>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-border/60 bg-card/60 px-4 py-4">
-          <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Em aberto</p>
-          <div className="mt-3 flex items-start justify-between gap-3">
-            <div>
-              <p className="text-3xl font-semibold text-foreground">{month.pending}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{month.validation} em validacao</p>
-            </div>
-            <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-medium ${pendingTrend.className}`}>
-              <PendingTrendIcon className="h-3.5 w-3.5" />
-              {pendingTrend.label}
-            </span>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-border/60 bg-card/60 px-4 py-4">
-          <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Atenção no prazo</p>
-          <div className="mt-3 flex items-start justify-between gap-3">
-            <div>
-              <p className="text-3xl font-semibold text-foreground">{criticalDeadlineCount}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{criticalDeadlineSummary}</p>
-            </div>
-            <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-medium ${criticalDeadlineTrend.className}`}>
-              <CriticalDeadlineTrendIcon className="h-3.5 w-3.5" />
-              {criticalDeadlineTrend.label}
-            </span>
-          </div>
-        </div>
-      </div>
 
       <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
         {STAGE_FILTER_OPTIONS.map((option) => {
@@ -927,7 +814,7 @@ export function AgendaPanel({
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-[28px] border border-border/60 bg-background/40">
+      <div className="hidden overflow-hidden rounded-[28px] border border-border/60 bg-background/40 lg:block">
         <div className="grid grid-cols-7 gap-1 border-b border-border/60 bg-card/50 px-2 py-2 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
           {weekdays.map((weekday) => (
             <span key={weekday} className="text-center font-semibold">
@@ -952,6 +839,33 @@ export function AgendaPanel({
 
         <div className="border-t border-border/60 px-3 py-3 text-xs text-muted-foreground">
           <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card/70 px-3 py-2">
+            <span className="inline-flex items-center gap-1">
+              <CalendarDays className="h-3.5 w-3.5" />
+              {month.concluded} concluídas
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <ArrowRight className="h-3.5 w-3.5" />
+              {month.total} entregas no período
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-2.5 lg:hidden">
+        {month.weeks.flat().filter((cell) => cell.tasks.length > 0).length === 0 ? (
+          <div className="rounded-2xl border border-border/60 bg-background/50 p-5 text-sm text-muted-foreground">
+            Nenhuma entrega encontrada para o mês e filtros selecionados.
+          </div>
+        ) : (
+          month.weeks.flat()
+            .filter((cell) => cell.tasks.length > 0)
+            .map((cell) => (
+              <AgendaDayListItem key={cell.date.toISOString()} cell={cell} onTaskClick={(task) => setSelectedTask(task)} />
+            ))
+        )}
+
+        <div className="rounded-xl border border-border/60 bg-card/70 px-3 py-2 text-xs text-muted-foreground">
+          <div className="flex items-center justify-between">
             <span className="inline-flex items-center gap-1">
               <CalendarDays className="h-3.5 w-3.5" />
               {month.concluded} concluídas
