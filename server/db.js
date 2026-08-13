@@ -1,73 +1,59 @@
-import { DatabaseSync } from 'node:sqlite';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import mysql from 'mysql2/promise';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_DIR = path.join(__dirname, '..', 'data');
-const DB_FILE = path.join(DB_DIR, 'approvals.db');
+// Persistência de decisões de clientes (aprovação/ajuste em posts) em MySQL
+// gerenciado — precisa sobreviver a deploys que refazem o checkout do app
+// do zero (a pasta local data/ nunca é versionada e se perde a cada deploy).
+const pool = mysql.createPool({
+  host: process.env.DB_HOST,
+  port: Number(process.env.DB_PORT) || 3306,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  waitForConnections: true,
+  connectionLimit: 10,
+  dateStrings: true,
+});
 
-fs.mkdirSync(DB_DIR, { recursive: true });
+// Lazy: as tabelas só são criadas na primeira chamada real, nunca no import
+// do módulo — uma falha de conexão aqui não pode derrubar o boot do server
+// inteiro (ex: instabilidade momentânea de rede até o banco gerenciado).
+let schemaReadyPromise = null;
+function ensureSchema() {
+  if (!schemaReadyPromise) {
+    schemaReadyPromise = (async () => {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS post_decisions (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          post_id VARCHAR(255) NOT NULL,
+          calendar_id VARCHAR(255) NOT NULL,
+          approved TINYINT(1) NOT NULL,
+          feedback TEXT,
+          created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+          goalfy_sync_status VARCHAR(32) NOT NULL DEFAULT 'pending',
+          goalfy_sync_error TEXT,
+          INDEX idx_post_decisions_post_id (post_id),
+          INDEX idx_post_decisions_calendar_id (calendar_id)
+        )
+      `);
 
-const db = new DatabaseSync(DB_FILE);
-db.exec('PRAGMA journal_mode = WAL');
-db.exec('PRAGMA foreign_keys = ON');
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS post_adjustment_resolutions (
+          post_id VARCHAR(255) PRIMARY KEY,
+          resolved_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+        )
+      `);
+    })().catch((error) => {
+      schemaReadyPromise = null;
+      throw error;
+    });
+  }
+  return schemaReadyPromise;
+}
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS post_decisions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    post_id TEXT NOT NULL,
-    calendar_id TEXT NOT NULL,
-    approved INTEGER NOT NULL,
-    feedback TEXT,
-    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-    goalfy_sync_status TEXT NOT NULL DEFAULT 'pending',
-    goalfy_sync_error TEXT
-  );
-
-  CREATE INDEX IF NOT EXISTS idx_post_decisions_post_id ON post_decisions (post_id);
-  CREATE INDEX IF NOT EXISTS idx_post_decisions_calendar_id ON post_decisions (calendar_id);
-
-  CREATE TABLE IF NOT EXISTS post_adjustment_resolutions (
-    post_id TEXT PRIMARY KEY,
-    resolved_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-  );
-`);
-
-const insertDecisionStmt = db.prepare(`
-  INSERT INTO post_decisions (post_id, calendar_id, approved, feedback, goalfy_sync_status, goalfy_sync_error)
-  VALUES (@postId, @calendarId, @approved, @feedback, @goalfySyncStatus, @goalfySyncError)
-`);
-
-const updateSyncStatusStmt = db.prepare(`
-  UPDATE post_decisions SET goalfy_sync_status = ?, goalfy_sync_error = ? WHERE id = ?
-`);
-
-const latestDecisionsByCalendarStmt = db.prepare(`
-  SELECT pd.*
-  FROM post_decisions pd
-  INNER JOIN (
-    SELECT post_id, MAX(id) AS max_id
-    FROM post_decisions
-    WHERE calendar_id = ?
-    GROUP BY post_id
-  ) latest ON latest.post_id = pd.post_id AND latest.max_id = pd.id
-  ORDER BY pd.created_at DESC
-`);
-
-const historyByPostStmt = db.prepare(`
-  SELECT * FROM post_decisions WHERE post_id = ? ORDER BY created_at DESC
-`);
-
-const upsertAdjustmentResolutionStmt = db.prepare(`
-  INSERT INTO post_adjustment_resolutions (post_id, resolved_at)
-  VALUES (@postId, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-  ON CONFLICT (post_id) DO UPDATE SET resolved_at = excluded.resolved_at
-`);
-
-const adjustmentResolutionByPostStmt = db.prepare(`
-  SELECT * FROM post_adjustment_resolutions WHERE post_id = ?
-`);
+function toIsoString(value) {
+  if (!value) return value;
+  return value.replace(' ', 'T') + 'Z';
+}
 
 function rowToDecision(row) {
   if (!row) return null;
@@ -77,43 +63,70 @@ function rowToDecision(row) {
     calendarId: row.calendar_id,
     approved: Boolean(row.approved),
     feedback: row.feedback,
-    createdAt: row.created_at,
+    createdAt: toIsoString(row.created_at),
     goalfySyncStatus: row.goalfy_sync_status,
     goalfySyncError: row.goalfy_sync_error,
   };
 }
 
-export function insertPostDecision({ postId, calendarId, approved, feedback }) {
-  const result = insertDecisionStmt.run({
+export async function insertPostDecision({ postId, calendarId, approved, feedback }) {
+  await ensureSchema();
+  const [result] = await pool.query(
+    `INSERT INTO post_decisions (post_id, calendar_id, approved, feedback, goalfy_sync_status, goalfy_sync_error)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [postId, calendarId, approved ? 1 : 0, feedback ?? null, 'pending', null],
+  );
+  return result.insertId;
+}
+
+export async function markDecisionSyncStatus(decisionId, status, error = null) {
+  await ensureSchema();
+  await pool.query(`UPDATE post_decisions SET goalfy_sync_status = ?, goalfy_sync_error = ? WHERE id = ?`, [
+    status,
+    error,
+    decisionId,
+  ]);
+}
+
+export async function getLatestDecisionsForCalendar(calendarId) {
+  await ensureSchema();
+  const [rows] = await pool.query(
+    `SELECT pd.*
+     FROM post_decisions pd
+     INNER JOIN (
+       SELECT post_id, MAX(id) AS max_id
+       FROM post_decisions
+       WHERE calendar_id = ?
+       GROUP BY post_id
+     ) latest ON latest.post_id = pd.post_id AND latest.max_id = pd.id
+     ORDER BY pd.created_at DESC`,
+    [calendarId],
+  );
+  return rows.map(rowToDecision);
+}
+
+export async function getDecisionHistoryForPost(postId) {
+  await ensureSchema();
+  const [rows] = await pool.query(`SELECT * FROM post_decisions WHERE post_id = ? ORDER BY created_at DESC`, [
     postId,
-    calendarId,
-    approved: approved ? 1 : 0,
-    feedback: feedback ?? null,
-    goalfySyncStatus: 'pending',
-    goalfySyncError: null,
-  });
-  return result.lastInsertRowid;
+  ]);
+  return rows.map(rowToDecision);
 }
 
-export function markDecisionSyncStatus(decisionId, status, error = null) {
-  updateSyncStatusStmt.run(status, error, decisionId);
+export async function markAdjustmentsResolvedForPost(postId) {
+  await ensureSchema();
+  await pool.query(
+    `INSERT INTO post_adjustment_resolutions (post_id, resolved_at)
+     VALUES (?, CURRENT_TIMESTAMP(3))
+     ON DUPLICATE KEY UPDATE resolved_at = VALUES(resolved_at)`,
+    [postId],
+  );
 }
 
-export function getLatestDecisionsForCalendar(calendarId) {
-  return latestDecisionsByCalendarStmt.all(calendarId).map(rowToDecision);
+export async function getAdjustmentResolvedAtForPost(postId) {
+  await ensureSchema();
+  const [rows] = await pool.query(`SELECT * FROM post_adjustment_resolutions WHERE post_id = ?`, [postId]);
+  return rows[0] ? toIsoString(rows[0].resolved_at) : null;
 }
 
-export function getDecisionHistoryForPost(postId) {
-  return historyByPostStmt.all(postId).map(rowToDecision);
-}
-
-export function markAdjustmentsResolvedForPost(postId) {
-  upsertAdjustmentResolutionStmt.run({ postId });
-}
-
-export function getAdjustmentResolvedAtForPost(postId) {
-  const row = adjustmentResolutionByPostStmt.get(postId);
-  return row?.resolved_at ?? null;
-}
-
-export default db;
+export default pool;

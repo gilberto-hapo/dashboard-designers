@@ -2119,19 +2119,21 @@ async function resolveCalendarPosts(
     if (task.formatoEntrega) goalfyFormatoBySequence.set(sequenceNumber, task.formatoEntrega);
   });
 
-  const decisionsByPostId = new Map(getLatestDecisionsForCalendar(calendario.id).map((d) => [d.postId, d]));
+  const decisionsForCalendar = await getLatestDecisionsForCalendar(calendario.id);
+  const decisionsByPostId = new Map(decisionsForCalendar.map((d) => [d.postId, d]));
   const totalPosts = folders.length;
 
-  const posts = folders
-    .map((folder, index) => {
+  const resolvedPosts = await Promise.all(
+    folders.map(async (folder, index) => {
       const postId = folder.folderId;
       const sequenceNumber = index + 1;
       const decision = decisionsByPostId.get(postId) || null;
       const goalfyStage = goalfyStageBySequence.get(sequenceNumber) || null;
       const published = goalfyStage === 'published';
       const approvedByGoalfyPhase = published || goalfyStage === 'approved';
-      const resolvedAt = getAdjustmentResolvedAtForPost(postId);
-      const allAdjustments = getDecisionHistoryForPost(postId)
+      const resolvedAt = await getAdjustmentResolvedAtForPost(postId);
+      const history = await getDecisionHistoryForPost(postId);
+      const allAdjustments = history
         .filter((d) => !d.approved && d.feedback)
         .map((d) => ({ feedback: d.feedback, createdAt: d.createdAt }))
         .reverse();
@@ -2169,8 +2171,10 @@ async function resolveCalendarPosts(
         resolvedFeedbackHistory,
         visibleToClient,
       };
-    })
-    .filter((post) => !requireClientVisiblePhase || post.visibleToClient);
+    }),
+  );
+
+  const posts = resolvedPosts.filter((post) => !requireClientVisiblePhase || post.visibleToClient);
 
   return {
     id: calendario.id,
@@ -2431,8 +2435,8 @@ app.post('/api/public/portal/:token/posts/:postId/decision', async (req, res) =>
       return;
     }
 
-    const decisionId = insertPostDecision({ postId, calendarId: calendario.id, approved, feedback });
-    markDecisionSyncStatus(decisionId, 'synced');
+    const decisionId = await insertPostDecision({ postId, calendarId: calendario.id, approved, feedback });
+    await markDecisionSyncStatus(decisionId, 'synced');
 
     res.json({ ok: true });
   } catch (error) {
@@ -2501,8 +2505,11 @@ app.get('/api/feedback', requireAuth, async (_req, res) => {
     ]);
     const preFetched = { calendarios, clients, goalfyData };
 
+    const calendarDecisions = await Promise.all(
+      calendarios.map((c) => getLatestDecisionsForCalendar(c.id)),
+    );
     const calendarIdsWithFeedback = calendarios
-      .filter((c) => getLatestDecisionsForCalendar(c.id).some((d) => !d.approved && d.feedback))
+      .filter((c, index) => calendarDecisions[index].some((d) => !d.approved && d.feedback))
       .map((c) => c.id);
 
     const resolvedCalendarios = await Promise.all(
@@ -2544,7 +2551,7 @@ app.post('/api/feedback/:postId/resolve', requireAuth, async (req, res) => {
     return;
   }
 
-  markAdjustmentsResolvedForPost(postId);
+  await markAdjustmentsResolvedForPost(postId);
   res.json({ ok: true });
 });
 
