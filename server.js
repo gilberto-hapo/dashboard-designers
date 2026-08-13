@@ -2242,12 +2242,12 @@ async function resolvePublicClientPayload(clientId, { forceRefreshDrive = false 
 // ajuste pendente (mesmo critério de GET /api/feedback) de todos os clientes
 // que têm QUALQUER copywriter dedicado preenchido — não distingue por nome,
 // é um único link compartilhado por toda a equipe de copywriting.
-async function resolvePublicCopywriterPayload() {
+async function resolvePublicCopywriterPayload({ forceRefreshDrive = false } = {}) {
   const writeToken = getGoalfyCardsWriteToken();
   const [calendarios, clients, goalfyData] = await Promise.all([
     fetchAllCalendarsWithPhase({ writeToken }),
     fetchCardsClients({ writeToken }),
-    fetchGoalfyData(),
+    fetchGoalfyData({ forceRefresh: forceRefreshDrive }),
   ]);
 
   const clientNamesWithCopywriter = new Set(
@@ -2257,7 +2257,7 @@ async function resolvePublicCopywriterPayload() {
   const relevantCalendarios = calendarios.filter((c) => clientNamesWithCopywriter.has(normalizeLookupKey(c.clienteNome)));
 
   const resolvedCalendarios = await Promise.all(
-    relevantCalendarios.map((calendario) => resolveCalendarPosts(calendario, { clients, goalfyData })),
+    relevantCalendarios.map((calendario) => resolveCalendarPosts(calendario, { clients, goalfyData, forceRefreshDrive })),
   );
 
   const posts = resolvedCalendarios
@@ -2283,9 +2283,10 @@ async function resolvePublicCopywriterPayload() {
   return { posts };
 }
 
-app.get('/api/public/copywriter-portal', async (_req, res) => {
+app.get('/api/public/copywriter-portal', async (req, res) => {
   try {
-    const payload = await resolvePublicCopywriterPayload();
+    const forceRefreshDrive = req.query.refresh === '1';
+    const payload = await resolvePublicCopywriterPayload({ forceRefreshDrive });
     res.json(payload);
   } catch (error) {
     console.error('Public copywriter portal request failed', error);

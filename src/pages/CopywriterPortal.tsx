@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Loader2 } from 'lucide-react';
+import { AlertTriangle, Loader2, RefreshCw } from 'lucide-react';
 import { FeedbackGridShared, type FeedbackPost } from '@/components/FeedbackGridShared';
 import hapoLogo from '@/assets/hapo-logo.svg';
 
@@ -10,13 +10,17 @@ type CopywriterPayload = {
 export default function CopywriterPortal() {
   const [payload, setPayload] = useState<CopywriterPayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setLoading(true);
+  function load(options?: { forceRefresh?: boolean }) {
+    const isRefresh = Boolean(options?.forceRefresh);
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
     setError(null);
 
-    fetch('/api/public/copywriter-portal')
+    const query = isRefresh ? '?refresh=1' : '';
+    fetch(`/api/public/copywriter-portal${query}`)
       .then(async (response) => {
         const body = await response.json().catch(() => null);
         if (!response.ok) {
@@ -26,7 +30,14 @@ export default function CopywriterPortal() {
       })
       .then((data) => setPayload(data))
       .catch((err) => setError(err instanceof Error ? err.message : 'Erro ao carregar'))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        setRefreshing(false);
+      });
+  }
+
+  useEffect(() => {
+    load();
   }, []);
 
   if (loading) {
@@ -52,10 +63,22 @@ export default function CopywriterPortal() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card px-4 py-3">
-        <div className="mx-auto flex max-w-6xl items-center gap-3">
-          <img src={hapoLogo} alt="hapo" className="h-6 w-auto shrink-0" />
-          <div className="h-5 w-px shrink-0 bg-border" />
-          <h1 className="truncate text-base font-semibold text-foreground">Ajustes — Copywriter</h1>
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <img src={hapoLogo} alt="hapo" className="h-6 w-auto shrink-0" />
+            <div className="h-5 w-px shrink-0 bg-border" />
+            <h1 className="truncate text-base font-semibold text-foreground">Ajustes — Copywriter</h1>
+          </div>
+          <button
+            type="button"
+            onClick={() => load({ forceRefresh: true })}
+            disabled={refreshing}
+            className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+            title="Atualizar dados"
+          >
+            <RefreshCw className={`h-4 w-4 text-muted-foreground ${refreshing ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">{refreshing ? 'Atualizando...' : 'Atualizar dados'}</span>
+          </button>
         </div>
       </header>
 
