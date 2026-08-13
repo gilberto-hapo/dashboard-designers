@@ -2109,12 +2109,14 @@ async function resolveCalendarPosts(
   const calendarTasks = tasks.filter((task) => task.calendarioId === calendario.id);
   const goalfyStageBySequence = new Map();
   const goalfyPhaseTitleBySequence = new Map();
+  const goalfyFormatoBySequence = new Map();
   calendarTasks.forEach((task) => {
     const sequenceNumber = extractPostSequenceNumber(task.title);
     if (sequenceNumber == null) return;
     if (task.stage === 'concluido') goalfyStageBySequence.set(sequenceNumber, 'published');
     else if (task.stage === 'aprovado_programacao') goalfyStageBySequence.set(sequenceNumber, 'approved');
     goalfyPhaseTitleBySequence.set(sequenceNumber, task.phaseTitle || '');
+    if (task.formatoEntrega) goalfyFormatoBySequence.set(sequenceNumber, task.formatoEntrega);
   });
 
   const decisionsByPostId = new Map(getLatestDecisionsForCalendar(calendario.id).map((d) => [d.postId, d]));
@@ -2152,11 +2154,14 @@ async function resolveCalendarPosts(
         goalfyPhaseTitle && CLIENT_PORTAL_VISIBLE_PHASE_KEYS.has(normalizeLookupKey(goalfyPhaseTitle)),
       );
 
+      const formatoEntrega = goalfyFormatoBySequence.get(sequenceNumber) || inferFormatoEntrega(folder.media);
+      const isStories = normalizeLookupKey(formatoEntrega) === normalizeLookupKey('Stories');
+
       return {
         id: postId,
         title: buildDriveFolderPostTitle(calendario, index, totalPosts),
-        formatoEntrega: inferFormatoEntrega(folder.media),
-        caption: folder.caption || null,
+        formatoEntrega,
+        caption: isStories ? null : (folder.caption || null),
         media: folder.media || null,
         decision: decisionPayload,
         published,
@@ -2173,6 +2178,7 @@ async function resolveCalendarPosts(
     clienteNome: calendario.clienteNome,
     mesAno: calendario.mesAno,
     designer: client?.designer || '',
+    copywriter: client?.copywriter || '',
     linkDriveArtes: calendario.linkDriveArtes || '',
     posts,
   };
@@ -2231,6 +2237,82 @@ async function resolvePublicClientPayload(clientId, { forceRefreshDrive = false 
     calendarios: resolvedCalendarios,
   };
 }
+
+// Resolve o payload do portal público ÚNICO de copywriters: os posts com
+// ajuste pendente (mesmo critério de GET /api/feedback) de todos os clientes
+// que têm QUALQUER copywriter dedicado preenchido — não distingue por nome,
+// é um único link compartilhado por toda a equipe de copywriting.
+async function resolvePublicCopywriterPayload() {
+  const writeToken = getGoalfyCardsWriteToken();
+  const [calendarios, clients, goalfyData] = await Promise.all([
+    fetchAllCalendarsWithPhase({ writeToken }),
+    fetchCardsClients({ writeToken }),
+    fetchGoalfyData(),
+  ]);
+
+  const clientNamesWithCopywriter = new Set(
+    clients.filter((c) => c.copywriter).map((c) => normalizeLookupKey(c.nome)),
+  );
+
+  const relevantCalendarios = calendarios.filter((c) => clientNamesWithCopywriter.has(normalizeLookupKey(c.clienteNome)));
+
+  const resolvedCalendarios = await Promise.all(
+    relevantCalendarios.map((calendario) => resolveCalendarPosts(calendario, { clients, goalfyData })),
+  );
+
+  const posts = resolvedCalendarios
+    .flatMap((calendario) =>
+      calendario.posts
+        .filter((post) => post.feedbackHistory.length > 0)
+        .map((post) => ({
+          postId: post.id,
+          postTitle: post.title,
+          calendarId: calendario.id,
+          calendarTitle: calendario.title,
+          designer: calendario.designer || '',
+          copywriter: calendario.copywriter || '',
+          caption: post.caption,
+          media: post.media,
+          latestCreatedAt: post.feedbackHistory[post.feedbackHistory.length - 1].createdAt,
+          feedbackHistory: post.feedbackHistory,
+          resolvedFeedbackHistory: post.resolvedFeedbackHistory,
+        })),
+    )
+    .sort((a, b) => new Date(b.latestCreatedAt) - new Date(a.latestCreatedAt));
+
+  return { posts };
+}
+
+app.get('/api/public/copywriter-portal', async (_req, res) => {
+  try {
+    const payload = await resolvePublicCopywriterPayload();
+    res.json(payload);
+  } catch (error) {
+    console.error('Public copywriter portal request failed', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/public/copywriter-portal/media/:fileId', async (req, res) => {
+  const fileId = String(req.params.fileId || '').trim();
+
+  try {
+    const payload = await resolvePublicCopywriterPayload();
+    const belongsToCopywriter = payload.posts.some(
+      (post) => (post.media?.files || []).some((file) => file.id === fileId) || post.media?.coverImageId === fileId,
+    );
+
+    if (!belongsToCopywriter) {
+      res.status(404).json({ error: 'Arquivo não encontrado' });
+      return;
+    }
+
+    await streamDriveMedia({ req, res, fileId, logLabel: 'Portal copywriter' });
+  } catch (error) {
+    console.error('Public copywriter portal media request failed', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 app.get('/api/public/portal/:token', async (req, res) => {
   try {
@@ -2437,6 +2519,7 @@ app.get('/api/feedback', requireAuth, async (_req, res) => {
             calendarId: calendario.id,
             calendarTitle: calendario.title,
             designer: calendario.designer || '',
+            copywriter: calendario.copywriter || '',
             caption: post.caption,
             media: post.media,
             latestCreatedAt: post.feedbackHistory[post.feedbackHistory.length - 1].createdAt,

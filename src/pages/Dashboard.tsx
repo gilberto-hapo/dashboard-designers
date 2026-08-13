@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { ChevronDown, ChevronLeft, ChevronRight, Loader2, WifiOff } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Loader2, WifiOff } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   navItems,
@@ -711,26 +711,40 @@ export default function Dashboard() {
                     <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   </div>
                 </div>
-              ) : activeView === 'feedback' && feedbackFilterOptions.designerOptions.length > 1 ? (
-                <div className="w-full max-w-xs">
-                  <label htmlFor="feedback-designer-filter" className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                    Designer
-                  </label>
-                  <div className="relative mt-2">
-                    <select
-                      id="feedback-designer-filter"
-                      value={selectedFeedbackDesigner}
-                      onChange={(event) => setSelectedFeedbackDesigner(event.target.value)}
-                      className="w-full appearance-none rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground outline-none transition-colors hover:border-primary/30 focus:border-primary/40"
-                    >
-                      {feedbackFilterOptions.designerOptions.map((value) => (
-                        <option key={value} value={value}>
-                          {value}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  </div>
+              ) : activeView === 'feedback' ? (
+                <div className="flex w-full flex-wrap items-end gap-3 md:w-auto md:justify-end">
+                  <a
+                    href="/copywriter-portal"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground transition-colors hover:border-primary/30"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Link do Copywriter
+                  </a>
+
+                  {feedbackFilterOptions.designerOptions.length > 1 && (
+                    <div className="w-full max-w-xs">
+                      <label htmlFor="feedback-designer-filter" className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                        Designer
+                      </label>
+                      <div className="relative mt-2">
+                        <select
+                          id="feedback-designer-filter"
+                          value={selectedFeedbackDesigner}
+                          onChange={(event) => setSelectedFeedbackDesigner(event.target.value)}
+                          className="w-full appearance-none rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground outline-none transition-colors hover:border-primary/30 focus:border-primary/40"
+                        >
+                          {feedbackFilterOptions.designerOptions.map((value) => (
+                            <option key={value} value={value}>
+                              {value}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : null}
             </div>
