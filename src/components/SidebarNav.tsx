@@ -14,24 +14,24 @@ export const navItems: Array<{
   icon: typeof CalendarCheck2;
 }> = [
   {
-    id: 'calendar',
-    label: 'Agenda',
-    icon: CalendarCheck2,
-  },
-  {
-    id: 'client-score',
-    label: 'Clientes',
-    icon: Users,
-  },
-  {
     id: 'calendars',
     label: 'Calendários',
     icon: FileText,
   },
   {
+    id: 'calendar',
+    label: 'Agenda',
+    icon: CalendarCheck2,
+  },
+  {
     id: 'feedback',
     label: 'Feedback',
     icon: MessageSquareWarning,
+  },
+  {
+    id: 'client-score',
+    label: 'Clientes',
+    icon: Users,
   },
   {
     id: 'create-cards',
@@ -58,6 +58,7 @@ export function SidebarNav({
   onLogout,
   isCollapsed,
   onToggleCollapsed,
+  badgeCounts,
 }: {
   activeView: string;
   onChange: (view: string) => void;
@@ -67,6 +68,7 @@ export function SidebarNav({
   onLogout: () => void;
   isCollapsed: boolean;
   onToggleCollapsed: () => void;
+  badgeCounts?: Record<string, number>;
 }) {
   return (
     <aside
@@ -105,6 +107,7 @@ export function SidebarNav({
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeView === item.id;
+            const badgeCount = badgeCounts?.[item.id] ?? 0;
 
             return (
               <button
@@ -120,13 +123,27 @@ export function SidebarNav({
                 }`}
               >
                 <div
-                  className={`rounded-lg p-2 ${
+                  className={`relative rounded-lg p-2 ${
                     isActive ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'
                   }`}
                 >
                   <Icon className="h-4 w-4" />
+                  {badgeCount > 0 && (
+                    <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
+                      {badgeCount > 99 ? '99+' : badgeCount}
+                    </span>
+                  )}
                 </div>
-                {!isCollapsed && <span className="text-sm font-semibold text-foreground">{item.label}</span>}
+                {!isCollapsed && (
+                  <span className="flex flex-1 items-center justify-between gap-2">
+                    <span className="text-sm font-semibold text-foreground">{item.label}</span>
+                    {badgeCount > 0 && (
+                      <span className="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-bold leading-none text-white">
+                        {badgeCount > 99 ? '99+' : badgeCount}
+                      </span>
+                    )}
+                  </span>
+                )}
               </button>
             );
           })}

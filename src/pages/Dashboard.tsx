@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Loader2, WifiOff } from 'lucide-react';
+import { BookOpen, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Loader2, RefreshCw, WifiOff } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   navItems,
@@ -19,95 +19,17 @@ import {
   getSelectedPeriodRange,
   type ClienteContato,
 } from '@/components/AgendaPanel';
-import { AlertsPanel } from '@/components/AlertsPanel';
-import { BottlenecksPanel } from '@/components/BottlenecksPanel';
 import { CalendarsPanel, type CalendarsFilterOptions } from '@/components/CalendarsPanel';
 import { ClientFeedbackPanel, type FeedbackFilterOptions } from '@/components/ClientFeedbackPanel';
 import { ClientScorePanel } from '@/components/ClientScorePanel';
 import { CreateCardsPanel } from '@/components/CreateCardsPanel';
-import { DesignerCard } from '@/components/DesignerCard';
-import { FrentePanel } from '@/components/FrentePanel';
-import { ProductionRhythmPanel } from '@/components/ProductionRhythmPanel';
-import { StatsBar } from '@/components/StatsBar';
-import {
-  getStatisticsCurrentMonth,
-  StatisticsPanel,
-} from '@/components/StatisticsPanel';
+import { TutorialPanel } from '@/components/TutorialPanel';
 import { useGoalfyData } from '@/hooks/useGoalfyData';
 import { useAuth } from '@/lib/auth';
 import type { DesignTask } from '@/lib/data';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
-type ViewMode = 'dashboard' | 'designers' | 'client-score' | 'statistics' | 'calendar' | 'calendars' | 'create-cards' | 'feedback';
-
-type DesignerAiReference = {
-  tone: 'success' | 'warning';
-  cliente: string;
-  message?: string;
-  highlight?: string;
-};
-
-const DESIGNER_REFERENCES_STORAGE_KEY = 'hapo:designer-client-references-batch:v5';
-
-function parseMonthValue(value: string) {
-  const [year, month] = value.split('-').map(Number);
-  return new Date(year, Math.max(0, (month || 1) - 1), 1);
-}
-
-function formatStatisticsMonthTitle(value: string) {
-  return new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(parseMonthValue(value));
-}
-
-function shiftMonthValue(value: string, offset: number) {
-  const date = parseMonthValue(value);
-  date.setMonth(date.getMonth() + offset);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function buildDesignerReferencesSignature(
-  dataVersion: number,
-  payloads: Array<{ designer: string; references: Array<Record<string, unknown>> }>,
-) {
-  return JSON.stringify({ dataVersion, payloads });
-}
-
-function readStoredDesignerReferences(signature: string) {
-  if (typeof window === 'undefined') return null;
-
-  try {
-    const raw = window.localStorage.getItem(DESIGNER_REFERENCES_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as {
-      signature?: string;
-      designers?: Record<string, DesignerAiReference[]>;
-    };
-
-    if (parsed.signature !== signature || !parsed.designers || typeof parsed.designers !== 'object') {
-      return null;
-    }
-
-    return parsed.designers;
-  } catch {
-    return null;
-  }
-}
-
-function writeStoredDesignerReferences(signature: string, designers: Record<string, DesignerAiReference[]>) {
-  if (typeof window === 'undefined') return;
-
-  try {
-    window.localStorage.setItem(
-      DESIGNER_REFERENCES_STORAGE_KEY,
-      JSON.stringify({
-        signature,
-        designers,
-        savedAt: Date.now(),
-      }),
-    );
-  } catch {
-    // ignore cache failure
-  }
-}
+type ViewMode = 'client-score' | 'calendar' | 'calendars' | 'create-cards' | 'feedback' | 'dicas';
 
 export default function Dashboard() {
   const {
@@ -138,7 +60,6 @@ export default function Dashboard() {
     (view: ViewMode) => navigate(`/painel/${view}`),
     [navigate],
   );
-  const [selectedStatisticsMonth, setSelectedStatisticsMonth] = useState(getStatisticsCurrentMonth());
   const agendaMonthOptions = useMemo(() => getAgendaMonthOptionsList(), []);
   const [selectedAgendaMonth, setSelectedAgendaMonth] = useState(AGENDA_NEXT_15_DAYS_VALUE);
   const [agendaCustomStart, setAgendaCustomStart] = useState('');
@@ -161,25 +82,12 @@ export default function Dashboard() {
     designerOptions: ['Todos'],
   });
   const [selectedFeedbackDesigner, setSelectedFeedbackDesigner] = useState('Todos');
-  const [designerAiReferences, setDesignerAiReferences] = useState<Record<string, DesignerAiReference[]>>({});
-  const [isDesignerAiLoading, setIsDesignerAiLoading] = useState(false);
 
   const activeNav = useMemo(
     () => navItems.find((item) => item.id === activeView) ?? navItems[0],
     [activeView],
   );
   const ActiveNavIcon = activeNav.icon;
-  const designerPeriodHighlightValues = useMemo(() => {
-    const designers = insights?.porDesigner ?? [];
-    const getMax = (period: 'mesAtual' | 'semanaAtual' | 'hoje') =>
-      Math.max(0, ...designers.map((designer) => designer.concluidasPeriodo[period] || 0));
-
-    return {
-      mesAtual: getMax('mesAtual'),
-      semanaAtual: getMax('semanaAtual'),
-      hoje: getMax('hoje'),
-    };
-  }, [insights?.porDesigner]);
 
   useEffect(() => {
     if (agendaMonthOptions.length === 0) return;
@@ -202,6 +110,15 @@ export default function Dashboard() {
   useEffect(() => {
     fetchClientesContatos().then(setClientesContatos);
   }, []);
+
+  const [pendingFeedbackCount, setPendingFeedbackCount] = useState(0);
+
+  useEffect(() => {
+    fetch('/api/feedback', { credentials: 'include' })
+      .then((response) => response.json())
+      .then((responseData) => setPendingFeedbackCount((responseData.posts ?? []).length))
+      .catch(() => setPendingFeedbackCount(0));
+  }, [lastUpdatedAt]);
 
   const clientScoreDesignerOptions = useMemo(
     () => ['Todos', ...clientesDesigners],
@@ -245,21 +162,6 @@ export default function Dashboard() {
     return ['Todos', ...options];
   }, [tasksInSelectedAgendaPeriod]);
 
-  const currentStatisticsMonth = useMemo(() => getStatisticsCurrentMonth(), []);
-  const isStatisticsCurrentMonth = selectedStatisticsMonth === currentStatisticsMonth;
-  const selectedStatisticsMonthTitle = useMemo(
-    () => formatStatisticsMonthTitle(selectedStatisticsMonth),
-    [selectedStatisticsMonth],
-  );
-  const handlePreviousStatisticsMonth = () => {
-    setSelectedStatisticsMonth((value) => shiftMonthValue(value, -1));
-  };
-  const handleNextStatisticsMonth = () => {
-    setSelectedStatisticsMonth((value) => {
-      const nextValue = shiftMonthValue(value, 1);
-      return nextValue > currentStatisticsMonth ? currentStatisticsMonth : nextValue;
-    });
-  };
   useEffect(() => {
     if (!clientScoreDesignerOptions.includes(selectedClientScoreDesigner)) {
       setSelectedClientScoreDesigner('Todos');
@@ -323,85 +225,6 @@ export default function Dashboard() {
     setIsAgendaCustomRangeDialogOpen(false);
   };
 
-  const designerReferencesPayload = useMemo(
-    () =>
-      insights?.porDesigner
-        .map((designer) => ({
-          designer: designer.nome,
-          references: designer.referenciasClientes,
-        }))
-        .filter((designer) => designer.references.length > 0) ?? [],
-    [insights],
-  );
-
-  const designerReferencesSignature = useMemo(
-    () => buildDesignerReferencesSignature(lastUpdatedAt, designerReferencesPayload),
-    [designerReferencesPayload, lastUpdatedAt],
-  );
-
-  useEffect(() => {
-    if (designerReferencesPayload.length === 0) {
-      setDesignerAiReferences({});
-      setIsDesignerAiLoading(false);
-      return;
-    }
-
-    const stored = readStoredDesignerReferences(designerReferencesSignature);
-    if (stored) {
-      setDesignerAiReferences(stored);
-      setIsDesignerAiLoading(false);
-      return;
-    }
-
-    let isActive = true;
-    const controller = new AbortController();
-
-    const loadBatchReferences = async () => {
-      setIsDesignerAiLoading(true);
-
-      try {
-        const response = await fetch('/api/ai/designer-client-references-batch', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify({ payloads: designerReferencesPayload }),
-          signal: controller.signal,
-        });
-
-        if (!response.ok) {
-          if (isActive) setIsDesignerAiLoading(false);
-          return;
-        }
-
-        const result = await response.json();
-        const designers = result?.designers && typeof result.designers === 'object'
-          ? result.designers as Record<string, DesignerAiReference[]>
-          : {};
-
-        if (isActive) {
-          setDesignerAiReferences(designers);
-          setIsDesignerAiLoading(false);
-          if (Object.keys(designers).length > 0) {
-            writeStoredDesignerReferences(designerReferencesSignature, designers);
-          }
-        }
-      } catch {
-        if (isActive) {
-          setIsDesignerAiLoading(false);
-        }
-      }
-    };
-
-    void loadBatchReferences();
-
-    return () => {
-      isActive = false;
-      controller.abort();
-    };
-  }, [designerReferencesPayload, designerReferencesSignature]);
-
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -426,6 +249,7 @@ export default function Dashboard() {
             onLogout={() => void logout()}
             isCollapsed={isSidebarCollapsed}
             onToggleCollapsed={() => setIsSidebarCollapsed((value) => !value)}
+            badgeCounts={{ feedback: pendingFeedbackCount }}
           />
 
           <main
@@ -493,6 +317,7 @@ export default function Dashboard() {
         onLogout={() => void logout()}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapsed={() => setIsSidebarCollapsed((value) => !value)}
+        badgeCounts={{ feedback: pendingFeedbackCount }}
       />
 
       <main
@@ -520,43 +345,7 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {activeView === 'statistics' ? (
-                <>
-                <div className="w-full max-w-sm">
-                  <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                    PERIODO
-                  </p>
-                  <div className="mt-2 flex min-w-0 items-center gap-2">
-                    <div className="inline-flex min-w-0 flex-1 items-center rounded-xl border border-border bg-card text-foreground">
-                      <button
-                        type="button"
-                        onClick={handlePreviousStatisticsMonth}
-                        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-l-xl text-muted-foreground transition-colors hover:bg-primary/10 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                        title="Mes anterior"
-                        aria-label="Mes anterior"
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </button>
-                      <div className="min-w-0 flex-1 border-x border-border px-3 text-center">
-                        <span className="block truncate text-sm font-semibold capitalize text-foreground">
-                          {selectedStatisticsMonthTitle}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleNextStatisticsMonth}
-                        disabled={isStatisticsCurrentMonth}
-                        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-r-xl text-muted-foreground transition-colors hover:bg-primary/10 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
-                        title="Proximo mes"
-                        aria-label="Proximo mes"
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                </>
-              ) : activeView === 'calendar' && agendaMonthOptions.length > 0 ? (
+              {activeView === 'calendar' && agendaMonthOptions.length > 0 ? (
                 <div className="grid w-full gap-3 md:ml-auto md:w-auto md:grid-cols-3">
                   <div className="w-full md:w-56">
                     <label htmlFor="calendar-month-filter" className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
@@ -630,7 +419,17 @@ export default function Dashboard() {
 
                 </div>
               ) : activeView === 'calendars' ? (
-                <div className="grid w-full gap-3 md:ml-auto md:w-auto md:grid-cols-3">
+                <div className="flex w-full flex-wrap items-end gap-3 md:w-auto md:justify-end">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/painel/dicas')}
+                    className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground transition-colors hover:border-primary/30"
+                  >
+                    <BookOpen className="h-4 w-4" />
+                    Dicas
+                  </button>
+
+                  <div className="grid w-full gap-3 md:w-auto md:grid-cols-3">
                   <div className="w-full md:w-48">
                     <label htmlFor="calendars-month-filter" className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                       Mês
@@ -693,6 +492,7 @@ export default function Dashboard() {
                       <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     </div>
                   </div>
+                  </div>
                 </div>
               ) : activeView === 'client-score' && clientScoreDesignerOptions.length > 0 ? (
                 <div className="w-full max-w-xs">
@@ -754,25 +554,8 @@ export default function Dashboard() {
             </div>
           </section>
 
-          {activeView === 'dashboard' ? (
-            <>
-              <StatsBar data={insights} />
-              <FrentePanel data={insights} />
-              <ProductionRhythmPanel tasks={data?.tasks ?? []} />
-              <BottlenecksPanel data={insights} />
-              <AlertsPanel alerts={insights.alertas} />
-            </>
-          ) : activeView === 'client-score' ? (
+          {activeView === 'client-score' ? (
             <ClientScorePanel selectedDesigner={selectedClientScoreDesigner} />
-          ) : activeView === 'statistics' ? (
-            <StatisticsPanel
-              selectedMonth={selectedStatisticsMonth}
-              dataVersion={lastUpdatedAt}
-              tasks={data?.tasks ?? []}
-              designers={data?.designers ?? []}
-              designerFronts={insights.porDesigner}
-              adjustments={data?.adjustments ?? []}
-            />
           ) : activeView === 'calendar' ? (
             <AgendaPanel
               tasks={data?.tasks ?? []}
@@ -798,30 +581,7 @@ export default function Dashboard() {
               onFilterOptionsChange={handleFeedbackFilterOptionsChange}
             />
           ) : (
-            <section className="space-y-4">
-              <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-2 2xl:grid-cols-3">
-                {insights.porDesigner.map((designer) => (
-                  <DesignerCard
-                    key={designer.nome}
-                    designer={designer}
-                    aiReferencesOverride={designerAiReferences[designer.nome] || null}
-                    isAiReferencesLoadingOverride={isDesignerAiLoading}
-                    disableInternalAiFetch
-                    periodHighlights={{
-                      mesAtual:
-                        designerPeriodHighlightValues.mesAtual > 0 &&
-                        designer.concluidasPeriodo.mesAtual === designerPeriodHighlightValues.mesAtual,
-                      semanaAtual:
-                        designerPeriodHighlightValues.semanaAtual > 0 &&
-                        designer.concluidasPeriodo.semanaAtual === designerPeriodHighlightValues.semanaAtual,
-                      hoje:
-                        designerPeriodHighlightValues.hoje > 0 &&
-                        designer.concluidasPeriodo.hoje === designerPeriodHighlightValues.hoje,
-                    }}
-                  />
-                ))}
-              </div>
-            </section>
+            <TutorialPanel />
           )}
         </div>
       </main>
