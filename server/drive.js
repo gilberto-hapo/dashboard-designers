@@ -166,7 +166,10 @@ async function resolvePostFolderContent(folder) {
   const images = mediaFiles
     .filter((f) => isImage(f.mimeType))
     .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
-  const coverImage = images.find((f) => /capa/i.test(f.name)) || null;
+  // Com só uma imagem na pasta do vídeo, ela é a capa mesmo sem "capa" no
+  // nome — evita depender do designer lembrar de nomear certo. Com mais de
+  // uma imagem, o nome ainda é necessário para saber qual delas é a capa.
+  const coverImage = images.length === 1 ? images[0] : images.find((f) => /capa/i.test(f.name)) || null;
 
   return {
     folderId: folder.id,
