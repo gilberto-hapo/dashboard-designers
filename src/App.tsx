@@ -7,6 +7,7 @@ import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import ClientPortal from "./pages/ClientPortal.tsx";
 import CopywriterPortal from "./pages/CopywriterPortal.tsx";
+import CopywriterPostDetail from "./pages/CopywriterPostDetail.tsx";
 import PortalPostDetail from "./pages/PortalPostDetail.tsx";
 import CalendarDetail from "./pages/CalendarDetail.tsx";
 import CalendarPostDetail from "./pages/CalendarPostDetail.tsx";
@@ -27,6 +28,7 @@ const App = () => (
           <Route path="/portal/:token" element={<ClientPortal />} />
           <Route path="/portal/:token/posts/:postId" element={<PortalPostDetail />} />
           <Route path="/copywriter-portal" element={<CopywriterPortal />} />
+          <Route path="/copywriter-portal/posts/:postId" element={<CopywriterPostDetail />} />
           <Route path="/calendarios/:id" element={<CalendarDetail />} />
           <Route path="/calendarios/:id/posts/:postId" element={<CalendarPostDetail />} />
           <Route path="/clientes/:id" element={<ClientDetail />} />

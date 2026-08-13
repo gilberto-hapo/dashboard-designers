@@ -122,6 +122,7 @@ export default function CopywriterPortal() {
           emptyMessage="Nenhum ajuste pendente no momento."
           gridClassName="grid grid-cols-3 gap-1 sm:gap-2"
           showCopywriterTag
+          linkTo={(postId) => `/copywriter-portal/posts/${postId}`}
         />
       </main>
     </div>
