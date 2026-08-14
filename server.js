@@ -32,11 +32,16 @@ const AI_REQUEST_TIMEOUT_MS = 15000;
 const GEMINI_API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 const OPENAI_API_BASE_URL = 'https://api.openai.com/v1/chat/completions';
 
+const CARDS_CLIENTS_CACHE_TTL_MS = 1000 * 60;
+
 const app = express();
 let cachedGoalfyData = null;
 let cachedGoalfyDataAt = 0;
 let inflightGoalfyDataPromise = null;
 let inflightBackgroundRefreshPromise = null;
+let cachedCardsClients = null;
+let cachedCardsClientsAt = 0;
+let inflightCardsClientsPromise = null;
 let goalfyRefreshState = {
   inProgress: false,
   startedAt: 0,
@@ -1447,6 +1452,8 @@ app.get('/api/goalfy-data', requireAuth, async (req, res) => {
 app.post('/api/goalfy-refresh', requireAuth, async (req, res) => {
   try {
     clearDriveFolderCache();
+    cachedCardsClients = null;
+    cachedCardsClientsAt = 0;
 
     if (!cachedGoalfyData) {
       const persistedGoalfyData = await readPersistedGoalfyData();
@@ -1830,10 +1837,35 @@ async function loadCardsClientsFromSource({ writeToken }) {
   return clients;
 }
 
-// Sem cache: dados cadastrais de cliente devem refletir mudanças imediatas
-// (ex: trocar o Designer Responsável de um cliente na Goalfy).
+// Cacheada com TTL curto + dedupe de chamadas concorrentes: fetchCardsClients
+// e chamada em varias rotas do backend (calendarios, portal do cliente,
+// feedback, etc.), e sem isso cada requisicao HTTP refaz do zero a busca
+// paginada completa na API da Goalfy. Navegar por varios calendarios ao
+// mesmo tempo (ou o polling automatico do frontend) disparava dezenas de
+// buscas redundantes em paralelo, aumentando o risco de timeout/502.
+// O botao "Atualizar dados" (POST /api/goalfy-refresh) zera esse cache, para
+// mudancas cadastrais feitas na Goalfy (ex: trocar o Designer Responsavel)
+// poderem ser puxadas na hora quando necessario.
 async function fetchCardsClients({ writeToken } = {}) {
-  return loadCardsClientsFromSource({ writeToken });
+  if (cachedCardsClients && Date.now() - cachedCardsClientsAt < CARDS_CLIENTS_CACHE_TTL_MS) {
+    return cachedCardsClients;
+  }
+
+  if (inflightCardsClientsPromise) {
+    return inflightCardsClientsPromise;
+  }
+
+  inflightCardsClientsPromise = loadCardsClientsFromSource({ writeToken })
+    .then((clients) => {
+      cachedCardsClients = clients;
+      cachedCardsClientsAt = Date.now();
+      return clients;
+    })
+    .finally(() => {
+      inflightCardsClientsPromise = null;
+    });
+
+  return inflightCardsClientsPromise;
 }
 
 async function fetchAllGoalfyCardsInBoard({ boardId, writeToken }) {
