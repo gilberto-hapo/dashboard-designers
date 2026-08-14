@@ -114,11 +114,16 @@ function normalizeCaptionWhitespace(text) {
 // Aceita tanto "Legenda:" quanto variações como "LEGENDA EXCLUSIVA
 // INSTAGRAM" — o marcador é a palavra "legenda" em uma linha própria,
 // cortando tudo a partir do fim dessa linha (ignora o resto do texto nela,
-// ex.: "EXCLUSIVA INSTAGRAM" ou ":").
+// ex.: "EXCLUSIVA INSTAGRAM" ou ":"). Usa a ÚLTIMA ocorrência, não a
+// primeira: documentos com instruções administrativas no topo (ex.: "Tema a
+// ser trabalhado na legenda:") também contêm a palavra "legenda" antes do
+// marcador real, e pegar a primeira ocorrência incluiria essas instruções
+// dentro da legenda extraída.
 function extractCaptionSection(rawText) {
-  const marker = /^.*\blegenda\b.*$/im;
-  const match = rawText.match(marker);
-  const section = match ? rawText.slice(match.index + match[0].length) : rawText;
+  const marker = /^.*\blegenda\b.*$/gim;
+  const matches = [...rawText.matchAll(marker)];
+  const lastMatch = matches[matches.length - 1];
+  const section = lastMatch ? rawText.slice(lastMatch.index + lastMatch[0].length) : rawText;
   return normalizeCaptionWhitespace(section);
 }
 

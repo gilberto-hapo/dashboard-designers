@@ -48,6 +48,8 @@ export type PortalPostTag = {
 export type PortalPost = {
   id: string;
   title: string;
+  folderName?: string;
+  goalfyCardTitle?: string;
   formatoEntrega: string;
   caption: string | null;
   media: PostMedia | null;

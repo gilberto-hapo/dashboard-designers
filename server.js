@@ -2115,6 +2115,7 @@ async function resolveCalendarPosts(
   const goalfyPhaseTitleBySequence = new Map();
   const goalfyFormatoBySequence = new Map();
   const goalfyTagsBySequence = new Map();
+  const goalfyCardTitleBySequence = new Map();
   calendarTasks.forEach((task) => {
     const sequenceNumber = extractPostSequenceNumber(task.title);
     if (sequenceNumber == null) return;
@@ -2123,6 +2124,7 @@ async function resolveCalendarPosts(
     goalfyPhaseTitleBySequence.set(sequenceNumber, task.phaseTitle || '');
     if (task.formatoEntrega) goalfyFormatoBySequence.set(sequenceNumber, task.formatoEntrega);
     if (Array.isArray(task.goalfyTags)) goalfyTagsBySequence.set(sequenceNumber, task.goalfyTags);
+    goalfyCardTitleBySequence.set(sequenceNumber, task.title || '');
   });
 
   const decisionsForCalendar = await getLatestDecisionsForCalendar(calendario.id);
@@ -2168,6 +2170,8 @@ async function resolveCalendarPosts(
       return {
         id: postId,
         title: buildDriveFolderPostTitle(calendario, index, totalPosts),
+        folderName: folder.folderName || '',
+        goalfyCardTitle: goalfyCardTitleBySequence.get(sequenceNumber) || '',
         formatoEntrega,
         caption: isStories ? null : (folder.caption || null),
         media: folder.media || null,

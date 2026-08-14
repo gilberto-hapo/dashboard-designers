@@ -278,15 +278,20 @@ function CalendarDetailContent() {
                 ) : (
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6">
                     {calendario.posts.map((post) => (
-                      <div key={post.id} className="space-y-1.5">
+                      <div key={post.id}>
                         <GridThumbShared
                           mediaUrl={mediaUrl}
                           media={post.media}
-                          title={post.title}
+                          title={post.goalfyCardTitle || post.title}
                           status={decisionStatus(post)}
                           onOpen={() => navigate(`/calendarios/${id}/posts/${post.id}`)}
                         />
-                        <p className="truncate text-xs font-medium text-foreground">{post.title}</p>
+                        <p className="mt-1.5 truncate text-xs font-medium text-foreground">
+                          {post.goalfyCardTitle || post.title}
+                        </p>
+                        {post.folderName && (
+                          <p className="truncate text-[11px] text-muted-foreground">Pasta: {post.folderName}</p>
+                        )}
                       </div>
                     ))}
                   </div>
