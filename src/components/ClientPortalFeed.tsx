@@ -40,6 +40,11 @@ export type FeedbackEntry = {
   createdAt: string;
 };
 
+export type PortalPostTag = {
+  text: string;
+  color: string | null;
+};
+
 export type PortalPost = {
   id: string;
   title: string;
@@ -51,7 +56,40 @@ export type PortalPost = {
   feedbackHistory: FeedbackEntry[];
   resolvedFeedbackHistory: FeedbackEntry[];
   calendarLabel?: string;
+  tags?: PortalPostTag[];
 };
+
+function getTagTextColor(hexColor: string | null) {
+  if (!hexColor) return '#ffffff';
+  const hex = hexColor.replace('#', '');
+  if (hex.length !== 6) return '#ffffff';
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.6 ? '#1a1a1a' : '#ffffff';
+}
+
+export function PostTags({ tags }: { tags?: PortalPostTag[] }) {
+  if (!tags || tags.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {tags.map((tag, index) => (
+        <span
+          key={`${tag.text}-${index}`}
+          className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase"
+          style={{
+            backgroundColor: tag.color || '#6b7280',
+            color: getTagTextColor(tag.color),
+          }}
+        >
+          {tag.text}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 function mediaUrl(token: string, fileId: string) {
   return `/api/public/portal/${token}/media/${fileId}`;
@@ -267,7 +305,15 @@ function ResolvedFeedbackToggle({ entries }: { entries: FeedbackEntry[] }) {
   );
 }
 
-function DecisionBadge({ decision, published }: { decision: PostDecision | null; published?: boolean }) {
+function DecisionBadge({
+  decision,
+  published,
+  hasPendingAdjustments,
+}: {
+  decision: PostDecision | null;
+  published?: boolean;
+  hasPendingAdjustments?: boolean;
+}) {
   if (published) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full border border-sky-500/40 bg-sky-500/10 px-3 py-1 text-xs font-semibold text-sky-600">
@@ -277,15 +323,7 @@ function DecisionBadge({ decision, published }: { decision: PostDecision | null;
     );
   }
 
-  if (!decision) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
-        Aguardando sua avaliação
-      </span>
-    );
-  }
-
-  if (decision.approved) {
+  if (decision?.approved) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-600">
         <CheckCircle2 className="h-3.5 w-3.5" />
@@ -294,10 +332,18 @@ function DecisionBadge({ decision, published }: { decision: PostDecision | null;
     );
   }
 
+  if (hasPendingAdjustments) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-600">
+        <MessageSquareWarning className="h-3.5 w-3.5" />
+        Ajuste solicitado
+      </span>
+    );
+  }
+
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-600">
-      <MessageSquareWarning className="h-3.5 w-3.5" />
-      Ajuste solicitado
+    <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+      Aguardando sua avaliação
     </span>
   );
 }
@@ -370,8 +416,14 @@ export function PostDetail({
           <span className="rounded-full border border-border px-2.5 py-0.5 text-[11px] font-medium uppercase text-muted-foreground">
             {post.formatoEntrega || 'Post'}
           </span>
-          <DecisionBadge decision={post.decision} published={post.published} />
+          <DecisionBadge
+            decision={post.decision}
+            published={post.published}
+            hasPendingAdjustments={post.feedbackHistory.length > 0}
+          />
         </div>
+
+        <PostTags tags={post.tags} />
 
         <CaptionText caption={post.caption} />
 

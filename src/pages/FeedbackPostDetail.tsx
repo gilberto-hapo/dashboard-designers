@@ -16,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { PostMediaViewShared } from '@/components/ClientPortalFeed';
+import { PostMediaViewShared, PostTags } from '@/components/ClientPortalFeed';
 import type { FeedbackPost } from '@/components/FeedbackGridShared';
 
 function mediaUrl(fileId: string) {
@@ -119,6 +119,8 @@ function FeedbackPostDetailContent() {
               </span>
             </div>
             <p className="text-xs text-muted-foreground">{post.calendarTitle}</p>
+
+            <PostTags tags={post.tags} />
 
             {post.caption && <p className="whitespace-pre-wrap text-sm text-foreground">{post.caption}</p>}
 

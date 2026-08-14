@@ -13,7 +13,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { GridThumbShared, PostMediaViewShared, type PostMedia } from '@/components/ClientPortalFeed';
+import { GridThumbShared, PostMediaViewShared, type PortalPostTag, type PostMedia } from '@/components/ClientPortalFeed';
 
 export type FeedbackHistoryEntry = {
   feedback: string;
@@ -32,6 +32,7 @@ export type FeedbackPost = {
   latestCreatedAt: string;
   feedbackHistory: FeedbackHistoryEntry[];
   resolvedFeedbackHistory: FeedbackHistoryEntry[];
+  tags?: PortalPostTag[];
 };
 
 function mediaUrl(fileId: string) {

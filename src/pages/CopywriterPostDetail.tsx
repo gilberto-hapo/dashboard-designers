@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AlertTriangle, ArrowLeft, Loader2, MessageSquareWarning } from 'lucide-react';
-import { PostMediaViewShared } from '@/components/ClientPortalFeed';
+import { PostMediaViewShared, PostTags } from '@/components/ClientPortalFeed';
 import type { FeedbackPost } from '@/components/FeedbackGridShared';
 
 type CopywriterPayload = {
@@ -97,6 +97,8 @@ export default function CopywriterPostDetail() {
               </span>
             </div>
             <p className="text-xs text-muted-foreground">{post.calendarTitle}</p>
+
+            <PostTags tags={post.tags} />
 
             {post.caption && <p className="whitespace-pre-wrap text-sm text-foreground">{post.caption}</p>}
 

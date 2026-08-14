@@ -424,6 +424,9 @@ function buildTaskFromPostCard(card, cardDetail, calendarMetaById) {
   const calendarMeta = calendarIds[0] ? calendarMetaById.get(calendarIds[0]) : null;
 
   const tags = (card.tags || []).map((tag) => tag.text).join(', ');
+  const goalfyTags = (card.tags || [])
+    .filter((tag) => tag?.text)
+    .map((tag) => ({ text: String(tag.text), color: tag.color || null }));
   const responsavel = normalizeDesignerName(
     calendarMeta?.designer || (card.responsibles || []).map((r) => r.name).join(', '),
   );
@@ -435,6 +438,7 @@ function buildTaskFromPostCard(card, cardDetail, calendarMetaById) {
     contentType: parseContentType(tags),
     formatoEntrega: findFieldValue(fields, CARDS_POST_FORMATO_FIELD_ID) || '',
     statusTags: parseStatusTags(tags),
+    goalfyTags,
     title: card.title,
     parceiro: calendarMeta?.clienteNome || 'Sem parceiro',
     calendario: calendarMeta?.calendarTitle || '',
@@ -2110,6 +2114,7 @@ async function resolveCalendarPosts(
   const goalfyStageBySequence = new Map();
   const goalfyPhaseTitleBySequence = new Map();
   const goalfyFormatoBySequence = new Map();
+  const goalfyTagsBySequence = new Map();
   calendarTasks.forEach((task) => {
     const sequenceNumber = extractPostSequenceNumber(task.title);
     if (sequenceNumber == null) return;
@@ -2117,6 +2122,7 @@ async function resolveCalendarPosts(
     else if (task.stage === 'aprovado_programacao') goalfyStageBySequence.set(sequenceNumber, 'approved');
     goalfyPhaseTitleBySequence.set(sequenceNumber, task.phaseTitle || '');
     if (task.formatoEntrega) goalfyFormatoBySequence.set(sequenceNumber, task.formatoEntrega);
+    if (Array.isArray(task.goalfyTags)) goalfyTagsBySequence.set(sequenceNumber, task.goalfyTags);
   });
 
   const decisionsForCalendar = await getLatestDecisionsForCalendar(calendario.id);
@@ -2170,6 +2176,7 @@ async function resolveCalendarPosts(
         feedbackHistory: approved ? [] : feedbackHistory,
         resolvedFeedbackHistory,
         visibleToClient,
+        tags: goalfyTagsBySequence.get(sequenceNumber) || [],
       };
     }),
   );
@@ -2280,6 +2287,7 @@ async function resolvePublicCopywriterPayload({ forceRefreshDrive = false } = {}
           latestCreatedAt: post.feedbackHistory[post.feedbackHistory.length - 1].createdAt,
           feedbackHistory: post.feedbackHistory,
           resolvedFeedbackHistory: post.resolvedFeedbackHistory,
+          tags: post.tags || [],
         })),
     )
     .sort((a, b) => new Date(b.latestCreatedAt) - new Date(a.latestCreatedAt));
@@ -2533,6 +2541,7 @@ app.get('/api/feedback', requireAuth, async (_req, res) => {
             latestCreatedAt: post.feedbackHistory[post.feedbackHistory.length - 1].createdAt,
             feedbackHistory: post.feedbackHistory,
             resolvedFeedbackHistory: post.resolvedFeedbackHistory,
+            tags: post.tags || [],
           })),
       )
       .sort((a, b) => new Date(b.latestCreatedAt) - new Date(a.latestCreatedAt));

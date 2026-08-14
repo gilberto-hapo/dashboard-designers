@@ -16,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { PostMediaViewShared, type FeedbackEntry, type PortalPost } from '@/components/ClientPortalFeed';
+import { PostMediaViewShared, PostTags, type FeedbackEntry, type PortalPost } from '@/components/ClientPortalFeed';
 
 type CalendarDetailData = {
   id: string;
@@ -163,6 +163,8 @@ function CalendarPostDetailContent() {
                 </span>
               )}
             </div>
+
+            <PostTags tags={post.tags} />
 
             {post.caption && <p className="whitespace-pre-wrap text-sm text-foreground">{post.caption}</p>}
 
