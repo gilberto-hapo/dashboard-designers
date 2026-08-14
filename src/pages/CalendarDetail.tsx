@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, CheckCircle2, ExternalLink, FolderOpen, Loader2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CalendarDays, CheckCircle2, ExternalLink, FolderOpen, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth';
 import Login from './Login';
@@ -38,6 +38,8 @@ type CalendarDetailData = {
   clientId: string | null;
   mesAno: string;
   designer: string;
+  copywriter?: string;
+  planejador?: string;
   linkDriveArtes: string;
   phaseTitle: string;
   phaseColor: string;
@@ -184,7 +186,7 @@ function CalendarDetailContent() {
                 {calendario.linkCalendarioEditorial && (
                   <Button variant="outline" className="gap-2 text-white hover:text-white" asChild>
                     <a href={calendario.linkCalendarioEditorial} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink className="h-4 w-4" />
+                      <CalendarDays className="h-4 w-4" />
                       Calendário editorial
                     </a>
                   </Button>
@@ -193,7 +195,7 @@ function CalendarDetailContent() {
                   <Button variant="outline" className="gap-2 text-white hover:text-white" asChild>
                     <a href={calendario.linkDriveArtes} target="_blank" rel="noopener noreferrer">
                       <FolderOpen className="h-4 w-4" />
-                      Drive do calendário
+                      Link do Drive
                     </a>
                   </Button>
                 )}
@@ -228,25 +230,34 @@ function CalendarDetailContent() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h1 className="text-lg font-semibold text-foreground">{calendario.title}</h1>
-                    <p className="text-sm text-muted-foreground">{calendario.mesAno}</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      {calendario.designer && (
+                        <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
+                          {getFirstName(calendario.designer)}
+                        </span>
+                      )}
+                      {calendario.copywriter && (
+                        <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
+                          {getFirstName(calendario.copywriter)}
+                        </span>
+                      )}
+                      {calendario.planejador && (
+                        <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
+                          {getFirstName(calendario.planejador)}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      className="inline-flex rounded border px-2 py-0.5 text-[11px] font-bold uppercase"
-                      style={{
-                        borderColor: calendario.phaseColor,
-                        backgroundColor: `${calendario.phaseColor}1a`,
-                        color: calendario.phaseColor,
-                      }}
-                    >
-                      {calendario.phaseTitle}
-                    </span>
-                    {calendario.designer && (
-                      <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
-                        {getFirstName(calendario.designer)}
-                      </span>
-                    )}
-                  </div>
+                  <span
+                    className="inline-flex shrink-0 rounded border px-2 py-0.5 text-[11px] font-bold uppercase"
+                    style={{
+                      borderColor: calendario.phaseColor,
+                      backgroundColor: `${calendario.phaseColor}1a`,
+                      color: calendario.phaseColor,
+                    }}
+                  >
+                    {calendario.phaseTitle}
+                  </span>
                 </div>
 
                 <div className="flex items-center justify-end">
