@@ -166,10 +166,6 @@ function CalendarPostDetailContent() {
 
             <PostTags tags={post.tags} />
 
-            {post.folderName && (
-              <p className="text-xs text-muted-foreground">Pasta: {post.folderName}</p>
-            )}
-
             {post.caption && <p className="whitespace-pre-wrap text-sm text-foreground">{post.caption}</p>}
 
             <FeedbackList title="Ajustes:" entries={post.feedbackHistory} />

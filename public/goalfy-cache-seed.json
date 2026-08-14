@@ -1,5 +1,5 @@
 {
-  "updatedAt": 1786715059500,
+  "updatedAt": 1786715446055,
   "data": {
     "tasks": [
       {
@@ -9245,7 +9245,7 @@
       {
         "id": "f7234f52-3430-4edd-9580-0f42553c29c7",
         "contentType": "FEED",
-        "formatoEntrega": "Estático",
+        "formatoEntrega": "Stories",
         "statusTags": [],
         "goalfyTags": [
           {
@@ -9612,6 +9612,7 @@
       "Transfast",
       "Une Lunelli",
       "You Gym Guaramirim",
+      "You Gym Itajaí",
       "Zipf Peças"
     ]
   }

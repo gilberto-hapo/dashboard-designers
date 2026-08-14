@@ -119,11 +119,18 @@ function normalizeCaptionWhitespace(text) {
 // ser trabalhado na legenda:") também contêm a palavra "legenda" antes do
 // marcador real, e pegar a primeira ocorrência incluiria essas instruções
 // dentro da legenda extraída.
+//
+// Documentos sem nenhum marcador de legenda (ex.: posts de story com só um
+// aviso/instrução, sem legenda de fato) não têm legenda nenhuma para
+// publicar — retorna null em vez de cair no texto inteiro do documento
+// (que são só instruções internas, não conteúdo para o cliente ver).
 function extractCaptionSection(rawText) {
   const marker = /^.*\blegenda\b.*$/gim;
   const matches = [...rawText.matchAll(marker)];
   const lastMatch = matches[matches.length - 1];
-  const section = lastMatch ? rawText.slice(lastMatch.index + lastMatch[0].length) : rawText;
+  if (!lastMatch) return null;
+
+  const section = rawText.slice(lastMatch.index + lastMatch[0].length);
   return normalizeCaptionWhitespace(section);
 }
 
