@@ -2159,15 +2159,12 @@ async function resolveCalendarPosts(
     goalfyCardTitleBySequence.set(sequenceNumber, task.title || '');
   });
 
-  const decisionsForCalendar = await getLatestDecisionsForCalendar(calendario.id);
-  const decisionsByPostId = new Map(decisionsForCalendar.map((d) => [d.postId, d]));
   const totalPosts = folders.length;
 
   const resolvedPosts = await Promise.all(
     folders.map(async (folder, index) => {
       const postId = folder.folderId;
       const sequenceNumber = index + 1;
-      const decision = decisionsByPostId.get(postId) || null;
       const goalfyStage = goalfyStageBySequence.get(sequenceNumber) || null;
       const published = goalfyStage === 'published';
       const approvedByGoalfyPhase = published || goalfyStage === 'approved';
@@ -2175,7 +2172,7 @@ async function resolveCalendarPosts(
       const history = await getDecisionHistoryForPost(postId);
       const allAdjustments = history
         .filter((d) => !d.approved && d.feedback)
-        .map((d) => ({ feedback: d.feedback, createdAt: d.createdAt }))
+        .map((d) => ({ feedback: d.feedback, createdAt: d.createdAt, mediaFileId: d.mediaFileId, x: d.x, y: d.y }))
         .reverse();
       const feedbackHistory = resolvedAt
         ? allAdjustments.filter((entry) => entry.createdAt > resolvedAt)
@@ -2184,11 +2181,19 @@ async function resolveCalendarPosts(
         ? allAdjustments.filter((entry) => entry.createdAt <= resolvedAt)
         : [];
 
-      const approved = approvedByGoalfyPhase || Boolean(decision?.approved);
+      // Pinos são comentários anexados a um ponto da imagem, não a decisão
+      // geral do post — para status/badge (aprovado x pedir ajustes), usamos
+      // a última decisão sem pino, não a última linha da tabela.
+      const latestGeneralDecision = history.find((d) => !d.mediaFileId) || null;
+      const approved = approvedByGoalfyPhase || Boolean(latestGeneralDecision?.approved);
       const decisionPayload = approved
-        ? { approved: true, feedback: null, createdAt: decision?.createdAt || null }
-        : decision
-          ? { approved: decision.approved, feedback: decision.feedback, createdAt: decision.createdAt }
+        ? { approved: true, feedback: null, createdAt: latestGeneralDecision?.createdAt || null }
+        : latestGeneralDecision
+          ? {
+              approved: latestGeneralDecision.approved,
+              feedback: latestGeneralDecision.feedback,
+              createdAt: latestGeneralDecision.createdAt,
+            }
           : null;
 
       const goalfyPhaseTitle = goalfyPhaseTitleBySequence.get(sequenceNumber) || null;
@@ -2459,6 +2464,16 @@ app.post('/api/public/portal/:token/posts/:postId/decision', async (req, res) =>
   const postId = String(req.params.postId || '').trim();
   const approved = Boolean(req.body?.approved);
   const feedback = approved ? null : String(req.body?.feedback || '').trim() || null;
+  const pins = approved
+    ? []
+    : (Array.isArray(req.body?.pins) ? req.body.pins : [])
+        .map((pin) => ({
+          feedback: String(pin?.feedback || '').trim(),
+          mediaFileId: String(pin?.mediaFileId || '').trim(),
+          x: Number(pin?.x),
+          y: Number(pin?.y),
+        }))
+        .filter((pin) => pin.feedback && pin.mediaFileId && Number.isFinite(pin.x) && Number.isFinite(pin.y));
 
   if (!postId) {
     res.status(400).json({ error: 'postId is required' });
@@ -2479,8 +2494,31 @@ app.post('/api/public/portal/:token/posts/:postId/decision', async (req, res) =>
       return;
     }
 
-    const decisionId = await insertPostDecision({ postId, calendarId: calendario.id, approved, feedback });
-    await markDecisionSyncStatus(decisionId, 'synced');
+    if (approved || feedback) {
+      const decisionId = await insertPostDecision({
+        postId,
+        calendarId: calendario.id,
+        approved,
+        feedback,
+        mediaFileId: null,
+        x: null,
+        y: null,
+      });
+      await markDecisionSyncStatus(decisionId, 'synced');
+    }
+
+    for (const pin of pins) {
+      const pinDecisionId = await insertPostDecision({
+        postId,
+        calendarId: calendario.id,
+        approved: false,
+        feedback: pin.feedback,
+        mediaFileId: pin.mediaFileId,
+        x: pin.x,
+        y: pin.y,
+      });
+      await markDecisionSyncStatus(pinDecisionId, 'synced');
+    }
 
     res.json({ ok: true });
   } catch (error) {

@@ -16,7 +16,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { PostMediaViewShared, PostTags, type FeedbackEntry, type PortalPost } from '@/components/ClientPortalFeed';
+import {
+  AdjustmentsBlock,
+  entriesToPins,
+  PostMediaViewShared,
+  PostTags,
+  type PortalPost,
+} from '@/components/ClientPortalFeed';
 
 type CalendarDetailData = {
   id: string;
@@ -28,27 +34,6 @@ function mediaUrl(fileId: string) {
   return `/api/media/${fileId}`;
 }
 
-function formatDate(iso: string) {
-  return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(iso));
-}
-
-function FeedbackList({ title, entries }: { title: string; entries: FeedbackEntry[] }) {
-  if (entries.length === 0) return null;
-  return (
-    <div className="space-y-1.5 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-muted-foreground">
-      <span className="font-semibold text-foreground">{title}</span>
-      <ul className="space-y-2">
-        {entries.map((entry, index) => (
-          <li key={`${entry.createdAt}-${index}`}>
-            <span className="mb-0.5 block text-[10px] text-muted-foreground">{formatDate(entry.createdAt)}</span>
-            {entry.feedback}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
 function CalendarPostDetailContent() {
   const { id, postId } = useParams<{ id: string; postId: string }>();
   const navigate = useNavigate();
@@ -56,7 +41,6 @@ function CalendarPostDetailContent() {
   const [calendario, setCalendario] = useState<CalendarDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showResolvedHistory, setShowResolvedHistory] = useState(false);
   const [confirmingResolve, setConfirmingResolve] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -135,7 +119,12 @@ function CalendarPostDetailContent() {
       <main className="mx-auto w-full max-w-lg">
         <div className="flex w-full flex-col">
           <div className="w-full bg-black">
-            <PostMediaViewShared mediaUrl={mediaUrl} media={post.media} title={post.title} />
+            <PostMediaViewShared
+              mediaUrl={mediaUrl}
+              media={post.media}
+              title={post.title}
+              pins={entriesToPins(post.feedbackHistory)}
+            />
           </div>
 
           <div className="flex w-full flex-1 flex-col gap-3 p-4">
@@ -168,33 +157,10 @@ function CalendarPostDetailContent() {
 
             {post.caption && <p className="whitespace-pre-wrap text-sm text-foreground">{post.caption}</p>}
 
-            <FeedbackList title="Ajustes:" entries={post.feedbackHistory} />
-
-            {post.resolvedFeedbackHistory.length > 0 && (
-              <div className="space-y-1.5">
-                <button
-                  type="button"
-                  onClick={() => setShowResolvedHistory((v) => !v)}
-                  className="text-xs font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-                >
-                  {showResolvedHistory
-                    ? 'ocultar ajustes concluídos'
-                    : `ver ajustes concluídos (${post.resolvedFeedbackHistory.length})`}
-                </button>
-                {showResolvedHistory && (
-                  <ul className="space-y-2 rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
-                    {post.resolvedFeedbackHistory.map((entry, index) => (
-                      <li key={`${entry.createdAt}-${index}`}>
-                        <span className="mb-0.5 block text-[10px] text-muted-foreground">
-                          {formatDate(entry.createdAt)}
-                        </span>
-                        {entry.feedback}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
+            <AdjustmentsBlock
+              feedbackHistory={post.feedbackHistory}
+              resolvedFeedbackHistory={post.resolvedFeedbackHistory}
+            />
 
             <div className="mt-4 pt-2">
               {isPublished || isApproved ? null : hasPendingAdjustments ? (

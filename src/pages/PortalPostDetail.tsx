@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AlertTriangle, ArrowLeft, Loader2 } from 'lucide-react';
-import { PostDetail, type PortalPost } from '@/components/ClientPortalFeed';
+import { PostDetail, type FeedbackEntry, type PortalPost } from '@/components/ClientPortalFeed';
 
 type PortalCalendarioResumo = {
   id: string;
@@ -42,7 +42,7 @@ export default function PortalPostDetail() {
       .finally(() => setLoading(false));
   }, [token]);
 
-  function handleDecided(postId: string, decision: PortalPost['decision']) {
+  function handleDecided(postId: string, decision: PortalPost['decision'] | null, pins?: FeedbackEntry[]) {
     setCliente((prev) =>
       prev
         ? {
@@ -53,10 +53,14 @@ export default function PortalPostDetail() {
                 post.id === postId
                   ? {
                       ...post,
-                      decision,
+                      decision: decision ?? post.decision,
                       feedbackHistory:
-                        decision && !decision.approved && decision.feedback
-                          ? [...post.feedbackHistory, { feedback: decision.feedback, createdAt: decision.createdAt }]
+                        !decision || !decision.approved
+                          ? [
+                              ...post.feedbackHistory,
+                              ...(decision?.feedback ? [{ feedback: decision.feedback, createdAt: decision.createdAt }] : []),
+                              ...(pins ?? []),
+                            ]
                           : post.feedbackHistory,
                     }
                   : post,
