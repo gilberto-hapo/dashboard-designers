@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, Loader2, MapPin, MessageSquareWarning, Play } from 'lucide-react';
+import { CheckCircle2, Loader2, MapPin, MessageSquareWarning, MoreVertical, Play } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
@@ -23,6 +23,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export type PostMedia = {
   type: 'image' | 'video';
@@ -37,6 +43,7 @@ export type PostDecision = {
 };
 
 export type FeedbackEntry = {
+  id?: number;
   feedback: string;
   createdAt: string;
   mediaFileId?: string | null;
@@ -108,11 +115,16 @@ function formatDate(iso: string) {
 export function AdjustmentsBlock({
   feedbackHistory,
   resolvedFeedbackHistory,
+  onDeleteEntry,
+  deletingEntryId,
 }: {
   feedbackHistory: FeedbackEntry[];
   resolvedFeedbackHistory: FeedbackEntry[];
+  onDeleteEntry?: (entryId: number) => void;
+  deletingEntryId?: number | null;
 }) {
   const [showResolvedHistory, setShowResolvedHistory] = useState(false);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<number | null>(null);
 
   let pinCounter = 0;
 
@@ -134,15 +146,43 @@ export function AdjustmentsBlock({
                   key={`${entry.createdAt}-${index}`}
                   className="rounded-lg border border-amber-500/20 bg-background/60 p-3.5"
                 >
-                  <div className="mb-1.5 flex items-center gap-1.5">
-                    <span className="inline-block rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600">
-                      {formatDate(entry.createdAt)}
-                    </span>
-                    {hasPin && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600">
-                        <MapPin className="h-3 w-3" />
-                        ponto {pinCounter} na imagem
+                  <div className="mb-1.5 flex items-center justify-between gap-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-block rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600">
+                        {formatDate(entry.createdAt)}
                       </span>
+                      {hasPin && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600">
+                          <MapPin className="h-3 w-3" />
+                          ponto {pinCounter} na imagem
+                        </span>
+                      )}
+                    </div>
+                    {onDeleteEntry && entry.id != null && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 shrink-0 cursor-pointer text-muted-foreground/60 hover:bg-transparent hover:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0"
+                            disabled={deletingEntryId === entry.id}
+                          >
+                            {deletingEntryId === entry.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <MoreVertical className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            className="cursor-pointer text-muted-foreground data-[highlighted]:bg-transparent data-[highlighted]:text-destructive"
+                            onClick={() => setConfirmingDeleteId(entry.id!)}
+                          >
+                            Excluir
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     )}
                   </div>
                   <p className="text-base leading-relaxed text-foreground">{entry.feedback}</p>
@@ -152,6 +192,30 @@ export function AdjustmentsBlock({
           </ul>
         </div>
       )}
+
+      <AlertDialog open={confirmingDeleteId != null} onOpenChange={(open) => !open && setConfirmingDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir este comentário?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Essa ação não pode ser desfeita. O comentário será removido definitivamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(event) => {
+                event.preventDefault();
+                if (confirmingDeleteId != null) onDeleteEntry?.(confirmingDeleteId);
+                setConfirmingDeleteId(null);
+              }}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {resolvedFeedbackHistory.length > 0 && (
         <div className="space-y-2">
@@ -431,6 +495,35 @@ export function PostMediaViewShared({
   );
 }
 
+/**
+ * Variante somente-leitura de PostMediaViewShared para as telas do
+ * designer/copywriter: mostra os pins já enviados pelo cliente e permite
+ * clicar num pino para ler o comentário, sem habilitar criação de novos.
+ */
+export function ReadOnlyPostMedia({
+  mediaUrl,
+  media,
+  title,
+  feedbackHistory,
+}: {
+  mediaUrl: (fileId: string) => string;
+  media: PostMedia | null;
+  title: string;
+  feedbackHistory: FeedbackEntry[];
+}) {
+  const [openPinId, setOpenPinId] = useState<string | null>(null);
+
+  return (
+    <PostMediaViewShared
+      mediaUrl={mediaUrl}
+      media={media}
+      title={title}
+      pins={entriesToPins(feedbackHistory).map((pin) => ({ ...pin, editing: openPinId === pin.id }))}
+      onTogglePin={(pinId) => setOpenPinId((current) => (current === pinId ? null : pinId))}
+    />
+  );
+}
+
 export type GridThumbStatus = 'approved' | 'published' | 'adjustment' | null;
 
 const GRID_THUMB_STATUS_STYLES: Record<
@@ -661,10 +754,12 @@ export function PostDetail({
   token,
   post,
   onDecided,
+  onEntryDeleted,
 }: {
   token: string;
   post: PortalPost;
   onDecided: (postId: string, decision: PostDecision | null, pins?: FeedbackEntry[]) => void;
+  onEntryDeleted?: (postId: string, entryId: number) => void;
 }) {
   const [isRejecting, setIsRejecting] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
@@ -672,6 +767,7 @@ export function PostDetail({
   const [openPinId, setOpenPinId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submittingPin, setSubmittingPin] = useState(false);
+  const [deletingEntryId, setDeletingEntryId] = useState<number | null>(null);
   const [confirmingApproval, setConfirmingApproval] = useState(false);
 
   const canEdit = !post.published && !post.decision?.approved;
@@ -765,6 +861,26 @@ export function PostDetail({
     }
   }
 
+  async function deleteEntry(entryId: number) {
+    setDeletingEntryId(entryId);
+    try {
+      const response = await fetch(`/api/public/portal/${token}/posts/${post.id}/decision/${entryId}`, {
+        method: 'DELETE',
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(body?.error || 'Erro ao excluir comentário');
+      }
+
+      onEntryDeleted?.(post.id, entryId);
+      toast.success('Comentário excluído.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao excluir comentário');
+    } finally {
+      setDeletingEntryId(null);
+    }
+  }
+
   return (
     <div className="flex w-full flex-col">
       <div className="w-full bg-black">
@@ -817,6 +933,8 @@ export function PostDetail({
         <AdjustmentsBlock
           feedbackHistory={post.feedbackHistory}
           resolvedFeedbackHistory={post.resolvedFeedbackHistory}
+          onDeleteEntry={deleteEntry}
+          deletingEntryId={deletingEntryId}
         />
 
         <div className="mt-auto pt-2">

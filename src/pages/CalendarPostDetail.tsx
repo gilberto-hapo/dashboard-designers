@@ -18,8 +18,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import {
   AdjustmentsBlock,
-  entriesToPins,
-  PostMediaViewShared,
+  ReadOnlyPostMedia,
   PostTags,
   type PortalPost,
 } from '@/components/ClientPortalFeed';
@@ -119,11 +118,11 @@ function CalendarPostDetailContent() {
       <main className="mx-auto w-full max-w-lg">
         <div className="flex w-full flex-col">
           <div className="w-full bg-black">
-            <PostMediaViewShared
+            <ReadOnlyPostMedia
               mediaUrl={mediaUrl}
               media={post.media}
               title={post.title}
-              pins={entriesToPins(post.feedbackHistory)}
+              feedbackHistory={post.feedbackHistory}
             />
           </div>
 

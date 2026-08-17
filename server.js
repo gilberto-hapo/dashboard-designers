@@ -13,6 +13,7 @@ import {
   getDecisionHistoryForPost,
   markAdjustmentsResolvedForPost,
   getAdjustmentResolvedAtForPost,
+  deletePostDecision,
 } from './server/db.js';
 import { listCalendarPostFolders, getDriveFileStream, getDriveFileMetadata, clearDriveFolderCache } from './server/drive.js';
 
@@ -2172,7 +2173,7 @@ async function resolveCalendarPosts(
       const history = await getDecisionHistoryForPost(postId);
       const allAdjustments = history
         .filter((d) => !d.approved && d.feedback)
-        .map((d) => ({ feedback: d.feedback, createdAt: d.createdAt, mediaFileId: d.mediaFileId, x: d.x, y: d.y }))
+        .map((d) => ({ id: d.id, feedback: d.feedback, createdAt: d.createdAt, mediaFileId: d.mediaFileId, x: d.x, y: d.y }))
         .reverse();
       const feedbackHistory = resolvedAt
         ? allAdjustments.filter((entry) => entry.createdAt > resolvedAt)
@@ -2523,6 +2524,56 @@ app.post('/api/public/portal/:token/posts/:postId/decision', async (req, res) =>
     res.json({ ok: true });
   } catch (error) {
     console.error('Public portal decision request failed', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/public/portal/:token/posts/:postId/decision/:decisionId', async (req, res) => {
+  const postId = String(req.params.postId || '').trim();
+  const decisionId = Number(req.params.decisionId);
+
+  if (!postId || !Number.isFinite(decisionId)) {
+    res.status(400).json({ error: 'postId e decisionId são obrigatórios' });
+    return;
+  }
+
+  try {
+    const clientId = await resolveClientIdFromSlug(req.params.token);
+    if (!clientId) {
+      res.status(401).json({ error: 'Link inválido' });
+      return;
+    }
+
+    const cliente = await resolvePublicClientPayload(clientId);
+    const calendario = (cliente?.calendarios || []).find((c) => c.posts.some((p) => p.id === postId));
+    if (!calendario) {
+      res.status(404).json({ error: 'Post não encontrado para este cliente' });
+      return;
+    }
+
+    // Só permite excluir comentários ainda pendentes (não resolvidos pelo
+    // designer) — uma vez resolvido, o histórico fica preservado.
+    const resolvedAt = await getAdjustmentResolvedAtForPost(postId);
+    const history = await getDecisionHistoryForPost(postId);
+    const decision = history.find((d) => d.id === decisionId);
+    if (!decision) {
+      res.status(404).json({ error: 'Comentário não encontrado' });
+      return;
+    }
+    if (resolvedAt && decision.createdAt <= resolvedAt) {
+      res.status(403).json({ error: 'Este ajuste já foi concluído e não pode mais ser excluído' });
+      return;
+    }
+
+    const deleted = await deletePostDecision(decisionId, postId);
+    if (!deleted) {
+      res.status(404).json({ error: 'Comentário não encontrado' });
+      return;
+    }
+
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('Public portal decision delete failed', error);
     res.status(500).json({ error: error.message });
   }
 });

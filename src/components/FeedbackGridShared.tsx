@@ -16,12 +16,13 @@ import { Button } from '@/components/ui/button';
 import {
   AdjustmentsBlock,
   GridThumbShared,
-  PostMediaViewShared,
+  ReadOnlyPostMedia,
   type PortalPostTag,
   type PostMedia,
 } from '@/components/ClientPortalFeed';
 
 export type FeedbackHistoryEntry = {
+  id?: number;
   feedback: string;
   createdAt: string;
   mediaFileId?: string | null;
@@ -146,7 +147,12 @@ export function FeedbackGridShared({
 
               <div className="flex w-full flex-col">
                 <div className="w-full bg-black">
-                  <PostMediaViewShared mediaUrl={resolveMediaUrl} media={openPost.media} title={openPost.postTitle} />
+                  <ReadOnlyPostMedia
+                    mediaUrl={resolveMediaUrl}
+                    media={openPost.media}
+                    title={openPost.postTitle}
+                    feedbackHistory={openPost.feedbackHistory}
+                  />
                 </div>
 
                 <div className="flex w-full flex-1 flex-col gap-3 p-4">

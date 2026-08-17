@@ -16,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { AdjustmentsBlock, entriesToPins, PostMediaViewShared, PostTags } from '@/components/ClientPortalFeed';
+import { AdjustmentsBlock, ReadOnlyPostMedia, PostTags } from '@/components/ClientPortalFeed';
 import type { FeedbackPost } from '@/components/FeedbackGridShared';
 
 function mediaUrl(fileId: string) {
@@ -103,11 +103,11 @@ function FeedbackPostDetailContent() {
       <main className="mx-auto w-full max-w-lg">
         <div className="flex w-full flex-col">
           <div className="w-full bg-black">
-            <PostMediaViewShared
+            <ReadOnlyPostMedia
               mediaUrl={mediaUrl}
               media={post.media}
               title={post.postTitle}
-              pins={entriesToPins(post.feedbackHistory)}
+              feedbackHistory={post.feedbackHistory}
             />
           </div>
 

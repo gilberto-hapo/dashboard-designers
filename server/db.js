@@ -111,6 +111,15 @@ export async function getLatestDecisionsForCalendar(calendarId) {
   return rows.map(rowToDecision);
 }
 
+export async function deletePostDecision(decisionId, postId) {
+  await ensureSchema();
+  const { rowCount } = await pool.query(`DELETE FROM post_decisions WHERE id = $1 AND post_id = $2`, [
+    decisionId,
+    postId,
+  ]);
+  return rowCount > 0;
+}
+
 export async function getDecisionHistoryForPost(postId) {
   await ensureSchema();
   const { rows } = await pool.query(`SELECT * FROM post_decisions WHERE post_id = $1 ORDER BY created_at DESC`, [

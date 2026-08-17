@@ -71,6 +71,24 @@ export default function PortalPostDetail() {
     );
   }
 
+  function handleEntryDeleted(postId: string, entryId: number) {
+    setCliente((prev) =>
+      prev
+        ? {
+            ...prev,
+            calendarios: prev.calendarios.map((calendario) => ({
+              ...calendario,
+              posts: calendario.posts.map((post) =>
+                post.id === postId
+                  ? { ...post, feedbackHistory: post.feedbackHistory.filter((entry) => entry.id !== entryId) }
+                  : post,
+              ),
+            })),
+          }
+        : prev,
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -115,7 +133,7 @@ export default function PortalPostDetail() {
       </header>
 
       <main className="mx-auto w-full max-w-lg">
-        <PostDetail token={token} post={post} onDecided={handleDecided} />
+        <PostDetail token={token} post={post} onDecided={handleDecided} onEntryDeleted={handleEntryDeleted} />
       </main>
     </div>
   );
