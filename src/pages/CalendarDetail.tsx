@@ -303,6 +303,9 @@ function CalendarDetailContent() {
                         {post.folderName && (
                           <p className="truncate text-[11px] text-muted-foreground">Pasta: {post.folderName}</p>
                         )}
+                        <span className="mt-1 inline-block rounded-full border border-border px-2 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
+                          {post.formatoEntrega || 'Post'}
+                        </span>
                       </div>
                     ))}
                   </div>
