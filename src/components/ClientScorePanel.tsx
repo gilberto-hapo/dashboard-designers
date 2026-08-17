@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ExternalLink, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { Loader2 } from 'lucide-react';
 import { fetchJson } from '@/lib/calendarUi';
 
 // Mesma paleta usada em src/lib/data.ts (buildDesigners) para manter o
-// padrão visual de avatar já existente no resto do dashboard.
-const AVATAR_COLORS = ['#E67E22', '#9B59B6', '#1ABC9C', '#3498DB', '#E74C3C', '#2ECC71', '#F39C12', '#8E44AD'];
+// padrão visual de cor por pessoa já existente no resto do dashboard.
+const DESIGNER_COLORS = ['#E67E22', '#9B59B6', '#1ABC9C', '#3498DB', '#E74C3C', '#2ECC71', '#F39C12', '#8E44AD'];
 
 function hashString(value: string) {
   let hash = 0;
@@ -17,21 +16,8 @@ function hashString(value: string) {
   return Math.abs(hash);
 }
 
-function getInitials(name: string) {
-  return name.trim().charAt(0).toUpperCase();
-}
-
-function PersonAvatar({ name }: { name: string }) {
-  const color = AVATAR_COLORS[hashString(name) % AVATAR_COLORS.length];
-
-  return (
-    <span
-      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold"
-      style={{ backgroundColor: `${color}25`, color }}
-    >
-      {getInitials(name)}
-    </span>
-  );
+function designerColor(name: string) {
+  return DESIGNER_COLORS[hashString(name) % DESIGNER_COLORS.length];
 }
 
 type LocalPublicacao = { nome: string; cor: string };
@@ -47,21 +33,11 @@ type ClienteInfo = {
   linkDriveGeral: string | null;
 };
 
-function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-3 text-sm">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="text-right font-medium text-foreground">{value}</span>
-    </div>
-  );
-}
-
 export function ClientScorePanel({ selectedDesigner = 'Todos' }: { selectedDesigner?: string }) {
   const navigate = useNavigate();
   const [clients, setClients] = useState<ClienteInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [generatingLinkForId, setGeneratingLinkForId] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -71,19 +47,6 @@ export function ClientScorePanel({ selectedDesigner = 'Todos' }: { selectedDesig
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
-
-  async function handleOpenClientLink(clientId: string) {
-    setGeneratingLinkForId(clientId);
-    try {
-      const data = await fetchJson<{ path: string }>(`/api/clientes/${clientId}/share-link`);
-      const url = `${window.location.origin}${data.path}`;
-      window.open(url, '_blank', 'noopener,noreferrer');
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Erro ao gerar link para o cliente');
-    } finally {
-      setGeneratingLinkForId(null);
-    }
-  }
 
   const filteredClients = (
     selectedDesigner === 'Todos' ? clients : clients.filter((c) => c.designer === selectedDesigner)
@@ -107,7 +70,7 @@ export function ClientScorePanel({ selectedDesigner = 'Todos' }: { selectedDesig
   }
 
   return (
-    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
       {filteredClients.map((client) => (
         <div
           key={client.id}
@@ -120,98 +83,20 @@ export function ClientScorePanel({ selectedDesigner = 'Todos' }: { selectedDesig
               navigate(`/clientes/${client.id}`);
             }
           }}
-          className="cursor-pointer space-y-3 rounded-xl border border-border bg-card p-4 transition-colors hover:border-foreground/30"
+          className="cursor-pointer space-y-2 rounded-xl border border-border bg-card p-4 transition-colors hover:border-foreground/30"
         >
-          <div>
-            <h3 className="text-base font-semibold text-foreground">{client.nome}</h3>
-            {client.locaisPublicacao.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {client.locaisPublicacao.map((local) => (
-                  <span
-                    key={local.nome}
-                    className="rounded px-2 py-0.5 text-[10px] font-bold uppercase text-white"
-                    style={{ backgroundColor: local.cor }}
-                  >
-                    {local.nome}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-1.5 border-t border-border pt-3">
-            <InfoRow
-              label="Designer Responsável"
-              value={
-                client.designer ? (
-                  <span className="inline-flex items-center gap-1.5">
-                    <PersonAvatar name={client.designer} />
-                    {client.designer}
-                  </span>
-                ) : (
-                  '—'
-                )
-              }
-            />
-            <InfoRow
-              label="Planejador Responsável"
-              value={
-                client.planejador ? (
-                  <span className="inline-flex items-center gap-1.5">
-                    <PersonAvatar name={client.planejador} />
-                    {client.planejador}
-                  </span>
-                ) : (
-                  '—'
-                )
-              }
-            />
-            <InfoRow
-              label="Copywriter Dedicado"
-              value={
-                client.copywriter ? (
-                  <span className="inline-flex items-center gap-1.5">
-                    <PersonAvatar name={client.copywriter} />
-                    {client.copywriter}
-                  </span>
-                ) : (
-                  '—'
-                )
-              }
-            />
-            <InfoRow label="Posts Contratados" value={client.postsContratados} />
-          </div>
-
-          <div className="flex gap-2 border-t border-border pt-3">
-            <button
-              type="button"
-              disabled={generatingLinkForId === client.id}
-              onClick={(event) => {
-                event.stopPropagation();
-                handleOpenClientLink(client.id);
-              }}
-              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-white/30 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-white/10 disabled:opacity-60"
+          <h3 className="truncate text-base font-semibold text-foreground">{client.nome}</h3>
+          {client.designer && (
+            <span
+              className="inline-block max-w-full truncate rounded-full px-2.5 py-0.5 text-[11px] font-medium uppercase"
+              style={{ backgroundColor: `${designerColor(client.designer)}25`, color: designerColor(client.designer) }}
             >
-              {generatingLinkForId === client.id ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <ExternalLink className="h-3.5 w-3.5" />
-              )}
-              Link do Cliente
-            </button>
-            {client.linkDriveGeral && (
-              <a
-                href={client.linkDriveGeral}
-                target="_blank"
-                rel="noreferrer"
-                onClick={(event) => event.stopPropagation()}
-                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-white/30 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-white/10"
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-                Drive Geral
-              </a>
-            )}
-          </div>
+              {client.designer}
+            </span>
+          )}
+          <p className="text-sm text-muted-foreground">
+            <span className="font-bold text-foreground">{client.postsContratados}</span> posts/mês
+          </p>
         </div>
       ))}
     </div>

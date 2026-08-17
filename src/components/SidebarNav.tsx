@@ -31,7 +31,7 @@ export const navItems: Array<{
     icon: MessageSquareWarning,
   },
   {
-    id: 'client-score',
+    id: 'clientes',
     label: 'Clientes',
     icon: Users,
   },

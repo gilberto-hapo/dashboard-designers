@@ -30,7 +30,7 @@ import { useAuth } from '@/lib/auth';
 import type { DesignTask } from '@/lib/data';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
-type ViewMode = 'client-score' | 'calendar' | 'calendars' | 'create-cards' | 'feedback' | 'dicas';
+type ViewMode = 'clientes' | 'calendar' | 'calendars' | 'create-cards' | 'feedback' | 'dicas';
 
 export default function Dashboard() {
   const {
@@ -101,7 +101,7 @@ export default function Dashboard() {
   const [clientesContatos, setClientesContatos] = useState<ClienteContato[]>([]);
 
   useEffect(() => {
-    if (activeView !== 'client-score') return;
+    if (activeView !== 'clientes') return;
     fetch('/api/clientes/designers', { credentials: 'include' })
       .then((response) => response.json())
       .then((responseData) => setClientesDesigners(responseData.designers ?? []))
@@ -488,7 +488,7 @@ export default function Dashboard() {
                   </div>
                   </div>
                 </div>
-              ) : activeView === 'client-score' && clientScoreDesignerOptions.length > 0 ? (
+              ) : activeView === 'clientes' && clientScoreDesignerOptions.length > 0 ? (
                 <div className="w-full max-w-xs">
                   <label htmlFor="client-score-designer-filter" className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                     Designer
@@ -548,7 +548,7 @@ export default function Dashboard() {
             </div>
           </section>
 
-          {activeView === 'client-score' ? (
+          {activeView === 'clientes' ? (
             <ClientScorePanel selectedDesigner={selectedClientScoreDesigner} />
           ) : activeView === 'calendar' ? (
             <AgendaPanel
