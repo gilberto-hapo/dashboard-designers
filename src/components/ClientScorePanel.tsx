@@ -73,45 +73,56 @@ export function ClientScorePanel({ selectedDesigner = 'Todos' }: { selectedDesig
     return <p className="text-sm text-muted-foreground">Nenhum cliente encontrado.</p>;
   }
 
+  const totalPostsPerMonth = filteredClients.reduce((sum, client) => sum + client.postsContratados, 0);
+
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-      {filteredClients.map((client) => (
-        <div
-          key={client.id}
-          role="button"
-          tabIndex={0}
-          onClick={() => navigate(`/clientes/${client.id}`)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault();
-              navigate(`/clientes/${client.id}`);
-            }
-          }}
-          className="cursor-pointer space-y-2 rounded-xl border border-border bg-card p-4 transition-colors hover:border-foreground/30"
-        >
-          <h3 className="truncate text-base font-semibold text-foreground">{client.nome}</h3>
-          {(client.designer || client.copywriter) && (
-            <div className="flex flex-wrap items-center gap-1.5">
-              {client.designer && (
-                <span
-                  className="inline-block max-w-full truncate rounded-full px-2.5 py-0.5 text-[11px] font-medium uppercase"
-                  style={{ backgroundColor: `${designerColor(client.designer)}25`, color: designerColor(client.designer) }}
-                >
-                  {firstName(client.designer)}
-                </span>
-              )}
-              {client.copywriter && (
-                <span className="inline-block max-w-full truncate rounded-full border border-border px-2.5 py-0.5 text-[11px] font-medium uppercase text-muted-foreground">
-                  {firstName(client.copywriter)}
-                </span>
-              )}
-            </div>
-          )}
-          <p className="text-sm text-muted-foreground">
-            <span className="font-bold text-foreground">{client.postsContratados}</span> posts/mês
-          </p>
-        </div>
-      ))}
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        Total: <span className="font-bold text-foreground">{totalPostsPerMonth}</span> posts/mês
+      </p>
+
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+        {filteredClients.map((client) => (
+          <div
+            key={client.id}
+            role="button"
+            tabIndex={0}
+            onClick={() => navigate(`/clientes/${client.id}`)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                navigate(`/clientes/${client.id}`);
+              }
+            }}
+            className="cursor-pointer space-y-2 rounded-xl border border-border bg-card p-4 transition-colors hover:border-foreground/30"
+          >
+            <h3 className="truncate text-base font-semibold text-foreground">{client.nome}</h3>
+            {(client.designer || client.copywriter) && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                {client.designer && (
+                  <span
+                    className="inline-block max-w-full truncate rounded-full px-2.5 py-0.5 text-[11px] font-medium uppercase"
+                    style={{
+                      backgroundColor: `${designerColor(client.designer)}25`,
+                      color: designerColor(client.designer),
+                    }}
+                  >
+                    {firstName(client.designer)}
+                  </span>
+                )}
+                {client.copywriter && (
+                  <span className="inline-block max-w-full truncate rounded-full border border-border px-2.5 py-0.5 text-[11px] font-medium uppercase text-muted-foreground">
+                    {firstName(client.copywriter)}
+                  </span>
+                )}
+              </div>
+            )}
+            <p className="text-sm text-muted-foreground">
+              <span className="font-bold text-foreground">{client.postsContratados}</span> posts/mês
+            </p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
