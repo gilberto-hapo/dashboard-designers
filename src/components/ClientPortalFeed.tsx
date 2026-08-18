@@ -433,11 +433,11 @@ export function PostMediaViewShared({
 
   if (media.type === 'video') {
     return (
-      <div className="flex items-center justify-center overflow-hidden bg-black">
+      <div className="flex max-h-[80vh] items-center justify-center overflow-hidden bg-black">
         <video
           controls
           playsInline
-          className="w-full object-contain"
+          className="max-h-[80vh] w-full object-contain"
           preload="metadata"
           poster={media.coverImageId ? buildMediaUrl(media.coverImageId) : undefined}
         >
@@ -460,15 +460,12 @@ export function PostMediaViewShared({
 
   if (media.files.length === 1) {
     return (
-      <AspectRatio ratio={4 / 5} className="relative overflow-hidden bg-muted">
-        <img
-          src={buildMediaUrl(media.files[0].id)}
-          alt={title}
-          className="h-full w-full object-cover"
-          loading="lazy"
-        />
-        <MediaPinOverlay mediaFileId={media.files[0].id} {...pinOverlayProps} />
-      </AspectRatio>
+      <SingleMediaFrame
+        src={buildMediaUrl(media.files[0].id)}
+        alt={title}
+        mediaFileId={media.files[0].id}
+        pinOverlayProps={pinOverlayProps}
+      />
     );
   }
 
@@ -477,21 +474,37 @@ export function PostMediaViewShared({
       <CarouselContent>
         {media.files.map((file, index) => (
           <CarouselItem key={file.id}>
-            <AspectRatio ratio={4 / 5} className="relative overflow-hidden bg-muted">
-              <img
-                src={buildMediaUrl(file.id)}
-                alt={`${title} — imagem ${index + 1}`}
-                className="h-full w-full object-cover"
-                loading="lazy"
-              />
-              <MediaPinOverlay mediaFileId={file.id} {...pinOverlayProps} />
-            </AspectRatio>
+            <SingleMediaFrame
+              src={buildMediaUrl(file.id)}
+              alt={`${title} — imagem ${index + 1}`}
+              mediaFileId={file.id}
+              pinOverlayProps={pinOverlayProps}
+            />
           </CarouselItem>
         ))}
       </CarouselContent>
       <CarouselPrevious className="left-2" />
       <CarouselNext className="right-2" />
     </Carousel>
+  );
+}
+
+function SingleMediaFrame({
+  src,
+  alt,
+  mediaFileId,
+  pinOverlayProps,
+}: {
+  src: string;
+  alt: string;
+  mediaFileId: string;
+  pinOverlayProps: Omit<Parameters<typeof MediaPinOverlay>[0], 'mediaFileId'>;
+}) {
+  return (
+    <div className="relative w-full bg-black">
+      <img src={src} alt={alt} className="block h-auto w-full" loading="lazy" />
+      <MediaPinOverlay mediaFileId={mediaFileId} {...pinOverlayProps} />
+    </div>
   );
 }
 
