@@ -332,10 +332,12 @@ export default function Dashboard() {
             <div className="flex min-h-[58px] flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div className="flex items-center gap-3">
                 <div className="rounded-xl bg-primary/10 p-2.5 text-primary">
-                  <ActiveNavIcon className="h-5 w-5" />
+                  {activeView === 'dicas' ? <Info className="h-5 w-5" /> : <ActiveNavIcon className="h-5 w-5" />}
                 </div>
                 <div>
-                  <h1 className="text-xl font-semibold text-foreground">{activeNav.label}</h1>
+                  <h1 className="text-xl font-semibold text-foreground">
+                    {activeView === 'dicas' ? 'Dicas' : activeNav.label}
+                  </h1>
                 </div>
               </div>
 
