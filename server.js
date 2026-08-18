@@ -14,8 +14,14 @@ import {
   markAdjustmentsResolvedForPost,
   getAdjustmentResolvedAtForPost,
   deletePostDecision,
+  listFileIdsMissingVariant,
 } from './server/db.js';
 import { listCalendarPostFolders, getDriveFileStream, getDriveFileMetadata, clearDriveFolderCache } from './server/drive.js';
+import {
+  serveOptimizedMedia,
+  cleanupCalendarMediaVariants,
+  pregenerateMissingVariants,
+} from './server/mediaVariants.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -595,6 +601,11 @@ function triggerGoalfyBackgroundRefresh() {
       logServerEvent('Goalfy background refresh finished', {
         ...getGoalfyRefreshStatus(),
         tasks: data.tasks.length,
+      });
+      // Fire-and-forget: não atrasa a conclusão do refresh nem propaga erro
+      // (best-effort, ver pregenerateActiveMediaVariants).
+      pregenerateActiveMediaVariants().catch((error) => {
+        logServerEvent('Pré-geração de variantes de mídia falhou', { error: error.message });
       });
       return data;
     })
@@ -2337,6 +2348,42 @@ async function resolvePublicCopywriterPayload({ forceRefreshDrive = false } = {}
   return { posts };
 }
 
+// Pré-gera as variantes de imagem (thumb + preview) que ainda faltam para
+// todos os posts dos calendários "Em Andamento" — chamado (fire-and-forget)
+// após o refresh manual do Goalfy terminar, para que a primeira visita a um
+// post recém-sincronizado já encontre cache hit em vez de gerar na hora.
+async function pregenerateActiveMediaVariants() {
+  const writeToken = getGoalfyCardsWriteToken();
+  const [calendarios, clients, goalfyData] = await Promise.all([
+    fetchAllCalendarsWithPhase({ writeToken }),
+    fetchCardsClients({ writeToken }),
+    fetchGoalfyData(),
+  ]);
+
+  const activeCalendarios = calendarios.filter(
+    (c) =>
+      c.phaseTitle &&
+      normalizeLookupKey(c.phaseTitle) === normalizeLookupKey(CARDS_CALENDAR_PHASES[CARDS_CALENDAR_PHASE_EM_ANDAMENTO_ID].title),
+  );
+
+  const resolvedCalendarios = await Promise.all(
+    activeCalendarios.map((calendario) => resolveCalendarPosts(calendario, { clients, goalfyData })),
+  );
+
+  const imageFiles = resolvedCalendarios.flatMap((calendario) =>
+    calendario.posts
+      .filter((post) => post.media?.type === 'image')
+      .flatMap((post) => (post.media.files || []).map((file) => ({ fileId: file.id, calendarId: calendario.id }))),
+  );
+
+  const result = await pregenerateMissingVariants(imageFiles, logServerEvent);
+  logServerEvent('Pré-geração de variantes de mídia concluída', {
+    calendariosAtivos: activeCalendarios.length,
+    arquivosConsiderados: imageFiles.length,
+    ...result,
+  });
+}
+
 app.get('/api/public/copywriter-portal', async (req, res) => {
   try {
     const forceRefreshDrive = req.query.refresh === '1';
@@ -2350,19 +2397,33 @@ app.get('/api/public/copywriter-portal', async (req, res) => {
 
 app.get('/api/public/copywriter-portal/media/:fileId', async (req, res) => {
   const fileId = String(req.params.fileId || '').trim();
+  const variant = String(req.query.variant || 'original').trim();
 
   try {
     const payload = await resolvePublicCopywriterPayload();
-    const belongsToCopywriter = payload.posts.some(
+    const owningPost = payload.posts.find(
       (post) => (post.media?.files || []).some((file) => file.id === fileId) || post.media?.coverImageId === fileId,
     );
 
-    if (!belongsToCopywriter) {
+    if (!owningPost) {
       res.status(404).json({ error: 'Arquivo não encontrado' });
       return;
     }
 
-    await streamDriveMedia({ req, res, fileId, logLabel: 'Portal copywriter' });
+    const fallback = () => streamDriveMedia({ req, res, fileId, logLabel: 'Portal copywriter' });
+    if (variant === 'thumb' || variant === 'preview') {
+      await serveOptimizedMedia({
+        res,
+        fileId,
+        calendarId: owningPost.calendarId,
+        variant,
+        logLabel: 'Portal copywriter',
+        fallback,
+        logServerEvent,
+      });
+    } else {
+      await fallback();
+    }
   } catch (error) {
     console.error('Public copywriter portal media request failed', error);
     res.status(500).json({ error: error.message });
@@ -2417,6 +2478,7 @@ async function streamDriveMedia({ req, res, fileId, logLabel }) {
 
 app.get('/api/public/portal/:token/media/:fileId', async (req, res) => {
   const fileId = String(req.params.fileId || '').trim();
+  const variant = String(req.query.variant || 'original').trim();
 
   try {
     const clientId = await resolveClientIdFromSlug(req.params.token);
@@ -2426,7 +2488,7 @@ app.get('/api/public/portal/:token/media/:fileId', async (req, res) => {
     }
 
     const cliente = await resolvePublicClientPayload(clientId);
-    const belongsToClient = (cliente?.calendarios || []).some((calendario) =>
+    const owningCalendario = (cliente?.calendarios || []).find((calendario) =>
       (calendario.posts || []).some(
         (post) =>
           (post.media?.files || []).some((file) => file.id === fileId) ||
@@ -2434,12 +2496,25 @@ app.get('/api/public/portal/:token/media/:fileId', async (req, res) => {
       ),
     );
 
-    if (!belongsToClient) {
+    if (!owningCalendario) {
       res.status(404).json({ error: 'Arquivo não encontrado para este cliente' });
       return;
     }
 
-    await streamDriveMedia({ req, res, fileId, logLabel: 'Portal cliente' });
+    const fallback = () => streamDriveMedia({ req, res, fileId, logLabel: 'Portal cliente' });
+    if (variant === 'thumb' || variant === 'preview') {
+      await serveOptimizedMedia({
+        res,
+        fileId,
+        calendarId: owningCalendario.id,
+        variant,
+        logLabel: 'Portal cliente',
+        fallback,
+        logServerEvent,
+      });
+    } else {
+      await fallback();
+    }
   } catch (error) {
     console.error('Public portal media request failed', error);
     res.status(500).json({ error: error.message });
@@ -2448,13 +2523,28 @@ app.get('/api/public/portal/:token/media/:fileId', async (req, res) => {
 
 app.get('/api/media/:fileId', requireAuth, async (req, res) => {
   const fileId = String(req.params.fileId || '').trim();
+  const calendarId = String(req.query.calendarId || '').trim();
+  const variant = String(req.query.variant || 'original').trim();
   if (!fileId) {
     res.status(400).json({ error: 'fileId is required' });
     return;
   }
 
   try {
-    await streamDriveMedia({ req, res, fileId, logLabel: 'Feedback' });
+    const fallback = () => streamDriveMedia({ req, res, fileId, logLabel: 'Feedback' });
+    if ((variant === 'thumb' || variant === 'preview') && calendarId) {
+      await serveOptimizedMedia({
+        res,
+        fileId,
+        calendarId,
+        variant,
+        logLabel: 'Feedback',
+        fallback,
+        logServerEvent,
+      });
+    } else {
+      await fallback();
+    }
   } catch (error) {
     console.error('Media request failed', error);
     res.status(500).json({ error: error.message });
@@ -3000,6 +3090,10 @@ app.post('/api/criar-cards/move-calendar-to-posts-programados', requireAuth, asy
       body: { phaseId: CARDS_CALENDAR_PHASE_POSTS_PROGRAMADOS_ID },
     });
     res.json({ ok: true });
+    // Calendário saiu de "Em Andamento" -- limpa as variantes otimizadas
+    // geradas para ele, para o storage não acumular indefinidamente. Não
+    // bloqueia a resposta ao usuário nem propaga erro (best-effort).
+    cleanupCalendarMediaVariants(calendarId, logServerEvent);
   } catch (error) {
     logServerEvent('Criar Cards: calendar move to Posts Programados failed', { calendarId, error: error.message });
     res.status(500).json({ error: error.message });

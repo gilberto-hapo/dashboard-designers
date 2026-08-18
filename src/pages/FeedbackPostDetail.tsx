@@ -19,8 +19,8 @@ import {
 import { AdjustmentsBlock, ReadOnlyPostMedia, PostTags } from '@/components/ClientPortalFeed';
 import type { FeedbackPost } from '@/components/FeedbackGridShared';
 
-function mediaUrl(fileId: string) {
-  return `/api/media/${fileId}`;
+function buildMediaUrl(fileId: string, calendarId: string, variant: 'thumb' | 'preview' | 'original' = 'preview') {
+  return `/api/media/${fileId}?calendarId=${calendarId}&variant=${variant}`;
 }
 
 function FeedbackPostDetailContent() {
@@ -104,7 +104,8 @@ function FeedbackPostDetailContent() {
         <div className="flex w-full flex-col">
           <div className="w-full bg-black">
             <ReadOnlyPostMedia
-              mediaUrl={mediaUrl}
+              mediaUrl={(fileId) => buildMediaUrl(fileId, post.calendarId, 'preview')}
+              originalMediaUrl={(fileId) => buildMediaUrl(fileId, post.calendarId, 'original')}
               media={post.media}
               title={post.postTitle}
               feedbackHistory={post.feedbackHistory}

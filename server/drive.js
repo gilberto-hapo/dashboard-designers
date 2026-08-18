@@ -263,8 +263,21 @@ export async function getDriveFileMetadata(fileId) {
   const drive = getDrive();
   const res = await drive.files.get({
     fileId,
-    fields: 'id, name, mimeType, size',
+    fields: 'id, name, mimeType, size, modifiedTime',
     supportsAllDrives: true,
   });
   return res.data;
+}
+
+// Baixa o arquivo completo em memória (sem range) -- usado só para gerar
+// variantes otimizadas de imagem, onde é preciso o buffer inteiro para
+// processar com sharp (diferente de getDriveFileStream, que faz proxy
+// incremental para o navegador sem bufferizar).
+export async function getDriveFileBuffer(fileId) {
+  const { stream } = await getDriveFileStream(fileId);
+  const chunks = [];
+  for await (const chunk of stream) {
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
 }

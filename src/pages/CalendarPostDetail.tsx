@@ -29,8 +29,8 @@ type CalendarDetailData = {
   posts: PortalPost[];
 };
 
-function mediaUrl(fileId: string) {
-  return `/api/media/${fileId}`;
+function buildMediaUrl(fileId: string, calendarId: string, variant: 'thumb' | 'preview' | 'original' = 'preview') {
+  return `/api/media/${fileId}?calendarId=${calendarId}&variant=${variant}`;
 }
 
 function CalendarPostDetailContent() {
@@ -119,7 +119,8 @@ function CalendarPostDetailContent() {
         <div className="flex w-full flex-col">
           <div className="w-full bg-black">
             <ReadOnlyPostMedia
-              mediaUrl={mediaUrl}
+              mediaUrl={(fileId) => buildMediaUrl(fileId, id!, 'preview')}
+              originalMediaUrl={(fileId) => buildMediaUrl(fileId, id!, 'original')}
               media={post.media}
               title={post.title}
               feedbackHistory={post.feedbackHistory}

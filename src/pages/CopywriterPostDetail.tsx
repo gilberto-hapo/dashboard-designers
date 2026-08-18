@@ -8,8 +8,8 @@ type CopywriterPayload = {
   posts: FeedbackPost[];
 };
 
-function mediaUrl(fileId: string) {
-  return `/api/public/copywriter-portal/media/${fileId}`;
+function buildMediaUrl(fileId: string, variant: 'thumb' | 'preview' | 'original' = 'preview') {
+  return `/api/public/copywriter-portal/media/${fileId}?variant=${variant}`;
 }
 
 export default function CopywriterPostDetail() {
@@ -82,7 +82,8 @@ export default function CopywriterPostDetail() {
         <div className="flex w-full flex-col">
           <div className="w-full bg-black">
             <ReadOnlyPostMedia
-              mediaUrl={mediaUrl}
+              mediaUrl={(fileId) => buildMediaUrl(fileId, 'preview')}
+              originalMediaUrl={(fileId) => buildMediaUrl(fileId, 'original')}
               media={post.media}
               title={post.postTitle}
               feedbackHistory={post.feedbackHistory}

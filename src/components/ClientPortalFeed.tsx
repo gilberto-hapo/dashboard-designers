@@ -104,8 +104,8 @@ export function PostTags({ tags }: { tags?: PortalPostTag[] }) {
   );
 }
 
-function mediaUrl(token: string, fileId: string) {
-  return `/api/public/portal/${token}/media/${fileId}`;
+function mediaUrl(token: string, fileId: string, variant: 'thumb' | 'preview' | 'original' = 'preview') {
+  return `/api/public/portal/${token}/media/${fileId}?variant=${variant}`;
 }
 
 function formatDate(iso: string) {
@@ -400,6 +400,7 @@ function MediaPinOverlay({
 
 export function PostMediaViewShared({
   mediaUrl: buildMediaUrl,
+  originalMediaUrl,
   media,
   title,
   pins,
@@ -412,6 +413,8 @@ export function PostMediaViewShared({
   onTogglePin,
 }: {
   mediaUrl: (fileId: string) => string;
+  /** Quando informado, habilita o botão "Ver em qualidade máxima" na visualização de imagem. */
+  originalMediaUrl?: (fileId: string) => string;
   media: PostMedia | null;
   title: string;
   pins?: MediaPin[];
@@ -423,6 +426,10 @@ export function PostMediaViewShared({
   onCancelPin?: (pinId: string) => void;
   onTogglePin?: (pinId: string) => void;
 }) {
+  const [highQuality, setHighQuality] = useState(false);
+  const resolveSrc = (fileId: string) =>
+    highQuality && originalMediaUrl ? originalMediaUrl(fileId) : buildMediaUrl(fileId);
+
   if (!media || media.files.length === 0) {
     return (
       <AspectRatio ratio={4 / 5} className="flex items-center justify-center bg-muted">
@@ -458,34 +465,46 @@ export function PostMediaViewShared({
     onTogglePin,
   };
 
+  const qualityToggle = originalMediaUrl ? (
+    <div className="flex bg-background px-2">
+      <QualityToggleButton highQuality={highQuality} onToggleQuality={() => setHighQuality((v) => !v)} />
+    </div>
+  ) : null;
+
   if (media.files.length === 1) {
     return (
-      <SingleMediaFrame
-        src={buildMediaUrl(media.files[0].id)}
-        alt={title}
-        mediaFileId={media.files[0].id}
-        pinOverlayProps={pinOverlayProps}
-      />
+      <div>
+        <SingleMediaFrame
+          src={resolveSrc(media.files[0].id)}
+          alt={title}
+          mediaFileId={media.files[0].id}
+          pinOverlayProps={pinOverlayProps}
+        />
+        {qualityToggle}
+      </div>
     );
   }
 
   return (
-    <Carousel className="w-full">
-      <CarouselContent>
-        {media.files.map((file, index) => (
-          <CarouselItem key={file.id}>
-            <SingleMediaFrame
-              src={buildMediaUrl(file.id)}
-              alt={`${title} — imagem ${index + 1}`}
-              mediaFileId={file.id}
-              pinOverlayProps={pinOverlayProps}
-            />
-          </CarouselItem>
-        ))}
-      </CarouselContent>
-      <CarouselPrevious className="left-2" />
-      <CarouselNext className="right-2" />
-    </Carousel>
+    <div>
+      <Carousel className="w-full">
+        <CarouselContent>
+          {media.files.map((file, index) => (
+            <CarouselItem key={file.id}>
+              <SingleMediaFrame
+                src={resolveSrc(file.id)}
+                alt={`${title} — imagem ${index + 1}`}
+                mediaFileId={file.id}
+                pinOverlayProps={pinOverlayProps}
+              />
+            </CarouselItem>
+          ))}
+        </CarouselContent>
+        <CarouselPrevious className="left-2" />
+        <CarouselNext className="right-2" />
+      </Carousel>
+      {qualityToggle}
+    </div>
   );
 }
 
@@ -508,6 +527,24 @@ function SingleMediaFrame({
   );
 }
 
+function QualityToggleButton({
+  highQuality,
+  onToggleQuality,
+}: {
+  highQuality: boolean;
+  onToggleQuality: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggleQuality}
+      className="ml-auto px-1 py-1.5 text-[11px] text-muted-foreground hover:text-foreground"
+    >
+      {highQuality ? 'Ver otimizado' : 'Ver em qualidade máxima'}
+    </button>
+  );
+}
+
 /**
  * Variante somente-leitura de PostMediaViewShared para as telas do
  * designer/copywriter: mostra os pins já enviados pelo cliente e permite
@@ -515,11 +552,13 @@ function SingleMediaFrame({
  */
 export function ReadOnlyPostMedia({
   mediaUrl,
+  originalMediaUrl,
   media,
   title,
   feedbackHistory,
 }: {
   mediaUrl: (fileId: string) => string;
+  originalMediaUrl?: (fileId: string) => string;
   media: PostMedia | null;
   title: string;
   feedbackHistory: FeedbackEntry[];
@@ -529,6 +568,7 @@ export function ReadOnlyPostMedia({
   return (
     <PostMediaViewShared
       mediaUrl={mediaUrl}
+      originalMediaUrl={originalMediaUrl}
       media={media}
       title={title}
       pins={entriesToPins(feedbackHistory).map((pin) => ({ ...pin, editing: openPinId === pin.id }))}
@@ -672,7 +712,8 @@ function PostMediaView({
 }) {
   return (
     <PostMediaViewShared
-      mediaUrl={(fileId) => mediaUrl(token, fileId)}
+      mediaUrl={(fileId) => mediaUrl(token, fileId, 'preview')}
+      originalMediaUrl={(fileId) => mediaUrl(token, fileId, 'original')}
       media={media}
       title={title}
       pins={pins}
@@ -740,7 +781,7 @@ function decisionStatus(post: PortalPost): GridThumbStatus {
 function GridThumb({ token, post, onOpen }: { token: string; post: PortalPost; onOpen: () => void }) {
   return (
     <GridThumbShared
-      mediaUrl={(fileId) => mediaUrl(token, fileId)}
+      mediaUrl={(fileId) => mediaUrl(token, fileId, 'thumb')}
       media={post.media}
       title={post.title}
       status={decisionStatus(post)}

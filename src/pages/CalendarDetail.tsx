@@ -57,8 +57,8 @@ function decisionStatus(post: PortalPost): GridThumbStatus {
   return null;
 }
 
-function mediaUrl(fileId: string) {
-  return `/api/media/${fileId}`;
+function buildMediaUrl(fileId: string, calendarId: string, variant: 'thumb' | 'preview' | 'original' = 'preview') {
+  return `/api/media/${fileId}?calendarId=${calendarId}&variant=${variant}`;
 }
 
 function CalendarDetailContent() {
@@ -291,7 +291,7 @@ function CalendarDetailContent() {
                     {calendario.posts.map((post) => (
                       <div key={post.id}>
                         <GridThumbShared
-                          mediaUrl={mediaUrl}
+                          mediaUrl={(fileId) => buildMediaUrl(fileId, id!, 'thumb')}
                           media={post.media}
                           title={post.goalfyCardTitle || post.title}
                           status={decisionStatus(post)}

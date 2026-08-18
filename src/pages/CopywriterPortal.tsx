@@ -118,7 +118,7 @@ export default function CopywriterPortal() {
         <FeedbackGridShared
           posts={filteredPosts}
           readOnly
-          mediaUrl={(fileId) => `/api/public/copywriter-portal/media/${fileId}`}
+          mediaUrl={(fileId, variant) => `/api/public/copywriter-portal/media/${fileId}?variant=${variant}`}
           emptyMessage="Nenhum ajuste pendente no momento."
           gridClassName="grid grid-cols-3 gap-1 sm:gap-2"
           showCopywriterTag

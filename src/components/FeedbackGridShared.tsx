@@ -45,8 +45,8 @@ export type FeedbackPost = {
   tags?: PortalPostTag[];
 };
 
-function mediaUrl(fileId: string) {
-  return `/api/media/${fileId}`;
+function buildMediaUrl(fileId: string, calendarId: string, variant: 'thumb' | 'preview' | 'original' = 'preview') {
+  return `/api/media/${fileId}?calendarId=${calendarId}&variant=${variant}`;
 }
 
 export function FeedbackGridShared({
@@ -64,7 +64,7 @@ export function FeedbackGridShared({
   readOnly?: boolean;
   onResolve?: (postId: string) => void;
   resolving?: boolean;
-  mediaUrl?: (fileId: string) => string;
+  mediaUrl?: (fileId: string, variant: 'thumb' | 'preview' | 'original') => string;
   emptyMessage?: string;
   gridClassName?: string;
   showCopywriterTag?: boolean;
@@ -74,7 +74,18 @@ export function FeedbackGridShared({
   const [openPostId, setOpenPostId] = useState<string | null>(null);
   const [confirmingResolve, setConfirmingResolve] = useState(false);
 
-  const resolveMediaUrl = mediaUrlOverride || mediaUrl;
+  const resolveThumbUrl = (post: FeedbackPost) =>
+    mediaUrlOverride
+      ? (fileId: string) => mediaUrlOverride(fileId, 'thumb')
+      : (fileId: string) => buildMediaUrl(fileId, post.calendarId, 'thumb');
+  const resolvePreviewUrl = (post: FeedbackPost) =>
+    mediaUrlOverride
+      ? (fileId: string) => mediaUrlOverride(fileId, 'preview')
+      : (fileId: string) => buildMediaUrl(fileId, post.calendarId, 'preview');
+  const resolveOriginalUrl = (post: FeedbackPost) =>
+    mediaUrlOverride
+      ? (fileId: string) => mediaUrlOverride(fileId, 'original')
+      : (fileId: string) => buildMediaUrl(fileId, post.calendarId, 'original');
   const openPost = posts.find((post) => post.postId === openPostId) ?? null;
 
   if (posts.length === 0) {
@@ -93,7 +104,7 @@ export function FeedbackGridShared({
           <div key={post.postId} className="space-y-1.5">
             <div className="overflow-hidden border border-amber-500/40">
               <GridThumbShared
-                mediaUrl={resolveMediaUrl}
+                mediaUrl={resolveThumbUrl(post)}
                 media={post.media}
                 title={post.postTitle}
                 status="adjustment"
@@ -148,7 +159,8 @@ export function FeedbackGridShared({
               <div className="flex w-full flex-col">
                 <div className="w-full bg-black">
                   <ReadOnlyPostMedia
-                    mediaUrl={resolveMediaUrl}
+                    mediaUrl={resolvePreviewUrl(openPost)}
+                    originalMediaUrl={resolveOriginalUrl(openPost)}
                     media={openPost.media}
                     title={openPost.postTitle}
                     feedbackHistory={openPost.feedbackHistory}
