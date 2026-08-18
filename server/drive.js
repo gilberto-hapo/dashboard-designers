@@ -2,7 +2,12 @@ import { google } from 'googleapis';
 import mammoth from 'mammoth';
 import { Readable } from 'node:stream';
 
-const DRIVE_FOLDER_TTL_MS = 1000 * 30;
+// 5 min, alinhado ao cache do Goalfy (GOALFY_CACHE_TTL_MS em server.js) — as
+// pastas/arquivos de posts no Drive não mudam a cada poucos segundos, e o
+// botão "Atualizar dados" já limpa esse cache explicitamente via
+// clearDriveFolderCache() quando o usuário precisa refletir uma mudança
+// recente sem esperar o TTL expirar.
+const DRIVE_FOLDER_TTL_MS = 1000 * 60 * 5;
 const cache = new Map();
 
 // Limpa o cache de pastas de post do Drive — chamado quando o usuário força
@@ -57,10 +62,15 @@ function getCachedAuth() {
   return authClient;
 }
 
+// Timeout aplicado a toda chamada à API do Drive — sem isso, uma falha de
+// rede parcial (não um erro claro, apenas silêncio) deixa a Promise nunca
+// resolver, travando a tela em "Carregando..." indefinidamente.
+const DRIVE_REQUEST_TIMEOUT_MS = 20000;
+
 let driveClient = null;
 function getDrive() {
   if (!driveClient) {
-    driveClient = google.drive({ version: 'v3', auth: getCachedAuth() });
+    driveClient = google.drive({ version: 'v3', auth: getCachedAuth(), timeout: DRIVE_REQUEST_TIMEOUT_MS });
   }
   return driveClient;
 }
@@ -74,7 +84,7 @@ async function listChildren(folderId) {
   const drive = getDrive();
   const res = await drive.files.list({
     q: `'${folderId}' in parents and trashed = false`,
-    fields: 'files(id, name, mimeType, size)',
+    fields: 'files(id, name, mimeType, size, modifiedTime)',
     orderBy: 'name',
     supportsAllDrives: true,
     includeItemsFromAllDrives: true,
@@ -134,6 +144,12 @@ function extractCaptionSection(rawText) {
   return normalizeCaptionWhitespace(section);
 }
 
+// Cache de legenda por arquivo, chaveado por modifiedTime — evita rebaixar
+// e reprocessar (mammoth ou export do Google Docs) o mesmo documento toda
+// vez que o cache de listagem de pastas expira, já que a legenda de um post
+// raramente muda depois de escrita.
+const captionCache = new Map();
+
 async function extractCaptionFromDocx(fileId) {
   const drive = getDrive();
   const res = await drive.files.get(
@@ -154,6 +170,21 @@ async function extractCaptionFromGoogleDoc(fileId) {
   return extractCaptionSection(String(res.data || ''));
 }
 
+async function extractCaptionCached(captionFile) {
+  const cached = captionCache.get(captionFile.id);
+  if (cached && cached.modifiedTime === captionFile.modifiedTime) {
+    return cached.caption;
+  }
+
+  const caption =
+    captionFile.mimeType === 'application/vnd.google-apps.document'
+      ? await extractCaptionFromGoogleDoc(captionFile.id)
+      : await extractCaptionFromDocx(captionFile.id);
+
+  captionCache.set(captionFile.id, { modifiedTime: captionFile.modifiedTime, caption });
+  return caption;
+}
+
 // Resolve o conteúdo (mídia + legenda) de uma subpasta de post. Quando há
 // mais de uma subpasta candidata com o mesmo prefixo (pastas duplicadas de
 // rascunho no Drive), usa a que tiver mídia de fato — a vazia é ignorada.
@@ -165,10 +196,7 @@ async function resolvePostFolderContent(folder) {
   let caption = null;
   if (captionFile) {
     try {
-      caption =
-        captionFile.mimeType === 'application/vnd.google-apps.document'
-          ? await extractCaptionFromGoogleDoc(captionFile.id)
-          : await extractCaptionFromDocx(captionFile.id);
+      caption = await extractCaptionCached(captionFile);
     } catch (error) {
       caption = null;
     }

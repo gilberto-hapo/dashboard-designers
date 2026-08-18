@@ -11,6 +11,11 @@ const { Pool } = pg;
 // uso (conexões breves e frequentes).
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  // Sem timeout, uma conexão/query presa (ex: instabilidade de rede até o
+  // Supavisor) travaria a Promise indefinidamente, prendendo o payload
+  // inteiro de /detail ou /portal/:token em "Carregando...".
+  connectionTimeoutMillis: 10000,
+  statement_timeout: 15000,
 });
 
 // Lazy: as tabelas só são criadas na primeira chamada real, nunca no import

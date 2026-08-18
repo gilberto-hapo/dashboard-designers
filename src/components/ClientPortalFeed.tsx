@@ -521,7 +521,7 @@ function SingleMediaFrame({
 }) {
   return (
     <div className="relative w-full bg-black">
-      <img src={src} alt={alt} className="block h-auto w-full" loading="lazy" />
+      <img key={src} src={src} alt={alt} className="block h-auto w-full" loading="lazy" />
       <MediaPinOverlay mediaFileId={mediaFileId} {...pinOverlayProps} />
     </div>
   );

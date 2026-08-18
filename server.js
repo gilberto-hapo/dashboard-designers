@@ -40,6 +40,7 @@ const GEMINI_API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/mo
 const OPENAI_API_BASE_URL = 'https://api.openai.com/v1/chat/completions';
 
 const CARDS_CLIENTS_CACHE_TTL_MS = 1000 * 60;
+const CALENDARS_WITH_PHASE_CACHE_TTL_MS = 1000 * 60;
 
 const app = express();
 let cachedGoalfyData = null;
@@ -49,6 +50,9 @@ let inflightBackgroundRefreshPromise = null;
 let cachedCardsClients = null;
 let cachedCardsClientsAt = 0;
 let inflightCardsClientsPromise = null;
+let cachedCalendarsWithPhase = null;
+let cachedCalendarsWithPhaseAt = 0;
+let inflightCalendarsWithPhasePromise = null;
 let goalfyRefreshState = {
   inProgress: false,
   startedAt: 0,
@@ -1466,6 +1470,7 @@ app.post('/api/goalfy-refresh', requireAuth, async (req, res) => {
     clearDriveFolderCache();
     cachedCardsClients = null;
     cachedCardsClientsAt = 0;
+    clearCalendarsWithPhaseCache();
 
     if (!cachedGoalfyData) {
       const persistedGoalfyData = await readPersistedGoalfyData();
@@ -2022,9 +2027,15 @@ async function fetchInboxCalendars({ writeToken }) {
 // aba "Calendários". Resolve o cliente por ID da tag (findFieldTagIds), não
 // por nome, para o vínculo cliente-calendário ficar exato mesmo quando o
 // texto do campo diverge do nome cadastrado do cliente (ex: apelidos,
-// digitação manual antiga). Sem cache pelo mesmo motivo de
-// fetchInboxCalendars.
-async function fetchAllCalendarsWithPhase({ writeToken }) {
+// digitação manual antiga).
+// Cache curto (1 min, mesmo padrão de fetchCardsClients): sem isso, esta
+// função (que faz 1 chamada à API do Goalfy por card do board, hoje já na
+// casa de dezenas) era refeita do zero em toda abertura de calendário/portal
+// do cliente, mesmo chamadas consecutivas em poucos segundos — era o maior
+// contribuinte de lentidão percebida ao navegar entre telas. O botão
+// "Atualizar dados" zera esse cache, para refletir mudanças de fase feitas
+// manualmente na Goalfy sem esperar o TTL.
+async function fetchAllCalendarsWithPhaseUncached({ writeToken }) {
   const [allCalendarCards, clients] = await Promise.all([
     fetchAllGoalfyCardsInBoard({ boardId: CARDS_CALENDAR_BOARD_ID, writeToken }),
     fetchCardsClients({ writeToken }),
@@ -2055,6 +2066,33 @@ async function fetchAllCalendarsWithPhase({ writeToken }) {
       linkDriveArtes: linkDriveArtes || '',
     };
   });
+}
+
+function clearCalendarsWithPhaseCache() {
+  cachedCalendarsWithPhase = null;
+  cachedCalendarsWithPhaseAt = 0;
+}
+
+async function fetchAllCalendarsWithPhase({ writeToken }) {
+  if (cachedCalendarsWithPhase && Date.now() - cachedCalendarsWithPhaseAt < CALENDARS_WITH_PHASE_CACHE_TTL_MS) {
+    return cachedCalendarsWithPhase;
+  }
+
+  if (inflightCalendarsWithPhasePromise) {
+    return inflightCalendarsWithPhasePromise;
+  }
+
+  inflightCalendarsWithPhasePromise = fetchAllCalendarsWithPhaseUncached({ writeToken })
+    .then((calendarios) => {
+      cachedCalendarsWithPhase = calendarios;
+      cachedCalendarsWithPhaseAt = Date.now();
+      return calendarios;
+    })
+    .finally(() => {
+      inflightCalendarsWithPhasePromise = null;
+    });
+
+  return inflightCalendarsWithPhasePromise;
 }
 
 app.get('/api/calendarios', requireAuth, async (_req, res) => {
@@ -2180,8 +2218,10 @@ async function resolveCalendarPosts(
       const goalfyStage = goalfyStageBySequence.get(sequenceNumber) || null;
       const published = goalfyStage === 'published';
       const approvedByGoalfyPhase = published || goalfyStage === 'approved';
-      const resolvedAt = await getAdjustmentResolvedAtForPost(postId);
-      const history = await getDecisionHistoryForPost(postId);
+      const [resolvedAt, history] = await Promise.all([
+        getAdjustmentResolvedAtForPost(postId),
+        getDecisionHistoryForPost(postId),
+      ]);
       const allAdjustments = history
         .filter((d) => !d.approved && d.feedback)
         .map((d) => ({ id: d.id, feedback: d.feedback, createdAt: d.createdAt, mediaFileId: d.mediaFileId, x: d.x, y: d.y }))
