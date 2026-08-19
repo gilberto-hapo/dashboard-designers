@@ -9,6 +9,7 @@ import {
   getFirstName,
   InfoRow,
 } from '@/lib/calendarUi';
+import { usePendingFeedbackByCalendar } from '@/hooks/usePendingFeedbackCount';
 
 type CalendarioInfo = {
   id: string;
@@ -88,6 +89,7 @@ export function CalendarsPanel({
   const [clientes, setClientes] = useState<ClienteInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const pendingFeedbackByCalendar = usePendingFeedbackByCalendar(refreshSignal);
 
   useEffect(() => {
     setLoading(true);
@@ -202,9 +204,10 @@ export function CalendarsPanel({
                 <div className="h-px flex-1 bg-border" />
               </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(285px,1fr))] gap-3">
                 {group.items.map((calendario) => {
                   const progress = getConclusionProgress(calendario);
+                  const pendingFeedbackCount = pendingFeedbackByCalendar[calendario.id] ?? 0;
 
                   return (
                     <div
@@ -218,12 +221,22 @@ export function CalendarsPanel({
                           navigate(`/calendarios/${calendario.id}`);
                         }
                       }}
-                      className={`group relative space-y-2 rounded-xl border p-3 cursor-pointer transition-colors ${
-                        progress?.percent === 100
-                          ? 'border-emerald-500/40 bg-emerald-500/15 hover:border-emerald-500/60'
-                          : 'border-border bg-card hover:border-primary/50'
+                      className={`group relative space-y-2 rounded-xl p-3 cursor-pointer transition-colors ${
+                        pendingFeedbackCount > 0
+                          ? 'border-2 border-amber-500/60 bg-card hover:border-amber-500'
+                          : progress?.percent === 100
+                          ? 'border border-emerald-500/40 bg-emerald-500/15 hover:border-emerald-500/60'
+                          : 'border border-border bg-card hover:border-primary/50'
                       }`}
                     >
+                      {pendingFeedbackCount > 0 && (
+                        <span
+                          title={`${pendingFeedbackCount} post${pendingFeedbackCount > 1 ? 's' : ''} com ajuste pendente`}
+                          className="absolute right-2 top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white"
+                        >
+                          {pendingFeedbackCount}
+                        </span>
+                      )}
                       <div>
                         <h3 className="text-sm font-semibold text-foreground">{calendario.title}</h3>
                         <div className="mt-1.5 flex items-center justify-between gap-1.5">
