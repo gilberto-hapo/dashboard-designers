@@ -140,6 +140,36 @@ export async function getLatestDecisionsForCalendar(calendarId) {
   return rows.map(rowToDecision);
 }
 
+// Mesma consulta de getLatestDecisionsForCalendar, mas para vários
+// calendários numa única ida ao banco — usado por /api/feedback, que
+// precisava de N queries (uma por calendário) para descobrir quais têm
+// algum ajuste pendente, tornando a primeira carga da tela lenta com muitos
+// calendários. Retorna um Map<calendarId, decisions[]> para lookup O(1).
+export async function getLatestDecisionsForCalendars(calendarIds) {
+  await ensureSchema();
+  if (!calendarIds.length) return new Map();
+  const { rows } = await pool.query(
+    `SELECT pd.*
+     FROM post_decisions pd
+     INNER JOIN (
+       SELECT post_id, MAX(id) AS max_id
+       FROM post_decisions
+       WHERE calendar_id = ANY($1)
+       GROUP BY post_id
+     ) latest ON latest.post_id = pd.post_id AND latest.max_id = pd.id
+     ORDER BY pd.created_at DESC`,
+    [calendarIds],
+  );
+  const decisionsByCalendarId = new Map();
+  rows.forEach((row) => {
+    const decision = rowToDecision(row);
+    const list = decisionsByCalendarId.get(decision.calendarId) || [];
+    list.push(decision);
+    decisionsByCalendarId.set(decision.calendarId, list);
+  });
+  return decisionsByCalendarId;
+}
+
 export async function deletePostDecision(decisionId, postId) {
   await ensureSchema();
   const { rowCount } = await pool.query(`DELETE FROM post_decisions WHERE id = $1 AND post_id = $2`, [

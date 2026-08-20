@@ -9,7 +9,7 @@ import { createServer as createViteServer } from 'vite';
 import {
   insertPostDecision,
   markDecisionSyncStatus,
-  getLatestDecisionsForCalendar,
+  getLatestDecisionsForCalendars,
   getDecisionHistoryForPost,
   markAdjustmentsResolvedForPost,
   getAdjustmentResolvedAtForPost,
@@ -2837,11 +2837,9 @@ app.get('/api/feedback', requireAuth, async (_req, res) => {
     ]);
     const preFetched = { calendarios, clients, goalfyData };
 
-    const calendarDecisions = await Promise.all(
-      calendarios.map((c) => getLatestDecisionsForCalendar(c.id)),
-    );
+    const decisionsByCalendarId = await getLatestDecisionsForCalendars(calendarios.map((c) => c.id));
     const calendarIdsWithFeedback = calendarios
-      .filter((c, index) => calendarDecisions[index].some((d) => !d.approved && d.feedback))
+      .filter((c) => (decisionsByCalendarId.get(c.id) || []).some((d) => !d.approved && d.feedback))
       .map((c) => c.id);
 
     const resolvedCalendarios = await Promise.all(

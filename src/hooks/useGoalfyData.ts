@@ -11,10 +11,10 @@ import { useAuth } from '@/lib/auth';
 
 const REFRESH_POLL_INTERVAL_MS = 2500;
 const REFRESH_POLL_MAX_ATTEMPTS = 36;
-// 3 minutos, nao 30s: cada tick reconsulta o banco MySQL gerenciado (via
-// /api/feedback -> getLatestDecisionsForCalendar, uma query por calendario
-// ativo em paralelo) -- com varias pessoas com o dashboard aberto ao mesmo
-// tempo, um intervalo curto estoura o limite de conexoes/hora da Hostinger.
+// 3 minutos, nao 30s: cada tick reconsulta o banco Postgres gerenciado (via
+// /api/feedback -> getLatestDecisionsForCalendars, alem de resolver posts do
+// Drive para calendarios com feedback pendente) -- com varias pessoas com o
+// dashboard aberto ao mesmo tempo, um intervalo curto gera carga desnecessaria.
 const AUTO_REFRESH_INTERVAL_MS = 180_000;
 
 export function useGoalfyData() {
