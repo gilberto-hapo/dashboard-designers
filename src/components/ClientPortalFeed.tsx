@@ -528,9 +528,25 @@ function SingleMediaFrame({
   mediaFileId: string;
   pinOverlayProps: Omit<Parameters<typeof MediaPinOverlay>[0], 'mediaFileId'>;
 }) {
+  const [loaded, setLoaded] = useState(false);
+
   return (
     <div className="relative w-full bg-black">
-      <img key={src} src={src} alt={alt} className="block h-auto w-full" loading="lazy" />
+      {!loaded ? (
+        <AspectRatio ratio={1080 / 1350} className="animate-pulse bg-muted" />
+      ) : null}
+      <img
+        key={src}
+        src={src}
+        alt={alt}
+        className={cn(
+          'block h-auto w-full transition-opacity duration-300',
+          loaded ? 'static opacity-100' : 'absolute inset-0 opacity-0',
+        )}
+        loading="eager"
+        decoding="async"
+        onLoad={() => setLoaded(true)}
+      />
       <MediaPinOverlay mediaFileId={mediaFileId} {...pinOverlayProps} />
     </div>
   );

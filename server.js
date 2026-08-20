@@ -63,6 +63,9 @@ let goalfyRefreshState = {
   error: '',
 };
 const aiRecommendationsCache = new Map();
+const PUBLIC_CLIENT_PAYLOAD_CACHE_TTL_MS = 1000 * 15;
+const publicClientPayloadCache = new Map();
+const inflightPublicClientPayloadPromises = new Map();
 
 app.use(express.json());
 app.use(cookieParser(process.env.SESSION_SECRET || 'change-me-in-production'));
@@ -2404,6 +2407,37 @@ async function resolvePublicClientPayload(clientId, { forceRefreshDrive = false 
   };
 }
 
+// Reaproveita resolvePublicClientPayload por um TTL curto: a página do
+// portal e cada <img> de mídia do post chamam essa resolução (que já busca
+// Drive + Postgres), então sem cache/dedup cada imagem de uma mesma página
+// reexecuta o trabalho todo. forceRefreshDrive nunca usa cache/gravação nele
+// para não interferir no refresh manual do usuário.
+async function getCachedPublicClientPayload(clientId, { forceRefreshDrive = false } = {}) {
+  if (forceRefreshDrive) {
+    return resolvePublicClientPayload(clientId, { forceRefreshDrive: true });
+  }
+
+  const cached = publicClientPayloadCache.get(clientId);
+  if (cached && nowMs() - cached.at < PUBLIC_CLIENT_PAYLOAD_CACHE_TTL_MS) {
+    return cached.value;
+  }
+
+  const inflight = inflightPublicClientPayloadPromises.get(clientId);
+  if (inflight) return inflight;
+
+  const promise = resolvePublicClientPayload(clientId)
+    .then((value) => {
+      publicClientPayloadCache.set(clientId, { value, at: nowMs() });
+      return value;
+    })
+    .finally(() => {
+      inflightPublicClientPayloadPromises.delete(clientId);
+    });
+
+  inflightPublicClientPayloadPromises.set(clientId, promise);
+  return promise;
+}
+
 // Resolve o payload do portal público ÚNICO de copywriters: os posts com
 // ajuste pendente (mesmo critério de GET /api/feedback) de todos os clientes
 // que têm QUALQUER copywriter dedicado preenchido — não distingue por nome,
@@ -2541,7 +2575,7 @@ app.get('/api/public/portal/:token', async (req, res) => {
     }
 
     const forceRefreshDrive = req.query.refresh === '1';
-    const cliente = await resolvePublicClientPayload(clientId, { forceRefreshDrive });
+    const cliente = await getCachedPublicClientPayload(clientId, { forceRefreshDrive });
     if (!cliente) {
       res.status(404).json({ error: 'Cliente não encontrado' });
       return;
@@ -2589,7 +2623,7 @@ app.get('/api/public/portal/:token/media/:fileId', async (req, res) => {
       return;
     }
 
-    const cliente = await resolvePublicClientPayload(clientId);
+    const cliente = await getCachedPublicClientPayload(clientId);
     const owningCalendario = (cliente?.calendarios || []).find((calendario) =>
       (calendario.posts || []).some(
         (post) =>
@@ -2713,6 +2747,7 @@ app.post('/api/public/portal/:token/posts/:postId/decision', async (req, res) =>
       await markDecisionSyncStatus(pinDecisionId, 'synced');
     }
 
+    publicClientPayloadCache.delete(clientId);
     res.json({ ok: true });
   } catch (error) {
     console.error('Public portal decision request failed', error);
@@ -2763,6 +2798,7 @@ app.delete('/api/public/portal/:token/posts/:postId/decision/:decisionId', async
       return;
     }
 
+    publicClientPayloadCache.delete(clientId);
     res.json({ ok: true });
   } catch (error) {
     console.error('Public portal decision delete failed', error);

@@ -309,13 +309,27 @@ export async function getDriveFileStream(fileId, { range } = {}) {
   };
 }
 
+// Cacheado com o mesmo TTL do cache de pastas: essa metadata é consultada a
+// cada request de mídia (inclusive em cache hit de variante otimizada, só
+// para comparar modifiedTime), então sem cache toda imagem paga uma chamada
+// de rede à API do Drive antes mesmo de checar o cache do Storage.
+const metadataCacheKeyPrefix = 'file-metadata:';
+
 export async function getDriveFileMetadata(fileId) {
+  const cacheKey = metadataCacheKeyPrefix + fileId;
+  const cached = cache.get(cacheKey);
+  if (cached && Date.now() - cached.at < DRIVE_FOLDER_TTL_MS) {
+    return cached.value;
+  }
+
   const drive = getDrive();
   const res = await drive.files.get({
     fileId,
     fields: 'id, name, mimeType, size, modifiedTime',
     supportsAllDrives: true,
   });
+
+  cache.set(cacheKey, { value: res.data, at: Date.now() });
   return res.data;
 }
 
