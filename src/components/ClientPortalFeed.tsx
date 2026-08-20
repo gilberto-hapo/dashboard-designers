@@ -56,6 +56,14 @@ export type PortalPostTag = {
   color: string | null;
 };
 
+export type PostPipelineStage =
+  | 'criacaoTextual'
+  | 'emAndamento'
+  | 'validacao'
+  | 'aprovado'
+  | 'publicado'
+  | null;
+
 export type PortalPost = {
   id: string;
   title: string;
@@ -66,6 +74,7 @@ export type PortalPost = {
   media: PostMedia | null;
   decision: PostDecision | null;
   published?: boolean;
+  pipelineStage?: PostPipelineStage;
   feedbackHistory: FeedbackEntry[];
   resolvedFeedbackHistory: FeedbackEntry[];
   calendarLabel?: string;

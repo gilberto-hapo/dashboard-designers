@@ -28,7 +28,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { GridThumbShared, type GridThumbStatus, type PortalPost } from '@/components/ClientPortalFeed';
+import {
+  GridThumbShared,
+  type GridThumbStatus,
+  type PortalPost,
+  type PostPipelineStage,
+} from '@/components/ClientPortalFeed';
 
 type CalendarDetailData = {
   id: string;
@@ -61,16 +66,64 @@ function decisionStatus(post: PortalPost): GridThumbStatus {
   return null;
 }
 
-function getPostsConclusionSegments(calendario: CalendarDetailData) {
-  const total = calendario.postsConectados;
-  const decidedTotal = calendario.postsAprovados + calendario.postsPublicados;
+const PIPELINE_STAGE_STYLES: Record<Exclude<PostPipelineStage, null>, { label: string; className: string }> = {
+  criacaoTextual: { label: 'Criação Textual', className: 'border-red-500/30 bg-red-500/10 text-red-400' },
+  emAndamento: { label: 'Em Andamento', className: 'border-yellow-400/30 bg-yellow-400/10 text-yellow-400' },
+  validacao: { label: 'Validação', className: 'border-orange-500/30 bg-orange-500/10 text-orange-400' },
+  aprovado: { label: 'Aprovado', className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' },
+  publicado: { label: 'Publicado', className: 'border-sky-500/30 bg-sky-500/10 text-sky-400' },
+};
+
+// Resumo do topo: reflete só a FASE do kanban da Goalfy (post.pipelineStage),
+// sem misturar com a decisao do cliente no portal (aprovado/publicado/ajuste
+// via decisionStatus) — um post pode estar em "Validação do Cliente" no
+// kanban mesmo já tendo uma decisão registrada de uma rodada anterior.
+function getPostsPipelineStageCounts(posts: PortalPost[]) {
+  const counts = {
+    criacaoTextual: 0,
+    emAndamento: 0,
+    validacao: 0,
+    aprovado: 0,
+    publicado: 0,
+  };
+  posts.forEach((post) => {
+    const stage = post.pipelineStage ?? 'criacaoTextual';
+    if (stage === 'emAndamento') counts.emAndamento += 1;
+    else if (stage === 'validacao') counts.validacao += 1;
+    else if (stage === 'aprovado') counts.aprovado += 1;
+    else if (stage === 'publicado') counts.publicado += 1;
+    else counts.criacaoTextual += 1;
+  });
+  return counts;
+}
+
+function getPostsConclusionSegments(posts: PortalPost[]) {
+  const total = posts.length;
+  const counts = {
+    criacaoTextual: 0,
+    emAndamento: 0,
+    validacao: 0,
+    aprovado: 0,
+    publicado: 0,
+    ajuste: 0,
+  };
+  posts.forEach((post) => {
+    if (decisionStatus(post) === 'adjustment') {
+      counts.ajuste += 1;
+      return;
+    }
+    const stage = post.pipelineStage ?? 'criacaoTextual';
+    counts[stage] += 1;
+  });
+
+  const decidedTotal = counts.aprovado + counts.publicado;
   const segments: ProgressSegment[] = [
-    { key: 'criacaoTextual', count: calendario.postsCriacaoTextual, className: 'bg-red-500' },
-    { key: 'emAndamento', count: calendario.postsEmAndamento, className: 'bg-yellow-400' },
-    { key: 'validacao', count: calendario.postsEmValidacao, className: 'bg-orange-500' },
-    { key: 'aprovado', count: calendario.postsAprovados, className: 'bg-emerald-500' },
-    { key: 'publicado', count: calendario.postsPublicados, className: 'bg-sky-500' },
-    { key: 'ajuste', count: 0, className: 'bg-amber-400' },
+    { key: 'criacaoTextual', count: counts.criacaoTextual, className: 'bg-red-500' },
+    { key: 'emAndamento', count: counts.emAndamento, className: 'bg-yellow-400' },
+    { key: 'validacao', count: counts.validacao, className: 'bg-orange-500' },
+    { key: 'aprovado', count: counts.aprovado, className: 'bg-emerald-500' },
+    { key: 'publicado', count: counts.publicado, className: 'bg-sky-500' },
+    { key: 'ajuste', count: counts.ajuste, className: 'bg-amber-400' },
   ];
 
   const percent = total > 0 ? Math.round((decidedTotal / total) * 100) : 0;
@@ -285,32 +338,72 @@ function CalendarDetailContent() {
                 </div>
 
                 <SegmentedConclusionBar
-                  segments={getPostsConclusionSegments(calendario).segments}
-                  total={getPostsConclusionSegments(calendario).total}
+                  segments={getPostsConclusionSegments(calendario.posts).segments}
+                  total={getPostsConclusionSegments(calendario.posts).total}
                 />
 
-                <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1.5">
-                    Contrato
-                    <span className="rounded bg-muted-foreground/10 px-1.5 py-0.5 text-[11px] font-semibold text-white/70">
-                      {calendario.postsContratados}
-                    </span>
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    Cards criados
-                    <span className="rounded bg-muted-foreground/10 px-1.5 py-0.5 text-[11px] font-semibold text-white/70">
-                      {calendario.postsConectados}
-                    </span>
-                  </span>
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   {(() => {
-                    const diff = calendario.postsConectados - calendario.postsContratados;
-                    if (diff === 0) return null;
+                    const pipelineCounts = getPostsPipelineStageCounts(calendario.posts);
                     return (
-                      <span className={`text-[11px] font-semibold ${diff > 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                        {diff > 0 ? `+${diff}` : diff}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                        <span className="flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-red-400">
+                          Criação Textual
+                          <span className={pipelineCounts.criacaoTextual > 0 ? 'font-bold text-white' : 'opacity-50'}>
+                            {pipelineCounts.criacaoTextual}
+                          </span>
+                        </span>
+                        <span className="flex items-center gap-1.5 rounded-full border border-yellow-400/30 bg-yellow-400/10 px-2.5 py-1 text-yellow-400">
+                          Em Andamento
+                          <span className={pipelineCounts.emAndamento > 0 ? 'font-bold text-white' : 'opacity-50'}>
+                            {pipelineCounts.emAndamento}
+                          </span>
+                        </span>
+                        <span className="flex items-center gap-1.5 rounded-full border border-orange-500/30 bg-orange-500/10 px-2.5 py-1 text-orange-400">
+                          Validação
+                          <span className={pipelineCounts.validacao > 0 ? 'font-bold text-white' : 'opacity-50'}>
+                            {pipelineCounts.validacao}
+                          </span>
+                        </span>
+                        <span className="flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-emerald-400">
+                          Aprovado
+                          <span className={pipelineCounts.aprovado > 0 ? 'font-bold text-white' : 'opacity-50'}>
+                            {pipelineCounts.aprovado}
+                          </span>
+                        </span>
+                        <span className="flex items-center gap-1.5 rounded-full border border-sky-500/30 bg-sky-500/10 px-2.5 py-1 text-sky-400">
+                          Publicado
+                          <span className={pipelineCounts.publicado > 0 ? 'font-bold text-white' : 'opacity-50'}>
+                            {pipelineCounts.publicado}
+                          </span>
+                        </span>
+                      </div>
                     );
                   })()}
+
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1.5">
+                      Contrato
+                      <span className="rounded bg-muted-foreground/10 px-1.5 py-0.5 text-[11px] font-semibold text-white/70">
+                        {calendario.postsContratados}
+                      </span>
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      Cards criados
+                      <span className="rounded bg-muted-foreground/10 px-1.5 py-0.5 text-[11px] font-semibold text-white/70">
+                        {calendario.postsConectados}
+                      </span>
+                    </span>
+                    {(() => {
+                      const diff = calendario.postsConectados - calendario.postsContratados;
+                      if (diff === 0) return null;
+                      return (
+                        <span className={`text-[11px] font-semibold ${diff > 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                          {diff > 0 ? `+${diff}` : diff}
+                        </span>
+                      );
+                    })()}
+                  </div>
                 </div>
               </div>
 
@@ -337,9 +430,18 @@ function CalendarDetailContent() {
                         {post.folderName && (
                           <p className="truncate text-[11px] text-muted-foreground">Pasta: {post.folderName}</p>
                         )}
-                        <span className="mt-1 inline-block rounded-full border border-border px-2 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
-                          {post.formatoEntrega || 'Post'}
-                        </span>
+                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                          <span className="inline-block rounded-full border border-border px-2 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
+                            {post.formatoEntrega || 'Post'}
+                          </span>
+                          {post.pipelineStage && (
+                            <span
+                              className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-medium ${PIPELINE_STAGE_STYLES[post.pipelineStage].className}`}
+                            >
+                              {PIPELINE_STAGE_STYLES[post.pipelineStage].label}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>

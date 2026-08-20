@@ -2205,7 +2205,19 @@ async function resolveCalendarPosts(
 
   const tasks = goalfyData?.tasks || [];
   const calendarTasks = tasks.filter((task) => task.calendarioId === calendario.id);
-  const goalfyStageBySequence = new Map();
+  // Ordem de prioridade quando há mais de uma task Goalfy com o mesmo número
+  // de sequência no título (ex: card antigo/arquivado duplicado) — sempre
+  // vence o estágio mais avançado do pipeline, nunca a última task iterada.
+  const STAGE_PRIORITY = {
+    fazer: 0,
+    executando: 1,
+    direcao_arte: 1,
+    montagem: 1,
+    validacao: 2,
+    aprovado_programacao: 3,
+    concluido: 4,
+  };
+  const goalfyRawStageBySequence = new Map();
   const goalfyPhaseTitleBySequence = new Map();
   const goalfyFormatoBySequence = new Map();
   const goalfyTagsBySequence = new Map();
@@ -2213,12 +2225,17 @@ async function resolveCalendarPosts(
   calendarTasks.forEach((task) => {
     const sequenceNumber = extractPostSequenceNumber(task.title);
     if (sequenceNumber == null) return;
-    if (task.stage === 'concluido') goalfyStageBySequence.set(sequenceNumber, 'published');
-    else if (task.stage === 'aprovado_programacao') goalfyStageBySequence.set(sequenceNumber, 'approved');
-    goalfyPhaseTitleBySequence.set(sequenceNumber, task.phaseTitle || '');
-    if (task.formatoEntrega) goalfyFormatoBySequence.set(sequenceNumber, task.formatoEntrega);
-    if (Array.isArray(task.goalfyTags)) goalfyTagsBySequence.set(sequenceNumber, task.goalfyTags);
-    goalfyCardTitleBySequence.set(sequenceNumber, task.title || '');
+    const stage = task.stage || 'fazer';
+    const currentStage = goalfyRawStageBySequence.get(sequenceNumber);
+    const isMoreAdvanced =
+      currentStage == null || (STAGE_PRIORITY[stage] ?? 0) >= (STAGE_PRIORITY[currentStage] ?? 0);
+    if (isMoreAdvanced) {
+      goalfyRawStageBySequence.set(sequenceNumber, stage);
+      goalfyPhaseTitleBySequence.set(sequenceNumber, task.phaseTitle || '');
+      if (task.formatoEntrega) goalfyFormatoBySequence.set(sequenceNumber, task.formatoEntrega);
+      if (Array.isArray(task.goalfyTags)) goalfyTagsBySequence.set(sequenceNumber, task.goalfyTags);
+      goalfyCardTitleBySequence.set(sequenceNumber, task.title || '');
+    }
   });
 
   const totalPosts = folders.length;
@@ -2227,9 +2244,9 @@ async function resolveCalendarPosts(
     folders.map(async (folder, index) => {
       const postId = folder.folderId;
       const sequenceNumber = index + 1;
-      const goalfyStage = goalfyStageBySequence.get(sequenceNumber) || null;
-      const published = goalfyStage === 'published';
-      const approvedByGoalfyPhase = published || goalfyStage === 'approved';
+      const rawStage = goalfyRawStageBySequence.get(sequenceNumber) || 'fazer';
+      const published = rawStage === 'concluido';
+      const approvedByGoalfyPhase = published || rawStage === 'aprovado_programacao';
       const [resolvedAt, history] = await Promise.all([
         getAdjustmentResolvedAtForPost(postId),
         getDecisionHistoryForPost(postId),
@@ -2268,6 +2285,19 @@ async function resolveCalendarPosts(
       const formatoEntrega = goalfyFormatoBySequence.get(sequenceNumber) || inferFormatoEntrega(folder.media);
       const isStories = normalizeLookupKey(formatoEntrega) === normalizeLookupKey('Stories');
 
+      const pipelineStage =
+        rawStage === 'fazer'
+          ? 'criacaoTextual'
+          : ['executando', 'direcao_arte', 'montagem'].includes(rawStage)
+            ? 'emAndamento'
+            : rawStage === 'validacao'
+              ? 'validacao'
+              : rawStage === 'aprovado_programacao'
+                ? 'aprovado'
+                : rawStage === 'concluido'
+                  ? 'publicado'
+                  : null;
+
       return {
         id: postId,
         title: buildDriveFolderPostTitle(calendario, index, totalPosts),
@@ -2278,6 +2308,7 @@ async function resolveCalendarPosts(
         media: folder.media || null,
         decision: decisionPayload,
         published,
+        pipelineStage,
         feedbackHistory: approved ? [] : feedbackHistory,
         resolvedFeedbackHistory,
         visibleToClient,
@@ -2342,9 +2373,20 @@ async function resolvePublicClientPayload(clientId, { forceRefreshDrive = false 
   );
 
   const resolvedCalendarios = await Promise.all(
-    activeCalendarios.map((calendario) =>
-      resolveCalendarPosts(calendario, { clients, goalfyData, requireClientVisiblePhase: true, forceRefreshDrive }),
-    ),
+    activeCalendarios.map(async (calendario) => {
+      const resolved = await resolveCalendarPosts(calendario, {
+        clients,
+        goalfyData,
+        requireClientVisiblePhase: true,
+        forceRefreshDrive,
+      });
+      return {
+        ...resolved,
+        // pipelineStage é informacao interna de producao (fase Goalfy) — nao
+        // deve vazar para o portal publico do cliente.
+        posts: resolved.posts.map(({ pipelineStage, ...post }) => post),
+      };
+    }),
   );
 
   return {
