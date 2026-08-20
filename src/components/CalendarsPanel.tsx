@@ -303,12 +303,12 @@ export function CalendarsPanel({
                           navigate(`/calendarios/${calendario.id}`);
                         }
                       }}
-                      className={`group relative space-y-2 rounded-xl p-3 cursor-pointer transition-colors ${
+                      className={`group relative space-y-2 rounded-xl border p-3 cursor-pointer transition-colors ${
                         pendingFeedbackCount > 0
-                          ? 'border-2 border-amber-500/60 bg-card hover:border-amber-500'
+                          ? 'border-amber-400/40 bg-amber-400/15 hover:border-amber-400/60'
                           : progress?.percent === 100
-                          ? 'border border-emerald-500/40 bg-emerald-500/15 hover:border-emerald-500/60'
-                          : 'border border-border bg-card hover:border-primary/50'
+                          ? 'border-emerald-500/40 bg-emerald-500/15 hover:border-emerald-500/60'
+                          : 'border-border bg-card hover:border-primary/50'
                       }`}
                     >
                       {pendingFeedbackCount > 0 && (
