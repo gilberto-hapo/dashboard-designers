@@ -226,6 +226,28 @@ async function resolvePostFolderContent(folder) {
   };
 }
 
+// Limita quantas chamadas concorrentes à API do Drive um único calendário
+// pode disparar de uma vez — sem isso, um calendário com muitos posts
+// dispara dezenas de chamadas simultâneas pela mesma service account,
+// acionando rate-limit/backoff do Google que atrasa a resposta em segundos
+// de forma silenciosa (sem erro visível). Mesmo padrão usado para o fan-out
+// de cards da Goalfy em server.js (lá com limite 8).
+async function mapWithConcurrency(items, limit, mapFn) {
+  const results = new Array(items.length);
+  let cursor = 0;
+
+  async function worker() {
+    while (cursor < items.length) {
+      const index = cursor;
+      cursor += 1;
+      results[index] = await mapFn(items[index], index);
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
 // Lista as subpastas de post dentro da pasta de artes do calendário, em
 // ordem (Post 01, Post 02, ...), resolvendo duplicatas ao preferir a
 // subpasta com mídia de fato quando o mesmo nome aparece mais de uma vez.
@@ -242,7 +264,7 @@ export async function listCalendarPostFolders(calendarFolderLink, { forceRefresh
   const children = await listChildren(folderId);
   const subfolders = children.filter((f) => f.mimeType === 'application/vnd.google-apps.folder');
 
-  const contents = await Promise.all(subfolders.map((folder) => resolvePostFolderContent(folder)));
+  const contents = await mapWithConcurrency(subfolders, 6, (folder) => resolvePostFolderContent(folder));
 
   const resolvedByName = new Map();
   subfolders.forEach((folder, index) => {

@@ -11,8 +11,10 @@ import {
   markDecisionSyncStatus,
   getLatestDecisionsForCalendars,
   getDecisionHistoryForPost,
+  getDecisionHistoryForPosts,
   markAdjustmentsResolvedForPost,
   getAdjustmentResolvedAtForPost,
+  getAdjustmentResolvedAtForPosts,
   deletePostDecision,
   listFileIdsMissingVariant,
 } from './server/db.js';
@@ -2240,16 +2242,20 @@ async function resolveCalendarPosts(
 
   const totalPosts = folders.length;
 
+  const postIds = folders.map((folder) => folder.folderId);
+  const [resolvedAtByPostId, decisionHistoryByPostId] = await Promise.all([
+    getAdjustmentResolvedAtForPosts(postIds),
+    getDecisionHistoryForPosts(postIds),
+  ]);
+
   const resolvedPosts = await Promise.all(
     folders.map(async (folder, index) => {
       const postId = folder.folderId;
       const sequenceNumber = index + 1;
       const rawStage = goalfyRawStageBySequence.get(sequenceNumber) || 'fazer';
       const published = rawStage === 'concluido';
-      const [resolvedAt, history] = await Promise.all([
-        getAdjustmentResolvedAtForPost(postId),
-        getDecisionHistoryForPost(postId),
-      ]);
+      const resolvedAt = resolvedAtByPostId.get(postId) || null;
+      const history = decisionHistoryByPostId.get(postId) || [];
       const allAdjustments = history
         .filter((d) => !d.approved && d.feedback)
         .map((d) => ({ id: d.id, feedback: d.feedback, createdAt: d.createdAt, mediaFileId: d.mediaFileId, x: d.x, y: d.y }))

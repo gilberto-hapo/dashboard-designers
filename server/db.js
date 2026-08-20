@@ -187,6 +187,28 @@ export async function getDecisionHistoryForPost(postId) {
   return rows.map(rowToDecision);
 }
 
+// Mesma consulta de getDecisionHistoryForPost, mas para varios posts numa
+// unica ida ao banco — usado por resolveCalendarPosts, que precisava de 2
+// queries por post (2N no total) para montar o detalhe de um calendario,
+// deixando a tela lenta para calendarios com muitos posts. Retorna um
+// Map<postId, decisions[]> para lookup O(1).
+export async function getDecisionHistoryForPosts(postIds) {
+  await ensureSchema();
+  if (!postIds.length) return new Map();
+  const { rows } = await pool.query(
+    `SELECT * FROM post_decisions WHERE post_id = ANY($1) ORDER BY created_at DESC`,
+    [postIds],
+  );
+  const decisionsByPostId = new Map();
+  rows.forEach((row) => {
+    const decision = rowToDecision(row);
+    const list = decisionsByPostId.get(decision.postId) || [];
+    list.push(decision);
+    decisionsByPostId.set(decision.postId, list);
+  });
+  return decisionsByPostId;
+}
+
 export async function markAdjustmentsResolvedForPost(postId) {
   await ensureSchema();
   await pool.query(
@@ -201,6 +223,19 @@ export async function getAdjustmentResolvedAtForPost(postId) {
   await ensureSchema();
   const { rows } = await pool.query(`SELECT * FROM post_adjustment_resolutions WHERE post_id = $1`, [postId]);
   return rows[0] ? toIsoString(rows[0].resolved_at) : null;
+}
+
+// Mesma consulta de getAdjustmentResolvedAtForPost, mas para varios posts
+// numa unica ida ao banco — ver getDecisionHistoryForPosts acima.
+export async function getAdjustmentResolvedAtForPosts(postIds) {
+  await ensureSchema();
+  if (!postIds.length) return new Map();
+  const { rows } = await pool.query(`SELECT * FROM post_adjustment_resolutions WHERE post_id = ANY($1)`, [
+    postIds,
+  ]);
+  const resolvedAtByPostId = new Map();
+  rows.forEach((row) => resolvedAtByPostId.set(row.post_id, toIsoString(row.resolved_at)));
+  return resolvedAtByPostId;
 }
 
 function rowToMediaVariant(row) {
