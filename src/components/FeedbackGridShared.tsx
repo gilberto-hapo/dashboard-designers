@@ -108,6 +108,7 @@ export function FeedbackGridShared({
                 media={post.media}
                 title={post.postTitle}
                 status="adjustment"
+                internalLabels
                 onOpen={() => {
                   if (linkTo) {
                     navigate(linkTo(post.postId));
