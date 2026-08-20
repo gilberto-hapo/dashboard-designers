@@ -2110,7 +2110,10 @@ app.get('/api/calendarios', requireAuth, async (_req, res) => {
     const result = calendarios.map((calendario) => {
       const client = clientsByName.get(normalizeLookupKey(calendario.clienteNome));
       const linkedTasks = tasks.filter((task) => task.calendarioId === calendario.id);
-      const postsConcluidos = linkedTasks.filter((task) => task.stage === 'concluido').length;
+      const postsPublicados = linkedTasks.filter((task) => task.stage === 'concluido').length;
+      const postsAprovados = linkedTasks.filter((task) => task.stage === 'aprovado_programacao').length;
+      const postsConectados = linkedTasks.length;
+      const postsPendentes = Math.max(0, postsConectados - postsPublicados - postsAprovados);
 
       return {
         id: calendario.id,
@@ -2122,8 +2125,11 @@ app.get('/api/calendarios', requireAuth, async (_req, res) => {
         linkCalendarioEditorial: calendario.linkCalendarioEditorial,
         designer: client?.designer || '',
         postsContratados: client?.postsContratados ?? 0,
-        postsConectados: linkedTasks.length,
-        postsConcluidos,
+        postsConectados,
+        postsConcluidos: postsPublicados,
+        postsPublicados,
+        postsAprovados,
+        postsPendentes,
       };
     });
 
@@ -2738,7 +2744,10 @@ app.get('/api/calendarios/:id/detail', requireAuth, async (req, res) => {
     const client = clients.find((c) => normalizeLookupKey(c.nome) === normalizeLookupKey(calendario.clienteNome));
     const tasks = goalfyData?.tasks || [];
     const linkedTasks = tasks.filter((task) => task.calendarioId === calendario.id);
-    const postsConcluidos = linkedTasks.filter((task) => task.stage === 'concluido').length;
+    const postsPublicados = linkedTasks.filter((task) => task.stage === 'concluido').length;
+    const postsAprovados = linkedTasks.filter((task) => task.stage === 'aprovado_programacao').length;
+    const postsConectados = linkedTasks.length;
+    const postsPendentes = Math.max(0, postsConectados - postsPublicados - postsAprovados);
 
     res.json({
       calendario: {
@@ -2749,8 +2758,11 @@ app.get('/api/calendarios/:id/detail', requireAuth, async (req, res) => {
         linkCalendarioEditorial: calendario.linkCalendarioEditorial,
         planejador: client?.planejador || '',
         postsContratados: client?.postsContratados ?? 0,
-        postsConectados: linkedTasks.length,
-        postsConcluidos,
+        postsConectados,
+        postsConcluidos: postsPublicados,
+        postsPublicados,
+        postsAprovados,
+        postsPendentes,
       },
     });
   } catch (error) {

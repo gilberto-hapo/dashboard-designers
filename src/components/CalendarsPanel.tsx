@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
+import { ChevronDown, Loader2 } from 'lucide-react';
 import {
-  ConclusionBar,
   ConclusionPercentLabel,
   fetchJson,
-  getConclusionProgress,
+  getConclusionSegments,
   getFirstName,
-  InfoRow,
+  normalizeClientKey,
+  SegmentedConclusionBar,
 } from '@/lib/calendarUi';
 
 type CalendarioInfo = {
@@ -22,6 +22,9 @@ type CalendarioInfo = {
   postsContratados: number;
   postsConectados: number;
   postsConcluidos: number;
+  postsPublicados: number;
+  postsAprovados: number;
+  postsPendentes: number;
 };
 
 const MONTH_ORDER = [
@@ -74,7 +77,7 @@ type CalendarsPanelProps = {
   refreshSignal?: number;
 };
 
-type ClienteInfo = { nome?: string; designer?: string };
+type ClienteInfo = { nome?: string; designer?: string; ativo?: boolean; postsContratados?: number };
 
 export function CalendarsPanel({
   selectedMonth,
@@ -88,6 +91,16 @@ export function CalendarsPanel({
   const [clientes, setClientes] = useState<ClienteInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
+
+  const toggleExpandedMonth = (mesAno: string) => {
+    setExpandedMonths((prev) => {
+      const next = new Set(prev);
+      if (next.has(mesAno)) next.delete(mesAno);
+      else next.add(mesAno);
+      return next;
+    });
+  };
 
   useEffect(() => {
     setLoading(true);
@@ -165,6 +178,13 @@ export function CalendarsPanel({
     });
   }, [visibleCalendarios, selectedMonth, selectedYear, selectedDesigner, designerByClientName]);
 
+  const activeClientRoster = useMemo(() => {
+    return clientes
+      .filter((c) => c.ativo !== false && c.nome)
+      .filter((c) => selectedDesigner === 'Todos' || c.designer === selectedDesigner)
+      .map((c) => ({ nome: c.nome as string, postsContratados: c.postsContratados ?? 0 }));
+  }, [clientes, selectedDesigner]);
+
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -200,11 +220,72 @@ export function CalendarsPanel({
                     : `${group.items.length} ${group.items.length === 1 ? 'calendário' : 'calendários'}`}
                 </span>
                 <div className="h-px flex-1 bg-border" />
+                <button
+                  type="button"
+                  onClick={() => toggleExpandedMonth(group.mesAno)}
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground"
+                >
+                  Status do mês
+                  <ChevronDown
+                    className={`h-3.5 w-3.5 transition-transform ${expandedMonths.has(group.mesAno) ? 'rotate-180' : ''}`}
+                  />
+                </button>
               </div>
+
+              {expandedMonths.has(group.mesAno) && (() => {
+                const createdKeys = new Set(group.items.map((item) => normalizeClientKey(item.clienteNome)));
+                const clientStatus = activeClientRoster
+                  .map((c) => ({ ...c, created: createdKeys.has(normalizeClientKey(c.nome)) }))
+                  .sort((a, b) => {
+                    if (a.created !== b.created) return a.created ? 1 : -1;
+                    return a.nome.localeCompare(b.nome, 'pt-BR');
+                  });
+                const semCalendario = clientStatus.filter((c) => !c.created);
+                const comCalendario = clientStatus.filter((c) => c.created);
+                const postsSemCalendario = semCalendario.reduce((sum, c) => sum + c.postsContratados, 0);
+                const postsComCalendario = comCalendario.reduce((sum, c) => sum + c.postsContratados, 0);
+
+                if (clientStatus.length === 0) {
+                  return (
+                    <div className="rounded-xl border border-border bg-card/50 p-3 text-xs text-muted-foreground">
+                      Nenhum cliente ativo encontrado para este filtro.
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-2.5 rounded-xl border border-border bg-card/50 p-3">
+                    <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1.5">
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-400" />
+                        Sem calendário ({semCalendario.length} {semCalendario.length === 1 ? 'cliente' : 'clientes'} / {postsSemCalendario} {postsSemCalendario === 1 ? 'post' : 'posts'})
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
+                        Calendário criado ({comCalendario.length} {comCalendario.length === 1 ? 'cliente' : 'clientes'} / {postsComCalendario} {postsComCalendario === 1 ? 'post' : 'posts'})
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {clientStatus.map((c) => (
+                        <span
+                          key={c.nome}
+                          className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
+                            c.created
+                              ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                              : 'border-red-500/30 bg-red-500/10 text-red-400'
+                          }`}
+                        >
+                          {c.nome}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
                 {group.items.map((calendario) => {
-                  const progress = getConclusionProgress(calendario);
+                  const progress = getConclusionSegments(calendario);
 
                   return (
                     <div
@@ -229,7 +310,7 @@ export function CalendarsPanel({
                         <div className="mt-1.5 flex items-center justify-between gap-1.5">
                           <div className="flex items-center gap-1.5">
                             <span
-                              className="rounded border px-2 py-0.5 text-[11px] font-bold uppercase"
+                              className="rounded border px-1.5 py-0.5 text-[10px] font-bold uppercase"
                               style={{
                                 borderColor: calendario.phaseColor,
                                 backgroundColor: `${calendario.phaseColor}1a`,
@@ -247,14 +328,32 @@ export function CalendarsPanel({
                           <ConclusionPercentLabel progress={progress} />
                         </div>
                         <div className="mt-3">
-                          <ConclusionBar progress={progress} />
+                          <SegmentedConclusionBar segments={progress.segments} total={progress.total} />
                         </div>
                       </div>
 
-                      <div className="space-y-1 pt-1">
-                        <InfoRow label="Posts Contratados" value={calendario.postsContratados} />
-                        <InfoRow label="Posts Criados" value={calendario.postsConectados} />
-                        <InfoRow label="Posts Concluídos" value={calendario.postsConcluidos} />
+                      <div className="flex items-center gap-3 pt-1 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1.5">
+                          Contrato
+                          <span className="rounded bg-muted-foreground/10 px-1.5 py-0.5 text-[11px] font-semibold text-white/70">
+                            {calendario.postsContratados}
+                          </span>
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          Cards criados
+                          <span className="rounded bg-muted-foreground/10 px-1.5 py-0.5 text-[11px] font-semibold text-white/70">
+                            {calendario.postsConectados}
+                          </span>
+                        </span>
+                        {(() => {
+                          const diff = calendario.postsConectados - calendario.postsContratados;
+                          if (diff === 0) return null;
+                          return (
+                            <span className={`text-[11px] font-semibold ${diff > 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                              {diff > 0 ? `+${diff}` : diff}
+                            </span>
+                          );
+                        })()}
                       </div>
                     </div>
                   );

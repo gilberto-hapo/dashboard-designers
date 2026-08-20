@@ -11,11 +11,11 @@ import {
   SIDEBAR_MARGIN_EXPANDED_CLASS,
 } from '@/components/SidebarNav';
 import {
-  ConclusionBar,
   ConclusionPercentLabel,
   fetchJson,
-  getConclusionProgress,
   getFirstName,
+  SegmentedConclusionBar,
+  type ProgressSegment,
 } from '@/lib/calendarUi';
 import { usePendingFeedbackCount } from '@/hooks/usePendingFeedbackCount';
 import { Button } from '@/components/ui/button';
@@ -55,6 +55,33 @@ function decisionStatus(post: PortalPost): GridThumbStatus {
   if (post.published) return 'published';
   if (post.decision?.approved) return 'approved';
   return null;
+}
+
+function getPostsConclusionSegments(posts: PortalPost[]) {
+  const total = posts.length;
+  const counts = { published: 0, approved: 0, adjustment: 0, pending: 0 };
+  posts.forEach((post) => {
+    const status = decisionStatus(post);
+    if (status === 'published') counts.published += 1;
+    else if (status === 'approved') counts.approved += 1;
+    else if (status === 'adjustment') counts.adjustment += 1;
+    else counts.pending += 1;
+  });
+
+  const segments: ProgressSegment[] = [
+    { key: 'publicado', count: counts.published, className: 'bg-sky-500' },
+    { key: 'aprovado', count: counts.approved, className: 'bg-emerald-500' },
+    { key: 'ajuste', count: counts.adjustment, className: 'bg-amber-400' },
+    { key: 'pendente', count: counts.pending, className: 'bg-muted-foreground/30' },
+  ];
+
+  const decided = counts.published + counts.approved;
+  const percent = total > 0 ? Math.round((decided / total) * 100) : 0;
+  const clampedPercent = Math.min(100, Math.max(0, percent));
+  const textColor =
+    clampedPercent >= 67 ? 'text-emerald-500' : clampedPercent >= 34 ? 'text-yellow-400' : 'text-red-500';
+
+  return { segments, percent: clampedPercent, textColor, total };
 }
 
 function buildMediaUrl(fileId: string, calendarId: string, variant: 'thumb' | 'preview' | 'original' = 'preview') {
@@ -261,9 +288,12 @@ function CalendarDetailContent() {
                 </div>
 
                 <div className="flex items-center justify-end">
-                  <ConclusionPercentLabel progress={getConclusionProgress(calendario)} />
+                  <ConclusionPercentLabel progress={getPostsConclusionSegments(calendario.posts)} />
                 </div>
-                <ConclusionBar progress={getConclusionProgress(calendario)} />
+                <SegmentedConclusionBar
+                  segments={getPostsConclusionSegments(calendario.posts).segments}
+                  total={getPostsConclusionSegments(calendario.posts).total}
+                />
 
                 <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                   <span>

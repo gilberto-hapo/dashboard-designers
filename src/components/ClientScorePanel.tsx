@@ -35,6 +35,7 @@ type ClienteInfo = {
   postsContratados: number;
   locaisPublicacao: LocalPublicacao[];
   linkDriveGeral: string | null;
+  ativo?: boolean;
 };
 
 export function ClientScorePanel({ selectedDesigner = 'Todos' }: { selectedDesigner?: string }) {
@@ -52,9 +53,10 @@ export function ClientScorePanel({ selectedDesigner = 'Todos' }: { selectedDesig
       .finally(() => setLoading(false));
   }, []);
 
-  const filteredClients = (
-    selectedDesigner === 'Todos' ? clients : clients.filter((c) => c.designer === selectedDesigner)
-  ).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  const filteredClients = clients
+    .filter((c) => c.ativo !== false)
+    .filter((c) => selectedDesigner === 'Todos' || c.designer === selectedDesigner)
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 
   if (loading) {
     return (
