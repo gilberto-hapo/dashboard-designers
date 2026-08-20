@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronDown, Loader2 } from 'lucide-react';
 import {
-  ConclusionPercentLabel,
   fetchJson,
   getConclusionSegments,
   getFirstName,
@@ -23,9 +22,11 @@ type CalendarioInfo = {
   postsContratados: number;
   postsConectados: number;
   postsConcluidos: number;
-  postsPublicados: number;
+  postsCriacaoTextual: number;
+  postsEmAndamento: number;
+  postsEmValidacao: number;
   postsAprovados: number;
-  postsPendentes: number;
+  postsPublicados: number;
 };
 
 const MONTH_ORDER = [
@@ -320,25 +321,22 @@ export function CalendarsPanel({
                       )}
                       <div>
                         <h3 className="text-sm font-semibold text-foreground">{calendario.title}</h3>
-                        <div className="mt-1.5 flex items-center justify-between gap-1.5">
-                          <div className="flex items-center gap-1.5">
-                            <span
-                              className="rounded border px-1.5 py-0.5 text-[10px] font-bold uppercase"
-                              style={{
-                                borderColor: calendario.phaseColor,
-                                backgroundColor: `${calendario.phaseColor}1a`,
-                                color: calendario.phaseColor,
-                              }}
-                            >
-                              {calendario.phaseTitle}
+                        <div className="mt-1.5 flex items-center gap-1.5">
+                          <span
+                            className="rounded border px-1.5 py-0.5 text-[10px] font-bold uppercase"
+                            style={{
+                              borderColor: calendario.phaseColor,
+                              backgroundColor: `${calendario.phaseColor}1a`,
+                              color: calendario.phaseColor,
+                            }}
+                          >
+                            {calendario.phaseTitle}
+                          </span>
+                          {calendario.designer && (
+                            <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
+                              {getFirstName(calendario.designer)}
                             </span>
-                            {calendario.designer && (
-                              <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
-                                {getFirstName(calendario.designer)}
-                              </span>
-                            )}
-                          </div>
-                          <ConclusionPercentLabel progress={progress} />
+                          )}
                         </div>
                         <div className="mt-3">
                           <SegmentedConclusionBar segments={progress.segments} total={progress.total} />

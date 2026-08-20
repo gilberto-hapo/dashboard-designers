@@ -13,13 +13,15 @@ export function normalizeClientKey(value: string) {
 
 export type CalendarioSegments = {
   postsConectados: number;
-  postsPublicados: number;
+  postsCriacaoTextual: number;
+  postsEmAndamento: number;
+  postsEmValidacao: number;
   postsAprovados: number;
-  postsPendentes: number;
+  postsPublicados: number;
 };
 
 export type ProgressSegment = {
-  key: 'publicado' | 'aprovado' | 'ajuste' | 'pendente';
+  key: 'criacaoTextual' | 'emAndamento' | 'validacao' | 'aprovado' | 'publicado' | 'ajuste';
   count: number;
   className: string;
 };
@@ -39,15 +41,17 @@ export function getConclusionProgress(calendario: CalendarioSummary) {
 
 export function getConclusionSegments(calendario: CalendarioSegments) {
   const total = calendario.postsConectados;
+  const decidedTotal = calendario.postsAprovados + calendario.postsPublicados;
   const segments: ProgressSegment[] = [
-    { key: 'publicado', count: calendario.postsPublicados, className: 'bg-sky-500' },
+    { key: 'criacaoTextual', count: calendario.postsCriacaoTextual, className: 'bg-red-500' },
+    { key: 'emAndamento', count: calendario.postsEmAndamento, className: 'bg-yellow-400' },
+    { key: 'validacao', count: calendario.postsEmValidacao, className: 'bg-orange-500' },
     { key: 'aprovado', count: calendario.postsAprovados, className: 'bg-emerald-500' },
+    { key: 'publicado', count: calendario.postsPublicados, className: 'bg-sky-500' },
     { key: 'ajuste', count: 0, className: 'bg-amber-400' },
-    { key: 'pendente', count: calendario.postsPendentes, className: 'bg-muted-foreground/30' },
   ];
 
-  const decided = calendario.postsPublicados + calendario.postsAprovados;
-  const percent = total > 0 ? Math.round((decided / total) * 100) : 0;
+  const percent = total > 0 ? Math.round((decidedTotal / total) * 100) : 0;
   const clampedPercent = Math.min(100, Math.max(0, percent));
 
   const textColor =
@@ -89,10 +93,12 @@ export function ConclusionBar({ progress }: { progress: ReturnType<typeof getCon
 }
 
 const SEGMENT_LABELS: Record<ProgressSegment['key'], string> = {
-  publicado: 'Publicado',
+  criacaoTextual: 'Criação Textual',
+  emAndamento: 'Em Andamento',
+  validacao: 'Validação do Cliente',
   aprovado: 'Aprovado',
+  publicado: 'Publicado',
   ajuste: 'Em ajuste',
-  pendente: 'Pendente',
 };
 
 export function SegmentedConclusionBar({

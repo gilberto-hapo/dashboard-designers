@@ -2112,8 +2112,12 @@ app.get('/api/calendarios', requireAuth, async (_req, res) => {
       const linkedTasks = tasks.filter((task) => task.calendarioId === calendario.id);
       const postsPublicados = linkedTasks.filter((task) => task.stage === 'concluido').length;
       const postsAprovados = linkedTasks.filter((task) => task.stage === 'aprovado_programacao').length;
+      const postsEmValidacao = linkedTasks.filter((task) => task.stage === 'validacao').length;
+      const postsEmAndamento = linkedTasks.filter((task) =>
+        ['executando', 'direcao_arte', 'montagem'].includes(task.stage),
+      ).length;
+      const postsCriacaoTextual = linkedTasks.filter((task) => task.stage === 'fazer').length;
       const postsConectados = linkedTasks.length;
-      const postsPendentes = Math.max(0, postsConectados - postsPublicados - postsAprovados);
 
       return {
         id: calendario.id,
@@ -2127,9 +2131,11 @@ app.get('/api/calendarios', requireAuth, async (_req, res) => {
         postsContratados: client?.postsContratados ?? 0,
         postsConectados,
         postsConcluidos: postsPublicados,
-        postsPublicados,
+        postsCriacaoTextual,
+        postsEmAndamento,
+        postsEmValidacao,
         postsAprovados,
-        postsPendentes,
+        postsPublicados,
       };
     });
 
@@ -2746,8 +2752,12 @@ app.get('/api/calendarios/:id/detail', requireAuth, async (req, res) => {
     const linkedTasks = tasks.filter((task) => task.calendarioId === calendario.id);
     const postsPublicados = linkedTasks.filter((task) => task.stage === 'concluido').length;
     const postsAprovados = linkedTasks.filter((task) => task.stage === 'aprovado_programacao').length;
+    const postsEmValidacao = linkedTasks.filter((task) => task.stage === 'validacao').length;
+    const postsEmAndamento = linkedTasks.filter((task) =>
+      ['executando', 'direcao_arte', 'montagem'].includes(task.stage),
+    ).length;
+    const postsCriacaoTextual = linkedTasks.filter((task) => task.stage === 'fazer').length;
     const postsConectados = linkedTasks.length;
-    const postsPendentes = Math.max(0, postsConectados - postsPublicados - postsAprovados);
 
     res.json({
       calendario: {
@@ -2760,9 +2770,11 @@ app.get('/api/calendarios/:id/detail', requireAuth, async (req, res) => {
         postsContratados: client?.postsContratados ?? 0,
         postsConectados,
         postsConcluidos: postsPublicados,
-        postsPublicados,
+        postsCriacaoTextual,
+        postsEmAndamento,
+        postsEmValidacao,
         postsAprovados,
-        postsPendentes,
+        postsPublicados,
       },
     });
   } catch (error) {
