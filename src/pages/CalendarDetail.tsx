@@ -61,7 +61,7 @@ type CalendarDetailData = {
 
 function decisionStatus(post: PortalPost): GridThumbStatus {
   if (post.feedbackHistory.length > 0) return 'adjustment';
-  if (post.published) return 'published';
+  if (post.published) return null;
   if (post.decision?.approved) return 'approved';
   return null;
 }
@@ -70,7 +70,7 @@ const PIPELINE_STAGE_STYLES: Record<Exclude<PostPipelineStage, null>, { label: s
   criacaoTextual: { label: 'Criação Textual', className: 'border-red-500/30 bg-red-500/10 text-red-400' },
   emAndamento: { label: 'Em Andamento', className: 'border-yellow-400/30 bg-yellow-400/10 text-yellow-400' },
   validacao: { label: 'Validação', className: 'border-orange-500/30 bg-orange-500/10 text-orange-400' },
-  aprovado: { label: 'Aprovado', className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' },
+  aprovado: { label: 'Aprovado para Programação', className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' },
   publicado: { label: 'Publicado', className: 'border-sky-500/30 bg-sky-500/10 text-sky-400' },
 };
 
@@ -366,7 +366,7 @@ function CalendarDetailContent() {
                           </span>
                         </span>
                         <span className="flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-emerald-400">
-                          Aprovado
+                          Aprovado para Programação
                           <span className={pipelineCounts.aprovado > 0 ? 'font-bold text-white' : 'opacity-50'}>
                             {pipelineCounts.aprovado}
                           </span>
@@ -422,6 +422,7 @@ function CalendarDetailContent() {
                           media={post.media}
                           title={post.goalfyCardTitle || post.title}
                           status={decisionStatus(post)}
+                          internalLabels
                           onOpen={() => navigate(`/calendarios/${id}/posts/${post.id}`)}
                         />
                         <p className="mt-1.5 truncate text-xs font-medium text-foreground">

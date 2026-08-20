@@ -617,12 +617,14 @@ export function GridThumbShared({
   media,
   title,
   status,
+  internalLabels = false,
   onOpen,
 }: {
   mediaUrl: (fileId: string) => string;
   media: PostMedia | null;
   title: string;
   status?: GridThumbStatus;
+  internalLabels?: boolean;
   onOpen: () => void;
 }) {
   const firstFile = media?.files?.[0];
@@ -630,6 +632,13 @@ export function GridThumbShared({
   const hasMultiple = (media?.files?.length ?? 0) > 1;
   const coverImageId = media?.coverImageId;
   const statusStyle = status ? GRID_THUMB_STATUS_STYLES[status] : null;
+  const statusLabel = internalLabels
+    ? status === 'approved'
+      ? 'Cliente Aprovou'
+      : status === 'adjustment'
+        ? 'Ajuste do Cliente'
+        : statusStyle?.label
+    : statusStyle?.label;
 
   return (
     <button
@@ -679,7 +688,7 @@ export function GridThumbShared({
           <span
             className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${statusStyle.badge}`}
           >
-            {statusStyle.label}
+            {statusLabel}
           </span>
         </>
       )}

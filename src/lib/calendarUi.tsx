@@ -96,7 +96,7 @@ const SEGMENT_LABELS: Record<ProgressSegment['key'], string> = {
   criacaoTextual: 'Criação Textual',
   emAndamento: 'Em Andamento',
   validacao: 'Validação do Cliente',
-  aprovado: 'Aprovado',
+  aprovado: 'Aprovado para Programação',
   publicado: 'Publicado',
   ajuste: 'Em ajuste',
 };

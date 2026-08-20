@@ -2246,7 +2246,6 @@ async function resolveCalendarPosts(
       const sequenceNumber = index + 1;
       const rawStage = goalfyRawStageBySequence.get(sequenceNumber) || 'fazer';
       const published = rawStage === 'concluido';
-      const approvedByGoalfyPhase = published || rawStage === 'aprovado_programacao';
       const [resolvedAt, history] = await Promise.all([
         getAdjustmentResolvedAtForPost(postId),
         getDecisionHistoryForPost(postId),
@@ -2266,7 +2265,10 @@ async function resolveCalendarPosts(
       // geral do post — para status/badge (aprovado x pedir ajustes), usamos
       // a última decisão sem pino, não a última linha da tabela.
       const latestGeneralDecision = history.find((d) => !d.mediaFileId) || null;
-      const approved = approvedByGoalfyPhase || Boolean(latestGeneralDecision?.approved);
+      // approved reflete SOMENTE a decisao real do cliente no portal — mover
+      // o card no kanban da Goalfy nao conta como aprovacao (ver pipelineStage
+      // abaixo para a fase de producao, que e uma informacao separada).
+      const approved = Boolean(latestGeneralDecision?.approved);
       const decisionPayload = approved
         ? { approved: true, feedback: null, createdAt: latestGeneralDecision?.createdAt || null }
         : latestGeneralDecision
