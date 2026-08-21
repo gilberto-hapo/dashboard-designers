@@ -347,33 +347,33 @@ function CalendarDetailContent() {
                     const pipelineCounts = getPostsPipelineStageCounts(calendario.posts);
                     return (
                       <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                        <span className="flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-red-400">
+                        <span className={`flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-red-400 ${pipelineCounts.criacaoTextual > 0 ? '' : 'opacity-50'}`}>
                           Criação Textual
-                          <span className={pipelineCounts.criacaoTextual > 0 ? 'font-bold text-white' : 'opacity-50'}>
+                          <span className={pipelineCounts.criacaoTextual > 0 ? 'font-bold text-white' : ''}>
                             {pipelineCounts.criacaoTextual}
                           </span>
                         </span>
-                        <span className="flex items-center gap-1.5 rounded-full border border-yellow-400/30 bg-yellow-400/10 px-2.5 py-1 text-yellow-400">
+                        <span className={`flex items-center gap-1.5 rounded-full border border-yellow-400/30 bg-yellow-400/10 px-2.5 py-1 text-yellow-400 ${pipelineCounts.emAndamento > 0 ? '' : 'opacity-50'}`}>
                           Em Andamento
-                          <span className={pipelineCounts.emAndamento > 0 ? 'font-bold text-white' : 'opacity-50'}>
+                          <span className={pipelineCounts.emAndamento > 0 ? 'font-bold text-white' : ''}>
                             {pipelineCounts.emAndamento}
                           </span>
                         </span>
-                        <span className="flex items-center gap-1.5 rounded-full border border-orange-500/30 bg-orange-500/10 px-2.5 py-1 text-orange-400">
+                        <span className={`flex items-center gap-1.5 rounded-full border border-orange-500/30 bg-orange-500/10 px-2.5 py-1 text-orange-400 ${pipelineCounts.validacao > 0 ? '' : 'opacity-50'}`}>
                           Validação
-                          <span className={pipelineCounts.validacao > 0 ? 'font-bold text-white' : 'opacity-50'}>
+                          <span className={pipelineCounts.validacao > 0 ? 'font-bold text-white' : ''}>
                             {pipelineCounts.validacao}
                           </span>
                         </span>
-                        <span className="flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-emerald-400">
+                        <span className={`flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-emerald-400 ${pipelineCounts.aprovado > 0 ? '' : 'opacity-50'}`}>
                           Aprovado para Programação
-                          <span className={pipelineCounts.aprovado > 0 ? 'font-bold text-white' : 'opacity-50'}>
+                          <span className={pipelineCounts.aprovado > 0 ? 'font-bold text-white' : ''}>
                             {pipelineCounts.aprovado}
                           </span>
                         </span>
-                        <span className="flex items-center gap-1.5 rounded-full border border-sky-500/30 bg-sky-500/10 px-2.5 py-1 text-sky-400">
+                        <span className={`flex items-center gap-1.5 rounded-full border border-sky-500/30 bg-sky-500/10 px-2.5 py-1 text-sky-400 ${pipelineCounts.publicado > 0 ? '' : 'opacity-50'}`}>
                           Publicado
-                          <span className={pipelineCounts.publicado > 0 ? 'font-bold text-white' : 'opacity-50'}>
+                          <span className={pipelineCounts.publicado > 0 ? 'font-bold text-white' : ''}>
                             {pipelineCounts.publicado}
                           </span>
                         </span>
