@@ -2921,11 +2921,36 @@ app.get('/api/calendarios/:id/detail', requireAuth, async (req, res) => {
   }
 });
 
+function calendarioToFeedbackPosts(calendario) {
+  return calendario.posts
+    .filter((post) => post.feedbackHistory.length > 0)
+    .map((post) => ({
+      postId: post.id,
+      postTitle: post.title,
+      calendarId: calendario.id,
+      calendarTitle: calendario.title,
+      designer: calendario.designer || '',
+      copywriter: calendario.copywriter || '',
+      caption: post.caption,
+      media: post.media,
+      latestCreatedAt: post.feedbackHistory[post.feedbackHistory.length - 1].createdAt,
+      feedbackHistory: post.feedbackHistory,
+      resolvedFeedbackHistory: post.resolvedFeedbackHistory,
+      tags: post.tags || [],
+    }));
+}
+
 // Reaproveita o resultado por um TTL curto + dedup de chamadas concorrentes:
 // o Dashboard e o painel de calendários chamam essa rota ao mesmo tempo em
 // toda navegação, e sem cache cada chamada refaz a resolução completa
 // (Drive + Postgres + Goalfy) para todos os calendários com ajuste pendente.
-async function loadFeedbackList() {
+//
+// onCalendarResolved (opcional) é chamado assim que CADA calendário termina
+// de resolver, com os posts daquele calendário já prontos — usado pela rota
+// de streaming (/api/feedback/stream) para a tela de Feedback ir exibindo
+// posts progressivamente em vez de esperar todos os calendários (que juntos
+// podem levar dezenas de segundos via Drive).
+async function loadFeedbackList(onCalendarResolved) {
   const writeToken = getGoalfyCardsWriteToken();
   const [calendarios, clients, goalfyData] = await Promise.all([
     fetchAllCalendarsWithPhase({ writeToken }),
@@ -2935,16 +2960,36 @@ async function loadFeedbackList() {
   const preFetched = { calendarios, clients, goalfyData };
 
   const decisionsByCalendarId = await getLatestDecisionsForCalendars(calendarios.map((c) => c.id));
+  // getLatestDecisionsForCalendars só traz a ÚLTIMA decisão de cada post —
+  // sem checar resolvedAt aqui, um calendário cujo único ajuste pendente já
+  // foi marcado como resolvido pelo designer continuaria contando como
+  // "candidato", inflando o total mostrado na barra de progresso da tela de
+  // Feedback (ex: "6" candidatos quando só 2 têm ajuste de fato pendente).
+  const candidatePostIds = [];
+  decisionsByCalendarId.forEach((decisions) => {
+    decisions.forEach((d) => {
+      if (!d.approved && d.feedback) candidatePostIds.push(d.postId);
+    });
+  });
+  const candidateResolvedAtByPostId = await getAdjustmentResolvedAtForPosts(candidatePostIds);
   const calendarIdsWithFeedback = calendarios
-    .filter((c) => (decisionsByCalendarId.get(c.id) || []).some((d) => !d.approved && d.feedback))
+    .filter((c) =>
+      (decisionsByCalendarId.get(c.id) || []).some((d) => {
+        if (d.approved || !d.feedback) return false;
+        const resolvedAt = candidateResolvedAtByPostId.get(d.postId);
+        return !resolvedAt || d.createdAt > resolvedAt;
+      }),
+    )
     .map((c) => c.id);
 
   feedbackListProgress = { total: calendarIdsWithFeedback.length, done: 0, active: true };
 
   const resolvedCalendarios = await Promise.all(
     calendarIdsWithFeedback.map((calendarId) =>
-      resolvePublicCalendarPayload(calendarId, preFetched).finally(() => {
+      resolvePublicCalendarPayload(calendarId, preFetched).then((calendario) => {
         feedbackListProgress = { ...feedbackListProgress, done: feedbackListProgress.done + 1 };
+        if (calendario) onCalendarResolved?.(calendarioToFeedbackPosts(calendario));
+        return calendario;
       }),
     ),
   );
@@ -2953,24 +2998,7 @@ async function loadFeedbackList() {
 
   return resolvedCalendarios
     .filter(Boolean)
-    .flatMap((calendario) =>
-      calendario.posts
-        .filter((post) => post.feedbackHistory.length > 0)
-        .map((post) => ({
-          postId: post.id,
-          postTitle: post.title,
-          calendarId: calendario.id,
-          calendarTitle: calendario.title,
-          designer: calendario.designer || '',
-          copywriter: calendario.copywriter || '',
-          caption: post.caption,
-          media: post.media,
-          latestCreatedAt: post.feedbackHistory[post.feedbackHistory.length - 1].createdAt,
-          feedbackHistory: post.feedbackHistory,
-          resolvedFeedbackHistory: post.resolvedFeedbackHistory,
-          tags: post.tags || [],
-        })),
-    )
+    .flatMap((calendario) => calendarioToFeedbackPosts(calendario))
     .sort((a, b) => new Date(b.latestCreatedAt) - new Date(a.latestCreatedAt));
 }
 
@@ -2995,6 +3023,43 @@ async function getCachedFeedbackList() {
 
 app.get('/api/feedback-progress', requireAuth, (_req, res) => {
   res.json(feedbackListProgress);
+});
+
+// Versão em streaming (Server-Sent Events) de /api/feedback: em vez de
+// esperar TODOS os calendários com ajuste pendente resolverem via Drive
+// (pode levar dezenas de segundos ao todo) para só então responder, emite
+// os posts de cada calendário assim que ficam prontos — a tela de Feedback
+// vai preenchendo progressivamente em vez de ficar com um spinner parado.
+// Não usa o cache de getCachedFeedbackList (não faria sentido cachear um
+// stream), mas os posts individuais já vêm de resolvePublicCalendarPayload,
+// que por sua vez usa o cache do Drive normalmente.
+app.get('/api/feedback/stream', requireAuth, async (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+
+  let closed = false;
+  req.on('close', () => {
+    closed = true;
+  });
+
+  function sendEvent(event, data) {
+    if (closed) return;
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  }
+
+  try {
+    await loadFeedbackList((posts) => {
+      posts.forEach((post) => sendEvent('post', post));
+    });
+    sendEvent('done', {});
+  } catch (error) {
+    console.error('Feedback stream failed', error);
+    sendEvent('error', { message: error.message });
+  } finally {
+    if (!closed) res.end();
+  }
 });
 
 function summarizeFeedbackCounts(posts) {
