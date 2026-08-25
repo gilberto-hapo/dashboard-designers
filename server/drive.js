@@ -245,18 +245,29 @@ async function extractCaptionCached(captionFile) {
 // mais de uma subpasta candidata com o mesmo prefixo (pastas duplicadas de
 // rascunho no Drive), usa a que tiver mídia de fato — a vazia é ignorada.
 async function resolvePostFolderContent(folder) {
+  const startedAt = Date.now();
   const children = await listChildren(folder.id);
   const mediaFiles = children.filter((f) => isImage(f.mimeType) || isVideo(f.mimeType));
   const captionFile = children.find((f) => isCaptionDoc(f.mimeType));
 
   let caption = null;
   if (captionFile) {
+    const captionStartedAt = Date.now();
     try {
       caption = await extractCaptionCached(captionFile);
     } catch (error) {
       caption = null;
     }
+    console.log(
+      'Drive caption extracted',
+      JSON.stringify({ folderId: folder.id, folderName: folder.name, durationMs: Date.now() - captionStartedAt }),
+    );
   }
+
+  console.log(
+    'Drive post folder content resolved',
+    JSON.stringify({ folderId: folder.id, folderName: folder.name, durationMs: Date.now() - startedAt }),
+  );
 
   const video = mediaFiles.find((f) => isVideo(f.mimeType));
   const images = mediaFiles
@@ -311,18 +322,32 @@ export async function listCalendarPostFolders(calendarFolderLink, { forceRefresh
   const folderId = extractFolderIdFromDriveLink(calendarFolderLink);
   if (!folderId) return [];
 
+  const startedAt = Date.now();
   await ensureDriveCacheLoaded();
 
   const cacheKey = folderId;
   const cached = cache.get(cacheKey);
   if (!forceRefresh && cached && Date.now() - cached.at < DRIVE_FOLDER_TTL_MS) {
+    console.log('Drive folder cache hit', JSON.stringify({ folderId, ageMs: Date.now() - cached.at }));
     return cached.value;
   }
 
+  console.log('Drive folder cache miss, listing from source', JSON.stringify({ folderId, forceRefresh }));
+
+  const listChildrenStartedAt = Date.now();
   const children = await listChildren(folderId);
   const subfolders = children.filter((f) => f.mimeType === 'application/vnd.google-apps.folder');
+  console.log(
+    'Drive listChildren finished',
+    JSON.stringify({ folderId, durationMs: Date.now() - listChildrenStartedAt, subfolders: subfolders.length }),
+  );
 
+  const resolveStartedAt = Date.now();
   const contents = await mapWithConcurrency(subfolders, 6, (folder) => resolvePostFolderContent(folder));
+  console.log(
+    'Drive subfolder contents resolved',
+    JSON.stringify({ folderId, durationMs: Date.now() - resolveStartedAt, subfolders: subfolders.length }),
+  );
 
   const resolvedByName = new Map();
   subfolders.forEach((folder, index) => {
@@ -339,6 +364,7 @@ export async function listCalendarPostFolders(calendarFolderLink, { forceRefresh
 
   cache.set(cacheKey, { value: result, at: Date.now() });
   schedulePersistDriveCache();
+  console.log('Drive folder listing finished', JSON.stringify({ folderId, totalDurationMs: Date.now() - startedAt }));
   return result;
 }
 

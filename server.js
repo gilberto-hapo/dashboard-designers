@@ -2210,12 +2210,19 @@ async function resolveCalendarPosts(
 
   let folders = [];
   if (calendario.linkDriveArtes) {
+    const driveStartedAt = nowMs();
     try {
       folders = await listCalendarPostFolders(calendario.linkDriveArtes, { forceRefresh: forceRefreshDrive });
+      logServerEvent('resolveCalendarPosts: Drive listing done', {
+        calendarId: calendario.id,
+        durationMs: getDurationMs(driveStartedAt),
+        folders: folders.length,
+      });
     } catch (error) {
       logServerEvent('Portal cliente: falha ao listar pastas do Drive', {
         calendarId: calendario.id,
         error: error.message,
+        durationMs: getDurationMs(driveStartedAt),
       });
     }
   }
@@ -2258,10 +2265,16 @@ async function resolveCalendarPosts(
   const totalPosts = folders.length;
 
   const postIds = folders.map((folder) => folder.folderId);
+  const dbStartedAt = nowMs();
   const [resolvedAtByPostId, decisionHistoryByPostId] = await Promise.all([
     getAdjustmentResolvedAtForPosts(postIds),
     getDecisionHistoryForPosts(postIds),
   ]);
+  logServerEvent('resolveCalendarPosts: DB batch queries done', {
+    calendarId: calendario.id,
+    durationMs: getDurationMs(dbStartedAt),
+    postIds: postIds.length,
+  });
 
   const resolvedPosts = await Promise.all(
     folders.map(async (folder, index) => {
@@ -2827,19 +2840,29 @@ app.get('/api/calendarios/:id/detail', requireAuth, async (req, res) => {
     return;
   }
 
+  const requestStartedAt = nowMs();
   try {
     const forceRefreshDrive = req.query.refresh === '1';
     const writeToken = getGoalfyCardsWriteToken();
+    const preFetchStartedAt = nowMs();
     const [calendarios, clients, goalfyData] = await Promise.all([
       fetchAllCalendarsWithPhase({ writeToken }),
       fetchCardsClients({ writeToken }),
       fetchGoalfyData({ forceRefresh: forceRefreshDrive }),
     ]);
+    logServerEvent('/api/calendarios/:id/detail: pre-fetch done', {
+      calendarId,
+      durationMs: getDurationMs(preFetchStartedAt),
+    });
     const resolvedCalendario = await resolvePublicCalendarPayload(
       calendarId,
       { calendarios, clients, goalfyData },
       { forceRefreshDrive },
     );
+    logServerEvent('/api/calendarios/:id/detail: total', {
+      calendarId,
+      durationMs: getDurationMs(requestStartedAt),
+    });
 
     const calendario = calendarios.find((c) => c.id === calendarId);
     if (!calendario || !resolvedCalendario) {
