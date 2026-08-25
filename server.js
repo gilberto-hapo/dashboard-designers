@@ -67,6 +67,13 @@ const PUBLIC_CLIENT_PAYLOAD_CACHE_TTL_MS = 1000 * 15;
 const publicClientPayloadCache = new Map();
 const inflightPublicClientPayloadPromises = new Map();
 
+const FEEDBACK_LIST_CACHE_TTL_MS = 1000 * 15;
+let feedbackListCache = null;
+let inflightFeedbackListPromise = null;
+function invalidateFeedbackListCache() {
+  feedbackListCache = null;
+}
+
 app.use(express.json());
 app.use(cookieParser(process.env.SESSION_SECRET || 'change-me-in-production'));
 
@@ -2748,6 +2755,7 @@ app.post('/api/public/portal/:token/posts/:postId/decision', async (req, res) =>
     }
 
     publicClientPayloadCache.delete(clientId);
+    invalidateFeedbackListCache();
     res.json({ ok: true });
   } catch (error) {
     console.error('Public portal decision request failed', error);
@@ -2799,6 +2807,7 @@ app.delete('/api/public/portal/:token/posts/:postId/decision/:decisionId', async
     }
 
     publicClientPayloadCache.delete(clientId);
+    invalidateFeedbackListCache();
     res.json({ ok: true });
   } catch (error) {
     console.error('Public portal decision delete failed', error);
@@ -2869,47 +2878,73 @@ app.get('/api/calendarios/:id/detail', requireAuth, async (req, res) => {
   }
 });
 
+// Reaproveita o resultado por um TTL curto + dedup de chamadas concorrentes:
+// o Dashboard e o painel de calendários chamam essa rota ao mesmo tempo em
+// toda navegação, e sem cache cada chamada refaz a resolução completa
+// (Drive + Postgres + Goalfy) para todos os calendários com ajuste pendente.
+async function loadFeedbackList() {
+  const writeToken = getGoalfyCardsWriteToken();
+  const [calendarios, clients, goalfyData] = await Promise.all([
+    fetchAllCalendarsWithPhase({ writeToken }),
+    fetchCardsClients({ writeToken }),
+    fetchGoalfyData(),
+  ]);
+  const preFetched = { calendarios, clients, goalfyData };
+
+  const decisionsByCalendarId = await getLatestDecisionsForCalendars(calendarios.map((c) => c.id));
+  const calendarIdsWithFeedback = calendarios
+    .filter((c) => (decisionsByCalendarId.get(c.id) || []).some((d) => !d.approved && d.feedback))
+    .map((c) => c.id);
+
+  const resolvedCalendarios = await Promise.all(
+    calendarIdsWithFeedback.map((calendarId) => resolvePublicCalendarPayload(calendarId, preFetched)),
+  );
+
+  return resolvedCalendarios
+    .filter(Boolean)
+    .flatMap((calendario) =>
+      calendario.posts
+        .filter((post) => post.feedbackHistory.length > 0)
+        .map((post) => ({
+          postId: post.id,
+          postTitle: post.title,
+          calendarId: calendario.id,
+          calendarTitle: calendario.title,
+          designer: calendario.designer || '',
+          copywriter: calendario.copywriter || '',
+          caption: post.caption,
+          media: post.media,
+          latestCreatedAt: post.feedbackHistory[post.feedbackHistory.length - 1].createdAt,
+          feedbackHistory: post.feedbackHistory,
+          resolvedFeedbackHistory: post.resolvedFeedbackHistory,
+          tags: post.tags || [],
+        })),
+    )
+    .sort((a, b) => new Date(b.latestCreatedAt) - new Date(a.latestCreatedAt));
+}
+
+async function getCachedFeedbackList() {
+  if (feedbackListCache && nowMs() - feedbackListCache.at < FEEDBACK_LIST_CACHE_TTL_MS) {
+    return feedbackListCache.value;
+  }
+
+  if (inflightFeedbackListPromise) return inflightFeedbackListPromise;
+
+  inflightFeedbackListPromise = loadFeedbackList()
+    .then((value) => {
+      feedbackListCache = { value, at: nowMs() };
+      return value;
+    })
+    .finally(() => {
+      inflightFeedbackListPromise = null;
+    });
+
+  return inflightFeedbackListPromise;
+}
+
 app.get('/api/feedback', requireAuth, async (_req, res) => {
   try {
-    const writeToken = getGoalfyCardsWriteToken();
-    const [calendarios, clients, goalfyData] = await Promise.all([
-      fetchAllCalendarsWithPhase({ writeToken }),
-      fetchCardsClients({ writeToken }),
-      fetchGoalfyData(),
-    ]);
-    const preFetched = { calendarios, clients, goalfyData };
-
-    const decisionsByCalendarId = await getLatestDecisionsForCalendars(calendarios.map((c) => c.id));
-    const calendarIdsWithFeedback = calendarios
-      .filter((c) => (decisionsByCalendarId.get(c.id) || []).some((d) => !d.approved && d.feedback))
-      .map((c) => c.id);
-
-    const resolvedCalendarios = await Promise.all(
-      calendarIdsWithFeedback.map((calendarId) => resolvePublicCalendarPayload(calendarId, preFetched)),
-    );
-
-    const posts = resolvedCalendarios
-      .filter(Boolean)
-      .flatMap((calendario) =>
-        calendario.posts
-          .filter((post) => post.feedbackHistory.length > 0)
-          .map((post) => ({
-            postId: post.id,
-            postTitle: post.title,
-            calendarId: calendario.id,
-            calendarTitle: calendario.title,
-            designer: calendario.designer || '',
-            copywriter: calendario.copywriter || '',
-            caption: post.caption,
-            media: post.media,
-            latestCreatedAt: post.feedbackHistory[post.feedbackHistory.length - 1].createdAt,
-            feedbackHistory: post.feedbackHistory,
-            resolvedFeedbackHistory: post.resolvedFeedbackHistory,
-            tags: post.tags || [],
-          })),
-      )
-      .sort((a, b) => new Date(b.latestCreatedAt) - new Date(a.latestCreatedAt));
-
+    const posts = await getCachedFeedbackList();
     res.json({ posts });
   } catch (error) {
     console.error('Feedback list request failed', error);
@@ -2925,6 +2960,7 @@ app.post('/api/feedback/:postId/resolve', requireAuth, async (req, res) => {
   }
 
   await markAdjustmentsResolvedForPost(postId);
+  invalidateFeedbackListCache();
   res.json({ ok: true });
 });
 
