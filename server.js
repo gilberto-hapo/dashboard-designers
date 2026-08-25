@@ -2527,43 +2527,11 @@ async function resolvePublicCopywriterPayload({ forceRefreshDrive = false } = {}
   return { posts };
 }
 
-// Timestamp da ultima navegacao real de calendario (interna ou portal
-// publico) -- ver markUserDriveActivity. A pre-geracao de variantes disputa
-// as mesmas 2 vagas de concorrencia entre calendarios que a navegacao real
-// usa (ver mapWithConcurrency acima); sem esperar a navegacao esfriar, ela
-// dobra a carga na cota do Drive bem na janela mais sensivel -- logo apos
-// cada boot/deploy, quando o cache esta todo frio e a demora mais visivel.
-let lastUserDriveActivityAt = 0;
-function markUserDriveActivity() {
-  lastUserDriveActivityAt = nowMs();
-}
-
-const PREGENERATE_IDLE_WAIT_MS = 1000 * 60 * 2;
-const PREGENERATE_MAX_WAIT_MS = 1000 * 60 * 10;
-
-// Espera a navegacao de calendarios ficar "fria" (sem requisicao nova por
-// PREGENERATE_IDLE_WAIT_MS) antes de deixar a pre-geracao rodar, checando em
-// intervalos curtos e reiniciando a espera se detectar atividade nova.
-// PREGENERATE_MAX_WAIT_MS evita que uso continuo do dashboard atrase a
-// pre-geracao indefinidamente.
-async function waitForDriveIdle() {
-  const startedAt = nowMs();
-  while (true) {
-    const idleForMs = nowMs() - lastUserDriveActivityAt;
-    if (idleForMs >= PREGENERATE_IDLE_WAIT_MS || nowMs() - startedAt >= PREGENERATE_MAX_WAIT_MS) {
-      return;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 5000));
-  }
-}
-
 // Pré-gera as variantes de imagem (thumb + preview) que ainda faltam para
 // todos os posts dos calendários "Em Andamento" — chamado (fire-and-forget)
 // após o refresh manual do Goalfy terminar, para que a primeira visita a um
 // post recém-sincronizado já encontre cache hit em vez de gerar na hora.
 async function pregenerateActiveMediaVariants() {
-  await waitForDriveIdle();
-
   const writeToken = getGoalfyCardsWriteToken();
   const [calendarios, clients, goalfyData] = await Promise.all([
     fetchAllCalendarsWithPhase({ writeToken }),
@@ -2597,7 +2565,6 @@ async function pregenerateActiveMediaVariants() {
 }
 
 app.get('/api/public/copywriter-portal', async (req, res) => {
-  markUserDriveActivity();
   try {
     const forceRefreshDrive = req.query.refresh === '1';
     const payload = await resolvePublicCopywriterPayload({ forceRefreshDrive });
@@ -2644,7 +2611,6 @@ app.get('/api/public/copywriter-portal/media/:fileId', async (req, res) => {
 });
 
 app.get('/api/public/portal/:token', async (req, res) => {
-  markUserDriveActivity();
   try {
     const clientId = await resolveClientIdFromSlug(req.params.token);
     if (!clientId) {
@@ -2895,7 +2861,6 @@ app.get('/api/calendarios/:id/detail', requireAuth, async (req, res) => {
     return;
   }
 
-  markUserDriveActivity();
   const requestStartedAt = nowMs();
   try {
     const forceRefreshDrive = req.query.refresh === '1';
