@@ -2819,7 +2819,7 @@ app.get('/api/calendarios/:id/detail', requireAuth, async (req, res) => {
     const [calendarios, clients, goalfyData] = await Promise.all([
       fetchAllCalendarsWithPhase({ writeToken }),
       fetchCardsClients({ writeToken }),
-      fetchGoalfyData(),
+      fetchGoalfyData({ forceRefresh: forceRefreshDrive }),
     ]);
     const resolvedCalendario = await resolvePublicCalendarPayload(
       calendarId,
