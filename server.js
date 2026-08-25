@@ -3080,7 +3080,7 @@ function summarizeFeedbackCounts(posts) {
 // bem mais longo (10min) em vez do TTL curto de /api/feedback, com
 // stale-while-revalidate: nunca espera o Drive responder, sempre devolve o
 // último valor conhecido e atualiza em background quando o cache vence.
-async function getCachedFeedbackCounts() {
+function getCachedFeedbackCounts() {
   const isFresh = feedbackCountCache && nowMs() - feedbackCountCache.at < FEEDBACK_COUNT_CACHE_TTL_MS;
   if (isFresh) {
     return feedbackCountCache.value;
@@ -3092,22 +3092,32 @@ async function getCachedFeedbackCounts() {
         feedbackCountCache = { value: summarizeFeedbackCounts(posts), at: nowMs() };
         return feedbackCountCache.value;
       })
+      .catch((error) => {
+        // Ninguém aguarda essa promise diretamente na primeira chamada (ver
+        // comentário abaixo), então sem isso um erro aqui ficaria como
+        // unhandled rejection silencioso.
+        console.error('Background feedback count refresh failed', error);
+      })
       .finally(() => {
         inflightFeedbackCountPromise = null;
       });
   }
 
-  // Stale-while-revalidate: com cache vencido mas ainda existente, devolve o
-  // último valor conhecido na hora e deixa a atualização rodando em
-  // background — só espera a promise quando não há NENHUM valor anterior
-  // (primeira chamada desde o boot do processo).
-  return feedbackCountCache ? feedbackCountCache.value : inflightFeedbackCountPromise;
+  // Nunca bloqueia a resposta esperando o Drive: com cache vencido mas ainda
+  // existente, devolve o último valor conhecido na hora. Sem NENHUM valor
+  // anterior (primeira chamada desde o boot do processo), devolve uma
+  // contagem vazia — o sino de notificações fica temporariamente impreciso
+  // por alguns segundos logo após cada restart/deploy, mas a página que
+  // disparou essa checagem (ex: abrir um calendário) nunca fica travada
+  // esperando o fan-out completo no Drive de TODOS os calendários com
+  // feedback pendente. loadFeedbackList continua rodando em background e
+  // popula o cache real para a próxima chamada.
+  return feedbackCountCache ? feedbackCountCache.value : { total: 0, countsByCalendarId: {} };
 }
 
-app.get('/api/feedback-count', requireAuth, async (_req, res) => {
+app.get('/api/feedback-count', requireAuth, (_req, res) => {
   try {
-    const counts = await getCachedFeedbackCounts();
-    res.json(counts);
+    res.json(getCachedFeedbackCounts());
   } catch (error) {
     console.error('Feedback count request failed', error);
     res.status(500).json({ error: error.message });
