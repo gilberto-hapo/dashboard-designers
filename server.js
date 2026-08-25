@@ -74,6 +74,19 @@ function invalidateFeedbackListCache() {
   feedbackListCache = null;
 }
 
+// Cache bem mais longo, exclusivo do contador do sino de notificações — ele
+// usa a mesma resolução completa (Drive + Postgres + Goalfy) de
+// loadFeedbackList, mas não pode competir pela cota do Drive toda vez que
+// qualquer página abre. Stale-while-revalidate: nunca bloqueia a resposta
+// esperando o Drive, sempre serve o último valor conhecido (mesmo vencido)
+// e só dispara uma atualização em background quando necessário.
+const FEEDBACK_COUNT_CACHE_TTL_MS = 1000 * 60 * 10;
+let feedbackCountCache = null;
+let inflightFeedbackCountPromise = null;
+function invalidateFeedbackCountCache() {
+  feedbackCountCache = null;
+}
+
 // Progresso real (não simulado) da resolução em andamento de /api/feedback,
 // para a UI mostrar quantos calendários já foram resolvidos em vez de um
 // spinner sem informação nenhuma. Resetado a cada nova resolução.
@@ -2774,6 +2787,7 @@ app.post('/api/public/portal/:token/posts/:postId/decision', async (req, res) =>
 
     publicClientPayloadCache.delete(clientId);
     invalidateFeedbackListCache();
+    invalidateFeedbackCountCache();
     res.json({ ok: true });
   } catch (error) {
     console.error('Public portal decision request failed', error);
@@ -2826,6 +2840,7 @@ app.delete('/api/public/portal/:token/posts/:postId/decision/:decisionId', async
 
     publicClientPayloadCache.delete(clientId);
     invalidateFeedbackListCache();
+    invalidateFeedbackCountCache();
     res.json({ ok: true });
   } catch (error) {
     console.error('Public portal decision delete failed', error);
@@ -2982,6 +2997,58 @@ app.get('/api/feedback-progress', requireAuth, (_req, res) => {
   res.json(feedbackListProgress);
 });
 
+function summarizeFeedbackCounts(posts) {
+  const countsByCalendarId = {};
+  posts.forEach((post) => {
+    countsByCalendarId[post.calendarId] = (countsByCalendarId[post.calendarId] || 0) + 1;
+  });
+  return { total: posts.length, countsByCalendarId };
+}
+
+// Contagem de posts com feedback pendente por calendário, para o badge/sino
+// de notificações. Usa a MESMA resolução completa (Drive + Postgres +
+// Goalfy) de loadFeedbackList — um post só conta como pendente se a pasta
+// dele ainda existir no Drive, então não dá pra calcular certo só com
+// Postgres (o post_id é o folderId do Drive; uma decisão no Postgres pode
+// referenciar uma pasta já deletada/renomeada). Para não competir pela cota
+// do Drive com a página que o usuário está abrindo, usa um cache próprio
+// bem mais longo (10min) em vez do TTL curto de /api/feedback, com
+// stale-while-revalidate: nunca espera o Drive responder, sempre devolve o
+// último valor conhecido e atualiza em background quando o cache vence.
+async function getCachedFeedbackCounts() {
+  const isFresh = feedbackCountCache && nowMs() - feedbackCountCache.at < FEEDBACK_COUNT_CACHE_TTL_MS;
+  if (isFresh) {
+    return feedbackCountCache.value;
+  }
+
+  if (!inflightFeedbackCountPromise) {
+    inflightFeedbackCountPromise = loadFeedbackList()
+      .then((posts) => {
+        feedbackCountCache = { value: summarizeFeedbackCounts(posts), at: nowMs() };
+        return feedbackCountCache.value;
+      })
+      .finally(() => {
+        inflightFeedbackCountPromise = null;
+      });
+  }
+
+  // Stale-while-revalidate: com cache vencido mas ainda existente, devolve o
+  // último valor conhecido na hora e deixa a atualização rodando em
+  // background — só espera a promise quando não há NENHUM valor anterior
+  // (primeira chamada desde o boot do processo).
+  return feedbackCountCache ? feedbackCountCache.value : inflightFeedbackCountPromise;
+}
+
+app.get('/api/feedback-count', requireAuth, async (_req, res) => {
+  try {
+    const counts = await getCachedFeedbackCounts();
+    res.json(counts);
+  } catch (error) {
+    console.error('Feedback count request failed', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/feedback', requireAuth, async (_req, res) => {
   try {
     const posts = await getCachedFeedbackList();
@@ -3001,6 +3068,7 @@ app.post('/api/feedback/:postId/resolve', requireAuth, async (req, res) => {
 
   await markAdjustmentsResolvedForPost(postId);
   invalidateFeedbackListCache();
+  invalidateFeedbackCountCache();
   res.json({ ok: true });
 });
 
