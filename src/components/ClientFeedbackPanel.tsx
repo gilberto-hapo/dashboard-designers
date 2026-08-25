@@ -31,19 +31,34 @@ export function ClientFeedbackPanel({
     setError(null);
     setProgress(null);
 
-    let cancelled = false;
+    // `finished` guarda contra o comportamento nativo do EventSource: ele
+    // tenta reconectar sozinho sempre que a conexão HTTP cai, mesmo num fim
+    // normal/esperado (quando o servidor chama res.end() após "done"). Sem
+    // essa guarda, uma reconexão automática reinicia loadFeedbackList()
+    // inteiro do zero, duplicando todo o trabalho de Drive já feito.
+    let finished = false;
     const pollInterval = setInterval(() => {
       fetch('/api/feedback-progress', { credentials: 'include' })
         .then((response) => response.json())
         .then((data: { total: number; done: number; active: boolean }) => {
-          if (!cancelled && data.active) setProgress({ total: data.total, done: data.done });
+          if (!finished && data.active) setProgress({ total: data.total, done: data.done });
         })
         .catch(() => {});
     }, 400);
 
     const source = new EventSource('/api/feedback/stream', { withCredentials: true });
 
+    function finish(errorMessage?: string) {
+      if (finished) return;
+      finished = true;
+      clearInterval(pollInterval);
+      setStreaming(false);
+      if (errorMessage && postsRef.current.length === 0) setError(errorMessage);
+      source.close();
+    }
+
     source.addEventListener('post', (event) => {
+      if (finished) return;
       const post = JSON.parse((event as MessageEvent).data) as FeedbackPost;
       postsRef.current = [post, ...postsRef.current].sort(
         (a, b) => new Date(b.latestCreatedAt).getTime() - new Date(a.latestCreatedAt).getTime(),
@@ -51,25 +66,11 @@ export function ClientFeedbackPanel({
       setPosts(postsRef.current);
     });
 
-    source.addEventListener('done', () => {
-      cancelled = true;
-      clearInterval(pollInterval);
-      setStreaming(false);
-      source.close();
-    });
-
-    source.addEventListener('error', () => {
-      cancelled = true;
-      clearInterval(pollInterval);
-      setStreaming(false);
-      if (postsRef.current.length === 0) {
-        setError('Não foi possível carregar o feedback dos clientes.');
-      }
-      source.close();
-    });
+    source.addEventListener('done', () => finish());
+    source.addEventListener('error', () => finish('Não foi possível carregar o feedback dos clientes.'));
 
     return () => {
-      cancelled = true;
+      finished = true;
       clearInterval(pollInterval);
       source.close();
     };
