@@ -19,16 +19,9 @@ const cache = new Map();
 // custo cheio de listar o Drive de novo para todos os calendários.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DRIVE_CACHE_PERSISTENCE_FILE = path.join(__dirname, '..', 'data', 'drive-folder-cache.json');
-// Legenda é chaveada por modifiedTime do docx (ver extractCaptionCached), não
-// por TTL de tempo — uma vez extraída, só reprocessa se o arquivo mudar. Por
-// isso persiste em arquivo separado, sem a limpeza por idade que o cache de
-// pastas tem: sobrevive a restart/deploy indefinidamente, poupando o passo
-// mais caro do fluxo (baixar + converter o docx, 5-10s vistos em produção).
-const CAPTION_CACHE_PERSISTENCE_FILE = path.join(__dirname, '..', 'data', 'drive-caption-cache.json');
 let driveCacheLoaded = false;
 let driveCacheLoadPromise = null;
 let persistDriveCacheTimer = null;
-let persistCaptionCacheTimer = null;
 
 async function loadPersistedDriveCache() {
   try {
@@ -43,33 +36,6 @@ async function loadPersistedDriveCache() {
   } catch {
     // sem cache persistido ainda (primeiro boot) ou arquivo inválido — segue com cache vazio
   }
-
-  try {
-    const raw = await fs.readFile(CAPTION_CACHE_PERSISTENCE_FILE, 'utf8');
-    const parsed = JSON.parse(raw);
-    for (const [key, entry] of Object.entries(parsed || {})) {
-      captionCache.set(key, entry);
-    }
-  } catch {
-    // sem cache de legenda persistido ainda (primeiro boot) ou arquivo inválido
-  }
-}
-
-function schedulePersistCaptionCache() {
-  if (persistCaptionCacheTimer) return;
-  persistCaptionCacheTimer = setTimeout(async () => {
-    persistCaptionCacheTimer = null;
-    try {
-      const payload = JSON.stringify(Object.fromEntries(captionCache));
-      await fs.mkdir(path.dirname(CAPTION_CACHE_PERSISTENCE_FILE), { recursive: true });
-      const tempFile = `${CAPTION_CACHE_PERSISTENCE_FILE}.tmp`;
-      await fs.writeFile(tempFile, payload, 'utf8');
-      await fs.rm(CAPTION_CACHE_PERSISTENCE_FILE, { force: true });
-      await fs.rename(tempFile, CAPTION_CACHE_PERSISTENCE_FILE);
-    } catch (error) {
-      console.error('Failed to persist Drive caption cache', error);
-    }
-  }, 2000);
 }
 
 function ensureDriveCacheLoaded() {
@@ -272,7 +238,6 @@ async function extractCaptionCached(captionFile) {
       : await extractCaptionFromDocx(captionFile.id);
 
   captionCache.set(captionFile.id, { modifiedTime: captionFile.modifiedTime, caption });
-  schedulePersistCaptionCache();
   return caption;
 }
 
@@ -378,7 +343,7 @@ export async function listCalendarPostFolders(calendarFolderLink, { forceRefresh
   );
 
   const resolveStartedAt = Date.now();
-  const contents = await mapWithConcurrency(subfolders, 16, (folder) => resolvePostFolderContent(folder));
+  const contents = await mapWithConcurrency(subfolders, 6, (folder) => resolvePostFolderContent(folder));
   console.log(
     'Drive subfolder contents resolved',
     JSON.stringify({ folderId, durationMs: Date.now() - resolveStartedAt, subfolders: subfolders.length }),
