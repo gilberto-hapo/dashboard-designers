@@ -2421,22 +2421,21 @@ async function resolvePublicClientPayload(clientId, { forceRefreshDrive = false 
       normalizeLookupKey(c.clienteNome) === normalizeLookupKey(client.nome),
   );
 
-  const resolvedCalendarios = await Promise.all(
-    activeCalendarios.map(async (calendario) => {
-      const resolved = await resolveCalendarPosts(calendario, {
-        clients,
-        goalfyData,
-        requireClientVisiblePhase: true,
-        forceRefreshDrive,
-      });
-      return {
-        ...resolved,
-        // pipelineStage é informacao interna de producao (fase Goalfy) — nao
-        // deve vazar para o portal publico do cliente.
-        posts: resolved.posts.map(({ pipelineStage, ...post }) => post),
-      };
-    }),
-  );
+  // Mesmo limite de concorrencia entre calendarios que resolvePublicCopywriterPayload -- ver comentario ali.
+  const resolvedCalendarios = await mapWithConcurrency(activeCalendarios, 2, async (calendario) => {
+    const resolved = await resolveCalendarPosts(calendario, {
+      clients,
+      goalfyData,
+      requireClientVisiblePhase: true,
+      forceRefreshDrive,
+    });
+    return {
+      ...resolved,
+      // pipelineStage é informacao interna de producao (fase Goalfy) — nao
+      // deve vazar para o portal publico do cliente.
+      posts: resolved.posts.map(({ pipelineStage, ...post }) => post),
+    };
+  });
 
   return {
     id: client.id,
@@ -2494,8 +2493,14 @@ async function resolvePublicCopywriterPayload({ forceRefreshDrive = false } = {}
 
   const relevantCalendarios = calendarios.filter((c) => clientNamesWithCopywriter.has(normalizeLookupKey(c.clienteNome)));
 
-  const resolvedCalendarios = await Promise.all(
-    relevantCalendarios.map((calendario) => resolveCalendarPosts(calendario, { clients, goalfyData, forceRefreshDrive })),
+  // Limitado a 2 calendarios em paralelo -- cada resolveCalendarPosts ja
+  // dispara ate 16 chamadas concorrentes ao Drive internamente, e resolver
+  // todos os calendarios de uma vez (Promise.all sem cap) somava dezenas de
+  // calendarios x 16 chamadas simultaneas na mesma service account,
+  // acionando throttling do Google que inflava a latencia de cada pasta de
+  // segundos para 10-20s (visto em produção).
+  const resolvedCalendarios = await mapWithConcurrency(relevantCalendarios, 2, (calendario) =>
+    resolveCalendarPosts(calendario, { clients, goalfyData, forceRefreshDrive }),
   );
 
   const posts = resolvedCalendarios
@@ -2540,8 +2545,9 @@ async function pregenerateActiveMediaVariants() {
       normalizeLookupKey(c.phaseTitle) === normalizeLookupKey(CARDS_CALENDAR_PHASES[CARDS_CALENDAR_PHASE_EM_ANDAMENTO_ID].title),
   );
 
-  const resolvedCalendarios = await Promise.all(
-    activeCalendarios.map((calendario) => resolveCalendarPosts(calendario, { clients, goalfyData })),
+  // Mesmo limite de concorrencia entre calendarios que resolvePublicCopywriterPayload -- ver comentario ali.
+  const resolvedCalendarios = await mapWithConcurrency(activeCalendarios, 2, (calendario) =>
+    resolveCalendarPosts(calendario, { clients, goalfyData }),
   );
 
   const imageFiles = resolvedCalendarios.flatMap((calendario) =>
