@@ -448,19 +448,7 @@ export function PostMediaViewShared({
   }
 
   if (media.type === 'video') {
-    return (
-      <div className="flex max-h-[80vh] items-center justify-center overflow-hidden bg-black">
-        <video
-          controls
-          playsInline
-          className="max-h-[80vh] w-full object-contain"
-          preload="metadata"
-          poster={media.coverImageId ? buildMediaUrl(media.coverImageId) : undefined}
-        >
-          <source src={buildMediaUrl(media.files[0].id)} type={media.files[0].mimeType} />
-        </video>
-      </div>
-    );
+    return <SingleVideoFrame src={buildMediaUrl(media.files[0].id)} mimeType={media.files[0].mimeType} poster={media.coverImageId ? buildMediaUrl(media.coverImageId) : undefined} />;
   }
 
   const pinOverlayProps = {
@@ -513,6 +501,31 @@ export function PostMediaViewShared({
         <CarouselNext className="right-2" />
       </Carousel>
       {qualityToggle}
+    </div>
+  );
+}
+
+// Mesma técnica de reserva de espaço do SingleMediaFrame (imagem): sem o
+// placeholder com aspect ratio, o vídeo não ocupa nenhum espaço até
+// carregar, fazendo o resto da página (badge, tags, legenda) saltar de
+// posição quando ele finalmente aparece.
+function SingleVideoFrame({ src, mimeType, poster }: { src: string; mimeType: string; poster?: string }) {
+  const [ready, setReady] = useState(false);
+
+  return (
+    <div className="relative flex max-h-[80vh] w-full items-center justify-center overflow-hidden bg-black">
+      {!ready ? <AspectRatio ratio={1080 / 1350} className="animate-pulse bg-muted" /> : null}
+      <video
+        key={src}
+        controls
+        playsInline
+        className={cn('max-h-[80vh] w-full object-contain', ready ? 'static' : 'absolute inset-0 opacity-0')}
+        preload="metadata"
+        poster={poster}
+        onLoadedMetadata={() => setReady(true)}
+      >
+        <source src={src} type={mimeType} />
+      </video>
     </div>
   );
 }
