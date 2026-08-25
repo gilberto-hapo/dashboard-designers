@@ -496,7 +496,7 @@ export function PostMediaViewShared({
 
   return (
     <div>
-      <Carousel className="w-full">
+      <Carousel className="w-full" opts={{ containScroll: 'trimSnaps' }}>
         <CarouselContent>
           {media.files.map((file, index) => (
             <CarouselItem key={file.id}>
