@@ -2533,13 +2533,7 @@ async function resolvePublicCopywriterPayload({ forceRefreshDrive = false } = {}
 // usa (ver mapWithConcurrency acima); sem esperar a navegacao esfriar, ela
 // dobra a carga na cota do Drive bem na janela mais sensivel -- logo apos
 // cada boot/deploy, quando o cache esta todo frio e a demora mais visivel.
-// Inicializado com o momento do boot (nao 0/epoch) -- caso contrario
-// "idleForMs" no primeiro refresh apos startup seria um numero gigante
-// (Date.now() - 0), passando a checagem de inatividade instantaneamente e
-// liberando a pre-geracao para rodar imediatamente, competindo com a
-// primeira navegacao do usuario logo apos o deploy -- exatamente a janela
-// que essa espera deveria proteger.
-let lastUserDriveActivityAt = nowMs();
+let lastUserDriveActivityAt = 0;
 function markUserDriveActivity() {
   lastUserDriveActivityAt = nowMs();
 }
