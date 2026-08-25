@@ -1,6 +1,9 @@
 import { google } from 'googleapis';
 import mammoth from 'mammoth';
 import { Readable } from 'node:stream';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // 5 min, alinhado ao cache do Goalfy (GOALFY_CACHE_TTL_MS em server.js) — as
 // pastas/arquivos de posts no Drive não mudam a cada poucos segundos, e o
@@ -10,11 +13,64 @@ import { Readable } from 'node:stream';
 const DRIVE_FOLDER_TTL_MS = 1000 * 60 * 5;
 const cache = new Map();
 
+// Persiste o cache de pastas em disco (mesmo diretório usado pelo cache da
+// Goalfy) para sobreviver a um restart/deploy: sem isso, toda reinicialização
+// do processo zera o cache e a primeira navegação de cada usuário paga o
+// custo cheio de listar o Drive de novo para todos os calendários.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const DRIVE_CACHE_PERSISTENCE_FILE = path.join(__dirname, '..', 'data', 'drive-folder-cache.json');
+let driveCacheLoaded = false;
+let driveCacheLoadPromise = null;
+let persistDriveCacheTimer = null;
+
+async function loadPersistedDriveCache() {
+  try {
+    const raw = await fs.readFile(DRIVE_CACHE_PERSISTENCE_FILE, 'utf8');
+    const parsed = JSON.parse(raw);
+    const now = Date.now();
+    for (const [key, entry] of Object.entries(parsed || {})) {
+      if (entry && typeof entry.at === 'number' && now - entry.at < DRIVE_FOLDER_TTL_MS) {
+        cache.set(key, entry);
+      }
+    }
+  } catch {
+    // sem cache persistido ainda (primeiro boot) ou arquivo inválido — segue com cache vazio
+  }
+}
+
+function ensureDriveCacheLoaded() {
+  if (driveCacheLoaded) return Promise.resolve();
+  if (!driveCacheLoadPromise) {
+    driveCacheLoadPromise = loadPersistedDriveCache().finally(() => {
+      driveCacheLoaded = true;
+    });
+  }
+  return driveCacheLoadPromise;
+}
+
+function schedulePersistDriveCache() {
+  if (persistDriveCacheTimer) return;
+  persistDriveCacheTimer = setTimeout(async () => {
+    persistDriveCacheTimer = null;
+    try {
+      const payload = JSON.stringify(Object.fromEntries(cache));
+      await fs.mkdir(path.dirname(DRIVE_CACHE_PERSISTENCE_FILE), { recursive: true });
+      const tempFile = `${DRIVE_CACHE_PERSISTENCE_FILE}.tmp`;
+      await fs.writeFile(tempFile, payload, 'utf8');
+      await fs.rm(DRIVE_CACHE_PERSISTENCE_FILE, { force: true });
+      await fs.rename(tempFile, DRIVE_CACHE_PERSISTENCE_FILE);
+    } catch (error) {
+      console.error('Failed to persist Drive folder cache', error);
+    }
+  }, 2000);
+}
+
 // Limpa o cache de pastas de post do Drive — chamado quando o usuário força
 // um refresh manual (botão "Atualizar dados"), para o link do cliente também
 // refletir correções feitas no Drive sem precisar esperar o TTL expirar.
 export function clearDriveFolderCache() {
   cache.clear();
+  schedulePersistDriveCache();
 }
 
 function parseServiceAccountJson(raw) {
@@ -255,6 +311,8 @@ export async function listCalendarPostFolders(calendarFolderLink, { forceRefresh
   const folderId = extractFolderIdFromDriveLink(calendarFolderLink);
   if (!folderId) return [];
 
+  await ensureDriveCacheLoaded();
+
   const cacheKey = folderId;
   const cached = cache.get(cacheKey);
   if (!forceRefresh && cached && Date.now() - cached.at < DRIVE_FOLDER_TTL_MS) {
@@ -280,6 +338,7 @@ export async function listCalendarPostFolders(calendarFolderLink, { forceRefresh
   );
 
   cache.set(cacheKey, { value: result, at: Date.now() });
+  schedulePersistDriveCache();
   return result;
 }
 

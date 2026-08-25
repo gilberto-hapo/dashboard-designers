@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { FeedbackGridShared, type FeedbackPost } from '@/components/FeedbackGridShared';
+import { Progress } from '@/components/ui/progress';
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, { credentials: 'include', ...options });
@@ -25,14 +26,35 @@ export function ClientFeedbackPanel({
   const [posts, setPosts] = useState<FeedbackPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ total: number; done: number } | null>(null);
 
   useEffect(() => {
     setLoading(true);
     setError(null);
+    setProgress(null);
+
+    let cancelled = false;
+    const pollInterval = setInterval(() => {
+      fetchJson<{ total: number; done: number; active: boolean }>('/api/feedback-progress')
+        .then((data) => {
+          if (!cancelled && data.active) setProgress({ total: data.total, done: data.done });
+        })
+        .catch(() => {});
+    }, 400);
+
     fetchJson<{ posts: FeedbackPost[] }>('/api/feedback')
       .then((data) => setPosts(data.posts))
       .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        cancelled = true;
+        clearInterval(pollInterval);
+        setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+      clearInterval(pollInterval);
+    };
   }, []);
 
   const designerOptions = useMemo(() => {
@@ -53,10 +75,16 @@ export function ClientFeedbackPanel({
   );
 
   if (loading) {
+    const hasProgress = progress && progress.total > 0;
     return (
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        Carregando feedback dos clientes...
+      <div className="max-w-sm space-y-3">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          {hasProgress
+            ? `Carregando calendários (${progress.done}/${progress.total})...`
+            : 'Carregando feedback dos clientes...'}
+        </div>
+        {hasProgress && <Progress value={(progress.done / progress.total) * 100} className="h-1.5" />}
       </div>
     );
   }

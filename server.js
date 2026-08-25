@@ -74,6 +74,11 @@ function invalidateFeedbackListCache() {
   feedbackListCache = null;
 }
 
+// Progresso real (não simulado) da resolução em andamento de /api/feedback,
+// para a UI mostrar quantos calendários já foram resolvidos em vez de um
+// spinner sem informação nenhuma. Resetado a cada nova resolução.
+let feedbackListProgress = { total: 0, done: 0, active: false };
+
 app.use(express.json());
 app.use(cookieParser(process.env.SESSION_SECRET || 'change-me-in-production'));
 
@@ -2896,9 +2901,17 @@ async function loadFeedbackList() {
     .filter((c) => (decisionsByCalendarId.get(c.id) || []).some((d) => !d.approved && d.feedback))
     .map((c) => c.id);
 
+  feedbackListProgress = { total: calendarIdsWithFeedback.length, done: 0, active: true };
+
   const resolvedCalendarios = await Promise.all(
-    calendarIdsWithFeedback.map((calendarId) => resolvePublicCalendarPayload(calendarId, preFetched)),
+    calendarIdsWithFeedback.map((calendarId) =>
+      resolvePublicCalendarPayload(calendarId, preFetched).finally(() => {
+        feedbackListProgress = { ...feedbackListProgress, done: feedbackListProgress.done + 1 };
+      }),
+    ),
   );
+
+  feedbackListProgress = { ...feedbackListProgress, active: false };
 
   return resolvedCalendarios
     .filter(Boolean)
@@ -2941,6 +2954,10 @@ async function getCachedFeedbackList() {
 
   return inflightFeedbackListPromise;
 }
+
+app.get('/api/feedback-progress', requireAuth, (_req, res) => {
+  res.json(feedbackListProgress);
+});
 
 app.get('/api/feedback', requireAuth, async (_req, res) => {
   try {
