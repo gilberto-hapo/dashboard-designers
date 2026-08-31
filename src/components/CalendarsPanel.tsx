@@ -188,6 +188,31 @@ export function CalendarsPanel({
       .map((c) => ({ nome: c.nome as string, postsContratados: c.postsContratados ?? 0 }));
   }, [clientes, selectedDesigner]);
 
+  // "Status do mês" (Sem calendário / Calendário criado) precisa considerar
+  // TODOS os calendários do mês, incluindo os já concluídos ("Posts
+  // Programados"), senão um cliente cujo calendário foi finalizado some da
+  // lista visível e volta a aparecer como "Sem calendário" incorretamente.
+  const createdKeysByMesAno = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    calendarios
+      .filter((calendario) => {
+        const [month, year] = calendario.mesAno.split('/');
+        if (selectedMonth !== 'Todos' && month !== selectedMonth) return false;
+        if (selectedYear !== 'Todos' && year !== selectedYear) return false;
+        if (selectedDesigner !== 'Todos') {
+          const designer = designerByClientName.get(calendario.clienteNome?.trim().toLowerCase() || '');
+          if (designer !== selectedDesigner) return false;
+        }
+        return true;
+      })
+      .forEach((calendario) => {
+        const key = calendario.mesAno || 'Sem data';
+        if (!map.has(key)) map.set(key, new Set());
+        map.get(key)!.add(normalizeClientKey(calendario.clienteNome));
+      });
+    return map;
+  }, [calendarios, selectedMonth, selectedYear, selectedDesigner, designerByClientName]);
+
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -236,7 +261,7 @@ export function CalendarsPanel({
               </div>
 
               {expandedMonths.has(group.mesAno) && (() => {
-                const createdKeys = new Set(group.items.map((item) => normalizeClientKey(item.clienteNome)));
+                const createdKeys = createdKeysByMesAno.get(group.mesAno) ?? new Set<string>();
                 const clientStatus = activeClientRoster
                   .map((c) => ({ ...c, created: createdKeys.has(normalizeClientKey(c.nome)) }))
                   .sort((a, b) => {

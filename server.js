@@ -362,11 +362,30 @@ function requireAuth(req, res, next) {
 // do board anterior. "Criação textual"/"Criação das artes" mapeiam para
 // fazer/executando (mesmas 2 primeiras colunas do fluxo anterior);
 // "Post Programado" e "Arquivado" mapeiam para concluido.
+//
+// Mapeado por phaseId (não pelo título) porque o título exibido na Goalfy
+// pode ser renomeado livremente pelo usuário sem avisar — ex: a fase
+// 41968cc9-6fc2-4dbe-881b-b522d6018de5 já se chamou "Montagem da
+// apresentação" e depois "Conferência", mas o id nunca muda.
+const stagePhaseIdMap = {
+  'a19bef65-cc3f-4418-8016-4c04efa8e602': 'fazer', // Criação textual
+  'be275650-93bf-424a-b4d3-cfa815bb0100': 'executando', // Criação das artes
+  'd83420e6-5add-4d5c-9d62-ff0d05b802cb': 'direcao_arte', // Direção de arte
+  '41968cc9-6fc2-4dbe-881b-b522d6018de5': 'montagem', // Montagem da apresentação / Conferência
+  '8380cb38-f9d4-4e65-a414-8d02daa12d80': 'validacao', // Validação do Cliente
+  '9f9c1a44-3abb-4779-8948-660a3c9bb293': 'aprovado_programacao', // Aprovado para programação
+  'e0b32273-ecf8-4925-8438-6b8965f93607': 'concluido', // Post Programado
+  '4f819103-ac82-456a-b307-fda98812081f': 'concluido', // Arquivado
+};
+// Fallback por título, usado apenas se a API não retornar phase.id por
+// algum motivo. Mantido por título (não por id) para continuar funcionando
+// mesmo que a Goalfy troque os ids de fase no futuro.
 const stageMap = {
   'criacao textual': 'fazer',
   'criacao das artes': 'executando',
   'direcao de arte': 'direcao_arte',
   'montagem da apresentacao': 'montagem',
+  conferencia: 'montagem',
   'validacao do cliente': 'validacao',
   'aprovado para programacao': 'aprovado_programacao',
   'post programado': 'concluido',
@@ -478,6 +497,7 @@ function buildTaskFromPostCard(card, cardDetail, calendarMetaById) {
   );
   const stageTimings = deriveStageTimings(cardDetail.phasesHistory);
   const currentPhaseTitle = cardDetail.phase?.title || card.phase || 'Criação textual';
+  const currentPhaseId = cardDetail.phase?.id || card.phase?.id || null;
 
   return {
     id: card.id,
@@ -497,7 +517,7 @@ function buildTaskFromPostCard(card, cardDetail, calendarMetaById) {
     responsavelCliente: calendarMeta?.designer || responsavel,
     designerResponsavel1: calendarMeta?.designer || '',
     dataVencimento: card.dueDate ? new Date(card.dueDate) : new Date(),
-    stage: stageMap[normalizeLookupKey(currentPhaseTitle)] || 'fazer',
+    stage: (currentPhaseId && stagePhaseIdMap[currentPhaseId]) || stageMap[normalizeLookupKey(currentPhaseTitle)] || 'fazer',
     phaseTitle: currentPhaseTitle,
     tempoEstimadoHoras: 3,
     tempoGastoHoras: 0,
