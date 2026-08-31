@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, Loader2, MapPin, MessageSquareWarning, MoreVertical, Play } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
   Carousel,
+  type CarouselApi,
   CarouselContent,
   CarouselItem,
   CarouselNext,
@@ -435,10 +436,6 @@ export function PostMediaViewShared({
   onCancelPin?: (pinId: string) => void;
   onTogglePin?: (pinId: string) => void;
 }) {
-  const [highQuality, setHighQuality] = useState(false);
-  const resolveSrc = (fileId: string) =>
-    highQuality && originalMediaUrl ? originalMediaUrl(fileId) : buildMediaUrl(fileId);
-
   if (!media || media.files.length === 0) {
     return (
       <AspectRatio ratio={4 / 5} className="flex items-center justify-center bg-muted">
@@ -462,34 +459,71 @@ export function PostMediaViewShared({
     onTogglePin,
   };
 
-  const qualityToggle = originalMediaUrl ? (
-    <div className="flex bg-background px-2">
-      <QualityToggleButton highQuality={highQuality} onToggleQuality={() => setHighQuality((v) => !v)} />
-    </div>
-  ) : null;
-
   if (media.files.length === 1) {
     return (
       <div>
         <SingleMediaFrame
-          src={resolveSrc(media.files[0].id)}
+          src={buildMediaUrl(media.files[0].id)}
           alt={title}
           mediaFileId={media.files[0].id}
           pinOverlayProps={pinOverlayProps}
         />
-        {qualityToggle}
+        {originalMediaUrl ? (
+          <div className="flex bg-background px-2">
+            <QualityMaxLink href={originalMediaUrl(media.files[0].id)} />
+          </div>
+        ) : null}
       </div>
     );
   }
 
   return (
+    <CarouselMediaFrames
+      files={media.files}
+      title={title}
+      buildMediaUrl={buildMediaUrl}
+      originalMediaUrl={originalMediaUrl}
+      pinOverlayProps={pinOverlayProps}
+    />
+  );
+}
+
+function CarouselMediaFrames({
+  files,
+  title,
+  buildMediaUrl,
+  originalMediaUrl,
+  pinOverlayProps,
+}: {
+  files: PostMedia['files'];
+  title: string;
+  buildMediaUrl: (fileId: string) => string;
+  originalMediaUrl?: (fileId: string) => string;
+  pinOverlayProps: Omit<Parameters<typeof MediaPinOverlay>[0], 'mediaFileId'>;
+}) {
+  const [api, setApi] = useState<CarouselApi>();
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  useEffect(() => {
+    if (!api) return;
+    const onSelect = () => setSelectedIndex(api.selectedScrollSnap());
+    onSelect();
+    api.on('select', onSelect);
+    return () => {
+      api.off('select', onSelect);
+    };
+  }, [api]);
+
+  const selectedFile = files[selectedIndex];
+
+  return (
     <div>
-      <Carousel className="w-full" opts={{ containScroll: 'trimSnaps' }}>
+      <Carousel className="w-full" opts={{ containScroll: 'trimSnaps' }} setApi={setApi}>
         <CarouselContent>
-          {media.files.map((file, index) => (
+          {files.map((file, index) => (
             <CarouselItem key={file.id}>
               <SingleMediaFrame
-                src={resolveSrc(file.id)}
+                src={buildMediaUrl(file.id)}
                 alt={`${title} — imagem ${index + 1}`}
                 mediaFileId={file.id}
                 pinOverlayProps={pinOverlayProps}
@@ -500,7 +534,11 @@ export function PostMediaViewShared({
         <CarouselPrevious className="left-2" />
         <CarouselNext className="right-2" />
       </Carousel>
-      {qualityToggle}
+      {originalMediaUrl && selectedFile ? (
+        <div className="flex bg-background px-2">
+          <QualityMaxLink href={originalMediaUrl(selectedFile.id)} />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -565,21 +603,16 @@ function SingleMediaFrame({
   );
 }
 
-function QualityToggleButton({
-  highQuality,
-  onToggleQuality,
-}: {
-  highQuality: boolean;
-  onToggleQuality: () => void;
-}) {
+function QualityMaxLink({ href }: { href: string }) {
   return (
-    <button
-      type="button"
-      onClick={onToggleQuality}
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
       className="ml-auto px-1 py-1.5 text-[11px] text-muted-foreground hover:text-foreground"
     >
-      {highQuality ? 'Ver otimizado' : 'Ver em qualidade máxima'}
-    </button>
+      Ver em qualidade máxima
+    </a>
   );
 }
 
