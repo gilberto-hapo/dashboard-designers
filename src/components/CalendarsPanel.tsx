@@ -306,11 +306,11 @@ export function CalendarsPanel({
                         Sem calendário ({semCalendario.length} {semCalendario.length === 1 ? 'cliente' : 'clientes'} / {postsSemCalendario} {postsSemCalendario === 1 ? 'post' : 'posts'})
                       </span>
                       <span className="flex items-center gap-1.5">
-                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-800" />
                         Calendário criado ({comCalendario.length} {comCalendario.length === 1 ? 'cliente' : 'clientes'} / {postsComCalendario} {postsComCalendario === 1 ? 'post' : 'posts'})
                       </span>
                       <span className="flex items-center gap-1.5">
-                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-white" />
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-green-400" />
                         Concluído ({concluidos.length} {concluidos.length === 1 ? 'cliente' : 'clientes'} / {postsConcluidos} {postsConcluidos === 1 ? 'post' : 'posts'})
                       </span>
                     </div>
@@ -320,9 +320,9 @@ export function CalendarsPanel({
                           key={c.nome}
                           className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
                             c.concluded
-                              ? 'border-white/30 bg-white/10 text-white'
+                              ? 'border-green-400/30 bg-green-400/10 text-green-300'
                               : c.created
-                                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                                ? 'border-emerald-800/40 bg-emerald-800/15 text-emerald-600'
                                 : 'border-red-500/30 bg-red-500/10 text-red-400'
                           }`}
                         >
