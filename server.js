@@ -392,6 +392,46 @@ const stageMap = {
   arquivado: 'concluido',
 };
 
+// Traduz o stage interno (já colapsado via stagePhaseIdMap/stageMap) para o
+// pipelineStage exposto no portal do cliente e no calendário interno. As 3
+// fases de produção (executando/direcao_arte/montagem) não são mais
+// agregadas em "emAndamento" — cada uma vira seu próprio status, espelhando
+// as colunas reais do board da Goalfy.
+function pipelineStageFromRawStage(rawStage) {
+  switch (rawStage) {
+    case 'fazer':
+      return 'criacaoTextual';
+    case 'executando':
+      return 'criacaoDasArtes';
+    case 'direcao_arte':
+      return 'direcaoDeArte';
+    case 'montagem':
+      return 'conferencia';
+    case 'validacao':
+      return 'validacao';
+    case 'aprovado_programacao':
+      return 'aprovado';
+    case 'concluido':
+      return 'publicado';
+    default:
+      return null;
+  }
+}
+
+// Contagens agregadas por status usadas nos cards de listagem/detalhe de
+// calendário (postsCriacaoTextual, postsCriacaoDasArtes, etc.).
+function countLinkedTasksByStage(linkedTasks) {
+  return {
+    postsCriacaoTextual: linkedTasks.filter((task) => task.stage === 'fazer').length,
+    postsCriacaoDasArtes: linkedTasks.filter((task) => task.stage === 'executando').length,
+    postsDirecaoDeArte: linkedTasks.filter((task) => task.stage === 'direcao_arte').length,
+    postsConferencia: linkedTasks.filter((task) => task.stage === 'montagem').length,
+    postsEmValidacao: linkedTasks.filter((task) => task.stage === 'validacao').length,
+    postsAprovados: linkedTasks.filter((task) => task.stage === 'aprovado_programacao').length,
+    postsPublicados: linkedTasks.filter((task) => task.stage === 'concluido').length,
+  };
+}
+
 // Fases (título original do card, não o stage já colapsado) a partir das
 // quais um post pode ser exibido no portal do cliente. "Post Programado"
 // aparece, mas "Arquivado" não — por isso não pode reusar stageMap aqui, já
@@ -2160,13 +2200,7 @@ app.get('/api/calendarios', requireAuth, async (_req, res) => {
     const result = calendarios.map((calendario) => {
       const client = clientsByName.get(normalizeLookupKey(calendario.clienteNome));
       const linkedTasks = tasks.filter((task) => task.calendarioId === calendario.id);
-      const postsPublicados = linkedTasks.filter((task) => task.stage === 'concluido').length;
-      const postsAprovados = linkedTasks.filter((task) => task.stage === 'aprovado_programacao').length;
-      const postsEmValidacao = linkedTasks.filter((task) => task.stage === 'validacao').length;
-      const postsEmAndamento = linkedTasks.filter((task) =>
-        ['executando', 'direcao_arte', 'montagem'].includes(task.stage),
-      ).length;
-      const postsCriacaoTextual = linkedTasks.filter((task) => task.stage === 'fazer').length;
+      const stageCounts = countLinkedTasksByStage(linkedTasks);
       const postsConectados = linkedTasks.length;
 
       return {
@@ -2180,12 +2214,8 @@ app.get('/api/calendarios', requireAuth, async (_req, res) => {
         designer: client?.designer || '',
         postsContratados: client?.postsContratados ?? 0,
         postsConectados,
-        postsConcluidos: postsPublicados,
-        postsCriacaoTextual,
-        postsEmAndamento,
-        postsEmValidacao,
-        postsAprovados,
-        postsPublicados,
+        postsConcluidos: stageCounts.postsPublicados,
+        ...stageCounts,
       };
     });
 
@@ -2354,18 +2384,7 @@ async function resolveCalendarPosts(
       const formatoEntrega = goalfyFormatoBySequence.get(sequenceNumber) || inferFormatoEntrega(folder.media);
       const isStories = normalizeLookupKey(formatoEntrega) === normalizeLookupKey('Stories');
 
-      const pipelineStage =
-        rawStage === 'fazer'
-          ? 'criacaoTextual'
-          : ['executando', 'direcao_arte', 'montagem'].includes(rawStage)
-            ? 'emAndamento'
-            : rawStage === 'validacao'
-              ? 'validacao'
-              : rawStage === 'aprovado_programacao'
-                ? 'aprovado'
-                : rawStage === 'concluido'
-                  ? 'publicado'
-                  : null;
+      const pipelineStage = pipelineStageFromRawStage(rawStage);
 
       return {
         id: postId,
@@ -2908,13 +2927,7 @@ app.get('/api/calendarios/:id/detail', requireAuth, async (req, res) => {
     const client = clients.find((c) => normalizeLookupKey(c.nome) === normalizeLookupKey(calendario.clienteNome));
     const tasks = goalfyData?.tasks || [];
     const linkedTasks = tasks.filter((task) => task.calendarioId === calendario.id);
-    const postsPublicados = linkedTasks.filter((task) => task.stage === 'concluido').length;
-    const postsAprovados = linkedTasks.filter((task) => task.stage === 'aprovado_programacao').length;
-    const postsEmValidacao = linkedTasks.filter((task) => task.stage === 'validacao').length;
-    const postsEmAndamento = linkedTasks.filter((task) =>
-      ['executando', 'direcao_arte', 'montagem'].includes(task.stage),
-    ).length;
-    const postsCriacaoTextual = linkedTasks.filter((task) => task.stage === 'fazer').length;
+    const stageCounts = countLinkedTasksByStage(linkedTasks);
     const postsConectados = linkedTasks.length;
 
     res.json({
@@ -2927,12 +2940,8 @@ app.get('/api/calendarios/:id/detail', requireAuth, async (req, res) => {
         planejador: client?.planejador || '',
         postsContratados: client?.postsContratados ?? 0,
         postsConectados,
-        postsConcluidos: postsPublicados,
-        postsCriacaoTextual,
-        postsEmAndamento,
-        postsEmValidacao,
-        postsAprovados,
-        postsPublicados,
+        postsConcluidos: stageCounts.postsPublicados,
+        ...stageCounts,
       },
     });
   } catch (error) {

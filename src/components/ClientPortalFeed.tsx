@@ -59,7 +59,9 @@ export type PortalPostTag = {
 
 export type PostPipelineStage =
   | 'criacaoTextual'
-  | 'emAndamento'
+  | 'criacaoDasArtes'
+  | 'direcaoDeArte'
+  | 'conferencia'
   | 'validacao'
   | 'aprovado'
   | 'publicado'

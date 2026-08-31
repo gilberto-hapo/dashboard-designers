@@ -52,7 +52,9 @@ type CalendarDetailData = {
   postsConectados: number;
   postsConcluidos: number;
   postsCriacaoTextual: number;
-  postsEmAndamento: number;
+  postsCriacaoDasArtes: number;
+  postsDirecaoDeArte: number;
+  postsConferencia: number;
   postsEmValidacao: number;
   postsAprovados: number;
   postsPublicados: number;
@@ -68,7 +70,9 @@ function decisionStatus(post: PortalPost): GridThumbStatus {
 
 const PIPELINE_STAGE_STYLES: Record<Exclude<PostPipelineStage, null>, { label: string; className: string }> = {
   criacaoTextual: { label: 'Criação Textual', className: 'border-red-500/30 bg-red-500/10 text-red-400' },
-  emAndamento: { label: 'Em Andamento', className: 'border-yellow-400/30 bg-yellow-400/10 text-yellow-400' },
+  criacaoDasArtes: { label: 'Criação das Artes', className: 'border-yellow-400/30 bg-yellow-400/10 text-yellow-400' },
+  direcaoDeArte: { label: 'Direção de Arte', className: 'border-purple-500/30 bg-purple-500/10 text-purple-400' },
+  conferencia: { label: 'Conferência', className: 'border-orange-400/30 bg-orange-400/10 text-orange-300' },
   validacao: { label: 'Validação', className: 'border-orange-500/30 bg-orange-500/10 text-orange-400' },
   aprovado: { label: 'Aprovado para Programação', className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' },
   publicado: { label: 'Publicado', className: 'border-sky-500/30 bg-sky-500/10 text-sky-400' },
@@ -81,14 +85,18 @@ const PIPELINE_STAGE_STYLES: Record<Exclude<PostPipelineStage, null>, { label: s
 function getPostsPipelineStageCounts(posts: PortalPost[]) {
   const counts = {
     criacaoTextual: 0,
-    emAndamento: 0,
+    criacaoDasArtes: 0,
+    direcaoDeArte: 0,
+    conferencia: 0,
     validacao: 0,
     aprovado: 0,
     publicado: 0,
   };
   posts.forEach((post) => {
     const stage = post.pipelineStage ?? 'criacaoTextual';
-    if (stage === 'emAndamento') counts.emAndamento += 1;
+    if (stage === 'criacaoDasArtes') counts.criacaoDasArtes += 1;
+    else if (stage === 'direcaoDeArte') counts.direcaoDeArte += 1;
+    else if (stage === 'conferencia') counts.conferencia += 1;
     else if (stage === 'validacao') counts.validacao += 1;
     else if (stage === 'aprovado') counts.aprovado += 1;
     else if (stage === 'publicado') counts.publicado += 1;
@@ -101,7 +109,9 @@ function getPostsConclusionSegments(posts: PortalPost[]) {
   const total = posts.length;
   const counts = {
     criacaoTextual: 0,
-    emAndamento: 0,
+    criacaoDasArtes: 0,
+    direcaoDeArte: 0,
+    conferencia: 0,
     validacao: 0,
     aprovado: 0,
     publicado: 0,
@@ -119,7 +129,9 @@ function getPostsConclusionSegments(posts: PortalPost[]) {
   const decidedTotal = counts.aprovado + counts.publicado;
   const segments: ProgressSegment[] = [
     { key: 'criacaoTextual', count: counts.criacaoTextual, className: 'bg-red-500' },
-    { key: 'emAndamento', count: counts.emAndamento, className: 'bg-yellow-400' },
+    { key: 'criacaoDasArtes', count: counts.criacaoDasArtes, className: 'bg-yellow-400' },
+    { key: 'direcaoDeArte', count: counts.direcaoDeArte, className: 'bg-purple-500' },
+    { key: 'conferencia', count: counts.conferencia, className: 'bg-orange-400' },
     { key: 'validacao', count: counts.validacao, className: 'bg-orange-500' },
     { key: 'aprovado', count: counts.aprovado, className: 'bg-emerald-500' },
     { key: 'publicado', count: counts.publicado, className: 'bg-sky-500' },
@@ -353,10 +365,22 @@ function CalendarDetailContent() {
                             {pipelineCounts.criacaoTextual}
                           </span>
                         </span>
-                        <span className={`flex items-center gap-1.5 rounded-full border border-yellow-400/30 bg-yellow-400/10 px-2.5 py-1 text-yellow-400 ${pipelineCounts.emAndamento > 0 ? '' : 'opacity-50'}`}>
-                          Em Andamento
-                          <span className={pipelineCounts.emAndamento > 0 ? 'font-bold text-white' : ''}>
-                            {pipelineCounts.emAndamento}
+                        <span className={`flex items-center gap-1.5 rounded-full border border-yellow-400/30 bg-yellow-400/10 px-2.5 py-1 text-yellow-400 ${pipelineCounts.criacaoDasArtes > 0 ? '' : 'opacity-50'}`}>
+                          Criação das Artes
+                          <span className={pipelineCounts.criacaoDasArtes > 0 ? 'font-bold text-white' : ''}>
+                            {pipelineCounts.criacaoDasArtes}
+                          </span>
+                        </span>
+                        <span className={`flex items-center gap-1.5 rounded-full border border-purple-500/30 bg-purple-500/10 px-2.5 py-1 text-purple-400 ${pipelineCounts.direcaoDeArte > 0 ? '' : 'opacity-50'}`}>
+                          Direção de Arte
+                          <span className={pipelineCounts.direcaoDeArte > 0 ? 'font-bold text-white' : ''}>
+                            {pipelineCounts.direcaoDeArte}
+                          </span>
+                        </span>
+                        <span className={`flex items-center gap-1.5 rounded-full border border-orange-400/30 bg-orange-400/10 px-2.5 py-1 text-orange-300 ${pipelineCounts.conferencia > 0 ? '' : 'opacity-50'}`}>
+                          Conferência
+                          <span className={pipelineCounts.conferencia > 0 ? 'font-bold text-white' : ''}>
+                            {pipelineCounts.conferencia}
                           </span>
                         </span>
                         <span className={`flex items-center gap-1.5 rounded-full border border-orange-500/30 bg-orange-500/10 px-2.5 py-1 text-orange-400 ${pipelineCounts.validacao > 0 ? '' : 'opacity-50'}`}>

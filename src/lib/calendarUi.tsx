@@ -14,14 +14,16 @@ export function normalizeClientKey(value: string) {
 export type CalendarioSegments = {
   postsConectados: number;
   postsCriacaoTextual: number;
-  postsEmAndamento: number;
+  postsCriacaoDasArtes: number;
+  postsDirecaoDeArte: number;
+  postsConferencia: number;
   postsEmValidacao: number;
   postsAprovados: number;
   postsPublicados: number;
 };
 
 export type ProgressSegment = {
-  key: 'criacaoTextual' | 'emAndamento' | 'validacao' | 'aprovado' | 'publicado' | 'ajuste';
+  key: 'criacaoTextual' | 'criacaoDasArtes' | 'direcaoDeArte' | 'conferencia' | 'validacao' | 'aprovado' | 'publicado' | 'ajuste';
   count: number;
   className: string;
 };
@@ -44,7 +46,9 @@ export function getConclusionSegments(calendario: CalendarioSegments) {
   const decidedTotal = calendario.postsAprovados + calendario.postsPublicados;
   const segments: ProgressSegment[] = [
     { key: 'criacaoTextual', count: calendario.postsCriacaoTextual, className: 'bg-red-500' },
-    { key: 'emAndamento', count: calendario.postsEmAndamento, className: 'bg-yellow-400' },
+    { key: 'criacaoDasArtes', count: calendario.postsCriacaoDasArtes, className: 'bg-yellow-400' },
+    { key: 'direcaoDeArte', count: calendario.postsDirecaoDeArte, className: 'bg-purple-500' },
+    { key: 'conferencia', count: calendario.postsConferencia, className: 'bg-orange-400' },
     { key: 'validacao', count: calendario.postsEmValidacao, className: 'bg-orange-500' },
     { key: 'aprovado', count: calendario.postsAprovados, className: 'bg-emerald-500' },
     { key: 'publicado', count: calendario.postsPublicados, className: 'bg-sky-500' },
@@ -94,7 +98,9 @@ export function ConclusionBar({ progress }: { progress: ReturnType<typeof getCon
 
 const SEGMENT_LABELS: Record<ProgressSegment['key'], string> = {
   criacaoTextual: 'Criação Textual',
-  emAndamento: 'Em Andamento',
+  criacaoDasArtes: 'Criação das Artes',
+  direcaoDeArte: 'Direção de Arte',
+  conferencia: 'Conferência',
   validacao: 'Validação do Cliente',
   aprovado: 'Aprovado para Programação',
   publicado: 'Publicado',

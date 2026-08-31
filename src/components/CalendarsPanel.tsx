@@ -23,7 +23,9 @@ type CalendarioInfo = {
   postsConectados: number;
   postsConcluidos: number;
   postsCriacaoTextual: number;
-  postsEmAndamento: number;
+  postsCriacaoDasArtes: number;
+  postsDirecaoDeArte: number;
+  postsConferencia: number;
   postsEmValidacao: number;
   postsAprovados: number;
   postsPublicados: number;
