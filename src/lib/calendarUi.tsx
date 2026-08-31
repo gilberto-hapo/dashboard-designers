@@ -48,10 +48,10 @@ export function getConclusionSegments(calendario: CalendarioSegments) {
     { key: 'criacaoTextual', count: calendario.postsCriacaoTextual, className: 'bg-red-500' },
     { key: 'criacaoDasArtes', count: calendario.postsCriacaoDasArtes, className: 'bg-yellow-400' },
     { key: 'direcaoDeArte', count: calendario.postsDirecaoDeArte, className: 'bg-purple-500' },
-    { key: 'conferencia', count: calendario.postsConferencia, className: 'bg-orange-400' },
+    { key: 'conferencia', count: calendario.postsConferencia, className: 'bg-sky-500' },
     { key: 'validacao', count: calendario.postsEmValidacao, className: 'bg-orange-500' },
-    { key: 'aprovado', count: calendario.postsAprovados, className: 'bg-emerald-500' },
-    { key: 'publicado', count: calendario.postsPublicados, className: 'bg-sky-500' },
+    { key: 'aprovado', count: calendario.postsAprovados, className: 'bg-emerald-800' },
+    { key: 'publicado', count: calendario.postsPublicados, className: 'bg-green-400' },
     { key: 'ajuste', count: 0, className: 'bg-amber-400' },
   ];
 

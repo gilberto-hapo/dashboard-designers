@@ -190,12 +190,14 @@ export function CalendarsPanel({
       .map((c) => ({ nome: c.nome as string, postsContratados: c.postsContratados ?? 0 }));
   }, [clientes, selectedDesigner]);
 
-  // "Status do mês" (Sem calendário / Calendário criado) precisa considerar
-  // TODOS os calendários do mês, incluindo os já concluídos ("Posts
-  // Programados"), senão um cliente cujo calendário foi finalizado some da
-  // lista visível e volta a aparecer como "Sem calendário" incorretamente.
+  // "Status do mês" (Sem calendário / Calendário criado / Concluído) precisa
+  // considerar TODOS os calendários do mês, incluindo os já concluídos
+  // ("Posts Programados"), senão um cliente cujo calendário foi finalizado
+  // some da lista visível e volta a aparecer como "Sem calendário"
+  // incorretamente. Guarda também se o calendário está concluído, para
+  // diferenciar visualmente do "criado, ainda em produção".
   const createdKeysByMesAno = useMemo(() => {
-    const map = new Map<string, Set<string>>();
+    const map = new Map<string, Map<string, boolean>>();
     calendarios
       .filter((calendario) => {
         const [month, year] = calendario.mesAno.split('/');
@@ -209,8 +211,13 @@ export function CalendarsPanel({
       })
       .forEach((calendario) => {
         const key = calendario.mesAno || 'Sem data';
-        if (!map.has(key)) map.set(key, new Set());
-        map.get(key)!.add(normalizeClientKey(calendario.clienteNome));
+        if (!map.has(key)) map.set(key, new Map());
+        const concluded = calendario.phaseTitle === 'Posts Programados';
+        const clientKey = normalizeClientKey(calendario.clienteNome);
+        const monthMap = map.get(key)!;
+        // Se houver mais de um calendário do mesmo cliente/mês, um concluído
+        // "vence" — o cliente já teve o trabalho daquele mês finalizado.
+        if (!monthMap.has(clientKey) || concluded) monthMap.set(clientKey, concluded);
       });
     return map;
   }, [calendarios, selectedMonth, selectedYear, selectedDesigner, designerByClientName]);
@@ -263,17 +270,25 @@ export function CalendarsPanel({
               </div>
 
               {expandedMonths.has(group.mesAno) && (() => {
-                const createdKeys = createdKeysByMesAno.get(group.mesAno) ?? new Set<string>();
+                const createdMap = createdKeysByMesAno.get(group.mesAno) ?? new Map<string, boolean>();
                 const clientStatus = activeClientRoster
-                  .map((c) => ({ ...c, created: createdKeys.has(normalizeClientKey(c.nome)) }))
+                  .map((c) => {
+                    const key = normalizeClientKey(c.nome);
+                    const created = createdMap.has(key);
+                    const concluded = created && (createdMap.get(key) ?? false);
+                    return { ...c, created, concluded };
+                  })
                   .sort((a, b) => {
                     if (a.created !== b.created) return a.created ? 1 : -1;
+                    if (a.concluded !== b.concluded) return a.concluded ? 1 : -1;
                     return a.nome.localeCompare(b.nome, 'pt-BR');
                   });
                 const semCalendario = clientStatus.filter((c) => !c.created);
-                const comCalendario = clientStatus.filter((c) => c.created);
+                const comCalendario = clientStatus.filter((c) => c.created && !c.concluded);
+                const concluidos = clientStatus.filter((c) => c.concluded);
                 const postsSemCalendario = semCalendario.reduce((sum, c) => sum + c.postsContratados, 0);
                 const postsComCalendario = comCalendario.reduce((sum, c) => sum + c.postsContratados, 0);
+                const postsConcluidos = concluidos.reduce((sum, c) => sum + c.postsContratados, 0);
 
                 if (clientStatus.length === 0) {
                   return (
@@ -294,15 +309,21 @@ export function CalendarsPanel({
                         <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
                         Calendário criado ({comCalendario.length} {comCalendario.length === 1 ? 'cliente' : 'clientes'} / {postsComCalendario} {postsComCalendario === 1 ? 'post' : 'posts'})
                       </span>
+                      <span className="flex items-center gap-1.5">
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-white" />
+                        Concluído ({concluidos.length} {concluidos.length === 1 ? 'cliente' : 'clientes'} / {postsConcluidos} {postsConcluidos === 1 ? 'post' : 'posts'})
+                      </span>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       {clientStatus.map((c) => (
                         <span
                           key={c.nome}
                           className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
-                            c.created
-                              ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
-                              : 'border-red-500/30 bg-red-500/10 text-red-400'
+                            c.concluded
+                              ? 'border-white/30 bg-white/10 text-white'
+                              : c.created
+                                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                                : 'border-red-500/30 bg-red-500/10 text-red-400'
                           }`}
                         >
                           {c.nome}

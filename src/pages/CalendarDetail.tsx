@@ -72,10 +72,10 @@ const PIPELINE_STAGE_STYLES: Record<Exclude<PostPipelineStage, null>, { label: s
   criacaoTextual: { label: 'Criação Textual', className: 'border-red-500/30 bg-red-500/10 text-red-400' },
   criacaoDasArtes: { label: 'Criação das Artes', className: 'border-yellow-400/30 bg-yellow-400/10 text-yellow-400' },
   direcaoDeArte: { label: 'Direção de Arte', className: 'border-purple-500/30 bg-purple-500/10 text-purple-400' },
-  conferencia: { label: 'Conferência', className: 'border-orange-400/30 bg-orange-400/10 text-orange-300' },
+  conferencia: { label: 'Conferência', className: 'border-sky-500/30 bg-sky-500/10 text-sky-400' },
   validacao: { label: 'Validação', className: 'border-orange-500/30 bg-orange-500/10 text-orange-400' },
-  aprovado: { label: 'Aprovado para Programação', className: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' },
-  publicado: { label: 'Publicado', className: 'border-sky-500/30 bg-sky-500/10 text-sky-400' },
+  aprovado: { label: 'Aprovado para Programação', className: 'border-emerald-800/40 bg-emerald-800/15 text-emerald-600' },
+  publicado: { label: 'Publicado', className: 'border-green-400/30 bg-green-400/10 text-green-300' },
 };
 
 // Resumo do topo: reflete só a FASE do kanban da Goalfy (post.pipelineStage),
@@ -131,10 +131,10 @@ function getPostsConclusionSegments(posts: PortalPost[]) {
     { key: 'criacaoTextual', count: counts.criacaoTextual, className: 'bg-red-500' },
     { key: 'criacaoDasArtes', count: counts.criacaoDasArtes, className: 'bg-yellow-400' },
     { key: 'direcaoDeArte', count: counts.direcaoDeArte, className: 'bg-purple-500' },
-    { key: 'conferencia', count: counts.conferencia, className: 'bg-orange-400' },
+    { key: 'conferencia', count: counts.conferencia, className: 'bg-sky-500' },
     { key: 'validacao', count: counts.validacao, className: 'bg-orange-500' },
-    { key: 'aprovado', count: counts.aprovado, className: 'bg-emerald-500' },
-    { key: 'publicado', count: counts.publicado, className: 'bg-sky-500' },
+    { key: 'aprovado', count: counts.aprovado, className: 'bg-emerald-800' },
+    { key: 'publicado', count: counts.publicado, className: 'bg-green-400' },
     { key: 'ajuste', count: counts.ajuste, className: 'bg-amber-400' },
   ];
 
@@ -377,7 +377,7 @@ function CalendarDetailContent() {
                             {pipelineCounts.direcaoDeArte}
                           </span>
                         </span>
-                        <span className={`flex items-center gap-1.5 rounded-full border border-orange-400/30 bg-orange-400/10 px-2.5 py-1 text-orange-300 ${pipelineCounts.conferencia > 0 ? '' : 'opacity-50'}`}>
+                        <span className={`flex items-center gap-1.5 rounded-full border border-sky-500/30 bg-sky-500/10 px-2.5 py-1 text-sky-400 ${pipelineCounts.conferencia > 0 ? '' : 'opacity-50'}`}>
                           Conferência
                           <span className={pipelineCounts.conferencia > 0 ? 'font-bold text-white' : ''}>
                             {pipelineCounts.conferencia}
@@ -389,13 +389,13 @@ function CalendarDetailContent() {
                             {pipelineCounts.validacao}
                           </span>
                         </span>
-                        <span className={`flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-emerald-400 ${pipelineCounts.aprovado > 0 ? '' : 'opacity-50'}`}>
+                        <span className={`flex items-center gap-1.5 rounded-full border border-emerald-800/40 bg-emerald-800/15 px-2.5 py-1 text-emerald-600 ${pipelineCounts.aprovado > 0 ? '' : 'opacity-50'}`}>
                           Aprovado para Programação
                           <span className={pipelineCounts.aprovado > 0 ? 'font-bold text-white' : ''}>
                             {pipelineCounts.aprovado}
                           </span>
                         </span>
-                        <span className={`flex items-center gap-1.5 rounded-full border border-sky-500/30 bg-sky-500/10 px-2.5 py-1 text-sky-400 ${pipelineCounts.publicado > 0 ? '' : 'opacity-50'}`}>
+                        <span className={`flex items-center gap-1.5 rounded-full border border-green-400/30 bg-green-400/10 px-2.5 py-1 text-green-300 ${pipelineCounts.publicado > 0 ? '' : 'opacity-50'}`}>
                           Publicado
                           <span className={pipelineCounts.publicado > 0 ? 'font-bold text-white' : ''}>
                             {pipelineCounts.publicado}
