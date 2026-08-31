@@ -303,11 +303,11 @@ export function CalendarsPanel({
                     <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1.5">
                         <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-400" />
-                        Sem calendário ({semCalendario.length} {semCalendario.length === 1 ? 'cliente' : 'clientes'} / {postsSemCalendario} {postsSemCalendario === 1 ? 'post' : 'posts'})
+                        Não aberto ({semCalendario.length} {semCalendario.length === 1 ? 'cliente' : 'clientes'} / {postsSemCalendario} {postsSemCalendario === 1 ? 'post' : 'posts'})
                       </span>
                       <span className="flex items-center gap-1.5">
-                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-800" />
-                        Calendário criado ({comCalendario.length} {comCalendario.length === 1 ? 'cliente' : 'clientes'} / {postsComCalendario} {postsComCalendario === 1 ? 'post' : 'posts'})
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-yellow-400" />
+                        Em andamento ({comCalendario.length} {comCalendario.length === 1 ? 'cliente' : 'clientes'} / {postsComCalendario} {postsComCalendario === 1 ? 'post' : 'posts'})
                       </span>
                       <span className="flex items-center gap-1.5">
                         <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-green-400" />
@@ -322,7 +322,7 @@ export function CalendarsPanel({
                             c.concluded
                               ? 'border-green-400/30 bg-green-400/10 text-green-300'
                               : c.created
-                                ? 'border-emerald-800/40 bg-emerald-800/15 text-emerald-600'
+                                ? 'border-yellow-400/30 bg-yellow-400/10 text-yellow-400'
                                 : 'border-red-500/30 bg-red-500/10 text-red-400'
                           }`}
                         >

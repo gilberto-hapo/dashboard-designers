@@ -1,5 +1,5 @@
 {
-  "updatedAt": 1788201650335,
+  "updatedAt": 1788207832948,
   "data": {
     "tasks": [
       {
@@ -247,7 +247,7 @@
       {
         "id": "0a55e4f1-ab6a-4cae-ac92-06f746c5a32c",
         "contentType": "FEED",
-        "formatoEntrega": "Carrossel",
+        "formatoEntrega": "Estático",
         "statusTags": [],
         "goalfyTags": [
           {
@@ -411,13 +411,13 @@
         "responsavelCliente": "Kiane Coelho",
         "designerResponsavel1": "Kiane Coelho",
         "dataVencimento": "2026-09-04T20:30:00.000Z",
-        "stage": "concluido",
-        "phaseTitle": "Post Programado",
+        "stage": "fazer",
+        "phaseTitle": "Criação textual",
         "tempoEstimadoHoras": 3,
         "tempoGastoHoras": 0,
         "criadoEm": "2026-08-26T21:11:43.756Z",
         "concluidoEm": "2026-08-31T20:14:05.776Z",
-        "dataNaFaseAtual": "2026-08-31T20:14:05.776Z",
+        "dataNaFaseAtual": "2026-08-26T21:11:43.760Z",
         "entrouExecutandoEm": "2026-08-27T21:03:43.579Z",
         "entrouMontagemEm": null,
         "entrouValidacaoEm": "2026-08-28T22:21:09.103Z",
@@ -813,50 +813,6 @@
         "clientePostsMes": 20
       },
       {
-        "id": "12722d14-960e-4fb2-86d1-04c17ec1f611",
-        "contentType": "FEED",
-        "formatoEntrega": "Estático",
-        "statusTags": [],
-        "goalfyTags": [
-          {
-            "text": "FACEBOOK",
-            "color": "#2384f7"
-          },
-          {
-            "text": "INSTAGRAM",
-            "color": "#d623f7"
-          }
-        ],
-        "title": "[UNE LUNELLI] SETEMBRO/2026 #30/40",
-        "parceiro": "Une Lunelli",
-        "calendario": "Une - Setembro/2026",
-        "calendarioId": "9e4a2aa2-a5d5-4e63-bf77-3fc645edae89",
-        "clienteRelacionado": "Une Lunelli",
-        "linkDrive": "https://drive.google.com/drive/folders/17E_CxGpAuP6fD0HFJbSJQ9cqS0zN94OK?usp=drive_link",
-        "linkCalendarioEditorial": "https://docs.google.com/spreadsheets/d/1anm1W8DbOvsvo4J44FWdSGLU2AR9vvc5/edit?gid=314412179#gid=314412179",
-        "responsavel": "Kiane Coelho",
-        "responsavelHistorico": "",
-        "responsavelCliente": "Kiane Coelho",
-        "designerResponsavel1": "Kiane Coelho",
-        "dataVencimento": "2026-09-04T20:30:00.000Z",
-        "stage": "concluido",
-        "phaseTitle": "Post Programado",
-        "tempoEstimadoHoras": 3,
-        "tempoGastoHoras": 0,
-        "criadoEm": "2026-08-26T21:11:59.973Z",
-        "concluidoEm": "2026-08-31T20:17:07.077Z",
-        "dataNaFaseAtual": "2026-08-31T20:17:07.077Z",
-        "entrouExecutandoEm": "2026-08-28T17:57:48.294Z",
-        "entrouMontagemEm": null,
-        "entrouValidacaoEm": "2026-08-28T22:58:18.641Z",
-        "tempoValidacaoDias": 2.88,
-        "tempoAprovadoProgramacaoDias": 0,
-        "teveAjustes": false,
-        "registroAjustes": "",
-        "clienteAtivo": true,
-        "clientePostsMes": 40
-      },
-      {
         "id": "12769d00-899b-423f-b9ac-c7ed0e8aa936",
         "contentType": "FEED",
         "formatoEntrega": "Carrossel",
@@ -991,7 +947,7 @@
       {
         "id": "15a81472-8486-40a3-a76d-7a3449d36e8a",
         "contentType": "FEED",
-        "formatoEntrega": "Estático",
+        "formatoEntrega": "Carrossel",
         "statusTags": [],
         "goalfyTags": [
           {
@@ -1183,7 +1139,7 @@
       {
         "id": "17c915b1-4ec7-4b14-ba76-885956995f8c",
         "contentType": "FEED",
-        "formatoEntrega": "Stories",
+        "formatoEntrega": "Carrossel",
         "statusTags": [],
         "goalfyTags": [
           {
@@ -1869,18 +1825,18 @@
         "responsavelCliente": "vitorya",
         "designerResponsavel1": "vitorya",
         "dataVencimento": "2026-08-14T17:35:00.000Z",
-        "stage": "aprovado_programacao",
-        "phaseTitle": "Aprovado para programação",
+        "stage": "concluido",
+        "phaseTitle": "Post Programado",
         "tempoEstimadoHoras": 3,
         "tempoGastoHoras": 0,
         "criadoEm": "2026-08-07T20:35:42.037Z",
-        "concluidoEm": null,
-        "dataNaFaseAtual": "2026-08-24T21:58:18.448Z",
+        "concluidoEm": "2026-08-31T21:47:11.530Z",
+        "dataNaFaseAtual": "2026-08-31T21:47:11.530Z",
         "entrouExecutandoEm": "2026-08-07T21:49:05.165Z",
         "entrouMontagemEm": null,
         "entrouValidacaoEm": "2026-08-14T20:08:07.379Z",
         "tempoValidacaoDias": 10.08,
-        "tempoAprovadoProgramacaoDias": 0,
+        "tempoAprovadoProgramacaoDias": 6.99,
         "teveAjustes": false,
         "registroAjustes": "",
         "clienteAtivo": true,
@@ -2189,53 +2145,9 @@
         "clientePostsMes": 6
       },
       {
-        "id": "30620844-d8d5-4997-bcb0-6e3ad6572d7e",
-        "contentType": "FEED",
-        "formatoEntrega": "Stories",
-        "statusTags": [],
-        "goalfyTags": [
-          {
-            "text": "FACEBOOK",
-            "color": "#2384f7"
-          },
-          {
-            "text": "INSTAGRAM",
-            "color": "#d623f7"
-          }
-        ],
-        "title": "[UNE LUNELLI] SETEMBRO/2026 #29/40",
-        "parceiro": "Une Lunelli",
-        "calendario": "Une - Setembro/2026",
-        "calendarioId": "9e4a2aa2-a5d5-4e63-bf77-3fc645edae89",
-        "clienteRelacionado": "Une Lunelli",
-        "linkDrive": "https://drive.google.com/drive/folders/17E_CxGpAuP6fD0HFJbSJQ9cqS0zN94OK?usp=drive_link",
-        "linkCalendarioEditorial": "https://docs.google.com/spreadsheets/d/1anm1W8DbOvsvo4J44FWdSGLU2AR9vvc5/edit?gid=314412179#gid=314412179",
-        "responsavel": "Kiane Coelho",
-        "responsavelHistorico": "",
-        "responsavelCliente": "Kiane Coelho",
-        "designerResponsavel1": "Kiane Coelho",
-        "dataVencimento": "2026-09-04T20:30:00.000Z",
-        "stage": "concluido",
-        "phaseTitle": "Post Programado",
-        "tempoEstimadoHoras": 3,
-        "tempoGastoHoras": 0,
-        "criadoEm": "2026-08-26T21:11:56.660Z",
-        "concluidoEm": "2026-08-31T20:15:42.521Z",
-        "dataNaFaseAtual": "2026-08-31T20:15:42.521Z",
-        "entrouExecutandoEm": "2026-08-28T17:45:40.420Z",
-        "entrouMontagemEm": null,
-        "entrouValidacaoEm": "2026-08-28T22:21:27.133Z",
-        "tempoValidacaoDias": 2.91,
-        "tempoAprovadoProgramacaoDias": 0,
-        "teveAjustes": false,
-        "registroAjustes": "",
-        "clienteAtivo": true,
-        "clientePostsMes": 40
-      },
-      {
         "id": "30987c52-59be-48ce-a030-3bb6274f4545",
         "contentType": "FEED",
-        "formatoEntrega": "Stories",
+        "formatoEntrega": "Carrossel",
         "statusTags": [],
         "goalfyTags": [
           {
@@ -2323,7 +2235,7 @@
       {
         "id": "32726fc8-31bb-4373-b48e-8aabd853b195",
         "contentType": "FEED",
-        "formatoEntrega": "Stories",
+        "formatoEntrega": "Estático",
         "statusTags": [],
         "goalfyTags": [
           {
@@ -2851,50 +2763,6 @@
         "clientePostsMes": 4
       },
       {
-        "id": "414fd118-82bd-4ea6-91a6-b04aac93a54a",
-        "contentType": "FEED",
-        "formatoEntrega": "Carrossel",
-        "statusTags": [],
-        "goalfyTags": [
-          {
-            "text": "FACEBOOK",
-            "color": "#2384f7"
-          },
-          {
-            "text": "INSTAGRAM",
-            "color": "#d623f7"
-          }
-        ],
-        "title": "[UNE LUNELLI] SETEMBRO/2026 #31/40",
-        "parceiro": "Une Lunelli",
-        "calendario": "Une - Setembro/2026",
-        "calendarioId": "9e4a2aa2-a5d5-4e63-bf77-3fc645edae89",
-        "clienteRelacionado": "Une Lunelli",
-        "linkDrive": "https://drive.google.com/drive/folders/17E_CxGpAuP6fD0HFJbSJQ9cqS0zN94OK?usp=drive_link",
-        "linkCalendarioEditorial": "https://docs.google.com/spreadsheets/d/1anm1W8DbOvsvo4J44FWdSGLU2AR9vvc5/edit?gid=314412179#gid=314412179",
-        "responsavel": "Kiane Coelho",
-        "responsavelHistorico": "",
-        "responsavelCliente": "Kiane Coelho",
-        "designerResponsavel1": "Kiane Coelho",
-        "dataVencimento": "2026-09-04T20:30:00.000Z",
-        "stage": "montagem",
-        "phaseTitle": "Conferência",
-        "tempoEstimadoHoras": 3,
-        "tempoGastoHoras": 0,
-        "criadoEm": "2026-08-26T21:12:03.221Z",
-        "concluidoEm": null,
-        "dataNaFaseAtual": "2026-08-31T21:24:07.589Z",
-        "entrouExecutandoEm": "2026-08-28T19:21:23.268Z",
-        "entrouMontagemEm": null,
-        "entrouValidacaoEm": null,
-        "tempoValidacaoDias": null,
-        "tempoAprovadoProgramacaoDias": null,
-        "teveAjustes": false,
-        "registroAjustes": "",
-        "clienteAtivo": true,
-        "clientePostsMes": 40
-      },
-      {
         "id": "47decdf9-4dd7-4767-94f7-cfef8e18b27c",
         "contentType": "FEED",
         "formatoEntrega": "Estático",
@@ -2927,18 +2795,18 @@
         "responsavelCliente": "vitorya",
         "designerResponsavel1": "vitorya",
         "dataVencimento": "2026-08-14T17:35:00.000Z",
-        "stage": "aprovado_programacao",
-        "phaseTitle": "Aprovado para programação",
+        "stage": "concluido",
+        "phaseTitle": "Post Programado",
         "tempoEstimadoHoras": 3,
         "tempoGastoHoras": 0,
         "criadoEm": "2026-08-07T20:35:34.760Z",
-        "concluidoEm": null,
-        "dataNaFaseAtual": "2026-08-27T22:36:36.894Z",
+        "concluidoEm": "2026-08-31T21:45:28.483Z",
+        "dataNaFaseAtual": "2026-08-31T21:45:28.483Z",
         "entrouExecutandoEm": "2026-08-07T21:47:45.429Z",
         "entrouMontagemEm": null,
         "entrouValidacaoEm": "2026-08-14T20:48:09.521Z",
         "tempoValidacaoDias": 13.08,
-        "tempoAprovadoProgramacaoDias": 0,
+        "tempoAprovadoProgramacaoDias": 3.96,
         "teveAjustes": false,
         "registroAjustes": "",
         "clienteAtivo": true,
@@ -3423,50 +3291,6 @@
         "registroAjustes": "",
         "clienteAtivo": true,
         "clientePostsMes": 4
-      },
-      {
-        "id": "5091cd7d-0a77-4520-9cd4-aa1eefda69dc",
-        "contentType": "FEED",
-        "formatoEntrega": "Stories",
-        "statusTags": [],
-        "goalfyTags": [
-          {
-            "text": "FACEBOOK",
-            "color": "#2384f7"
-          },
-          {
-            "text": "INSTAGRAM",
-            "color": "#d623f7"
-          }
-        ],
-        "title": "[UNE LUNELLI] SETEMBRO/2026 #35/40",
-        "parceiro": "Une Lunelli",
-        "calendario": "Une - Setembro/2026",
-        "calendarioId": "9e4a2aa2-a5d5-4e63-bf77-3fc645edae89",
-        "clienteRelacionado": "Une Lunelli",
-        "linkDrive": "https://drive.google.com/drive/folders/17E_CxGpAuP6fD0HFJbSJQ9cqS0zN94OK?usp=drive_link",
-        "linkCalendarioEditorial": "https://docs.google.com/spreadsheets/d/1anm1W8DbOvsvo4J44FWdSGLU2AR9vvc5/edit?gid=314412179#gid=314412179",
-        "responsavel": "Kiane Coelho",
-        "responsavelHistorico": "",
-        "responsavelCliente": "Kiane Coelho",
-        "designerResponsavel1": "Kiane Coelho",
-        "dataVencimento": "2026-09-04T20:30:00.000Z",
-        "stage": "executando",
-        "phaseTitle": "Criação das artes",
-        "tempoEstimadoHoras": 3,
-        "tempoGastoHoras": 0,
-        "criadoEm": "2026-08-26T21:12:23.874Z",
-        "concluidoEm": null,
-        "dataNaFaseAtual": "2026-08-28T19:49:30.774Z",
-        "entrouExecutandoEm": "2026-08-28T19:49:30.774Z",
-        "entrouMontagemEm": null,
-        "entrouValidacaoEm": null,
-        "tempoValidacaoDias": null,
-        "tempoAprovadoProgramacaoDias": null,
-        "teveAjustes": false,
-        "registroAjustes": "",
-        "clienteAtivo": true,
-        "clientePostsMes": 40
       },
       {
         "id": "52421d6e-10e3-45b7-8798-e52a8d97bb7f",
@@ -4143,50 +3967,6 @@
         "clientePostsMes": 40
       },
       {
-        "id": "5de12355-4dc9-49ff-bf86-6fbee057509c",
-        "contentType": "FEED",
-        "formatoEntrega": "Stories",
-        "statusTags": [],
-        "goalfyTags": [
-          {
-            "text": "FACEBOOK",
-            "color": "#2384f7"
-          },
-          {
-            "text": "INSTAGRAM",
-            "color": "#d623f7"
-          }
-        ],
-        "title": "[UNE LUNELLI] SETEMBRO/2026 #38/40",
-        "parceiro": "Une Lunelli",
-        "calendario": "Une - Setembro/2026",
-        "calendarioId": "9e4a2aa2-a5d5-4e63-bf77-3fc645edae89",
-        "clienteRelacionado": "Une Lunelli",
-        "linkDrive": "https://drive.google.com/drive/folders/17E_CxGpAuP6fD0HFJbSJQ9cqS0zN94OK?usp=drive_link",
-        "linkCalendarioEditorial": "https://docs.google.com/spreadsheets/d/1anm1W8DbOvsvo4J44FWdSGLU2AR9vvc5/edit?gid=314412179#gid=314412179",
-        "responsavel": "Kiane Coelho",
-        "responsavelHistorico": "",
-        "responsavelCliente": "Kiane Coelho",
-        "designerResponsavel1": "Kiane Coelho",
-        "dataVencimento": "2026-09-04T20:30:00.000Z",
-        "stage": "executando",
-        "phaseTitle": "Criação das artes",
-        "tempoEstimadoHoras": 3,
-        "tempoGastoHoras": 0,
-        "criadoEm": "2026-08-26T21:12:27.130Z",
-        "concluidoEm": null,
-        "dataNaFaseAtual": "2026-08-28T19:49:37.567Z",
-        "entrouExecutandoEm": "2026-08-28T19:49:37.567Z",
-        "entrouMontagemEm": null,
-        "entrouValidacaoEm": null,
-        "tempoValidacaoDias": null,
-        "tempoAprovadoProgramacaoDias": null,
-        "teveAjustes": false,
-        "registroAjustes": "",
-        "clienteAtivo": true,
-        "clientePostsMes": 40
-      },
-      {
         "id": "5e1a87bf-c26f-4b4a-bf4c-d81d259525eb",
         "contentType": "FEED",
         "formatoEntrega": "Vídeo",
@@ -4235,50 +4015,6 @@
         "clientePostsMes": 8
       },
       {
-        "id": "5f34b6eb-11b0-4bd0-a6d8-5ad01adf3688",
-        "contentType": "FEED",
-        "formatoEntrega": "Carrossel",
-        "statusTags": [],
-        "goalfyTags": [
-          {
-            "text": "FACEBOOK",
-            "color": "#2384f7"
-          },
-          {
-            "text": "INSTAGRAM",
-            "color": "#d623f7"
-          }
-        ],
-        "title": "[UNE LUNELLI] SETEMBRO/2026 #33/40",
-        "parceiro": "Une Lunelli",
-        "calendario": "Une - Setembro/2026",
-        "calendarioId": "9e4a2aa2-a5d5-4e63-bf77-3fc645edae89",
-        "clienteRelacionado": "Une Lunelli",
-        "linkDrive": "https://drive.google.com/drive/folders/17E_CxGpAuP6fD0HFJbSJQ9cqS0zN94OK?usp=drive_link",
-        "linkCalendarioEditorial": "https://docs.google.com/spreadsheets/d/1anm1W8DbOvsvo4J44FWdSGLU2AR9vvc5/edit?gid=314412179#gid=314412179",
-        "responsavel": "Kiane Coelho",
-        "responsavelHistorico": "",
-        "responsavelCliente": "Kiane Coelho",
-        "designerResponsavel1": "Kiane Coelho",
-        "dataVencimento": "2026-09-04T20:30:00.000Z",
-        "stage": "executando",
-        "phaseTitle": "Criação das artes",
-        "tempoEstimadoHoras": 3,
-        "tempoGastoHoras": 0,
-        "criadoEm": "2026-08-26T21:12:09.685Z",
-        "concluidoEm": null,
-        "dataNaFaseAtual": "2026-08-28T19:38:54.993Z",
-        "entrouExecutandoEm": "2026-08-28T19:38:54.993Z",
-        "entrouMontagemEm": null,
-        "entrouValidacaoEm": null,
-        "tempoValidacaoDias": null,
-        "tempoAprovadoProgramacaoDias": null,
-        "teveAjustes": false,
-        "registroAjustes": "",
-        "clienteAtivo": true,
-        "clientePostsMes": 40
-      },
-      {
         "id": "60222c07-6507-4ac7-b21a-53442148b3ed",
         "contentType": "FEED",
         "formatoEntrega": "Carrossel",
@@ -4325,50 +4061,6 @@
         "registroAjustes": "",
         "clienteAtivo": false,
         "clientePostsMes": 8
-      },
-      {
-        "id": "603386ef-4d25-45e0-adf2-465d6b625ca3",
-        "contentType": "FEED",
-        "formatoEntrega": "Vídeo",
-        "statusTags": [],
-        "goalfyTags": [
-          {
-            "text": "FACEBOOK",
-            "color": "#2384f7"
-          },
-          {
-            "text": "INSTAGRAM",
-            "color": "#d623f7"
-          }
-        ],
-        "title": "[UNE LUNELLI] SETEMBRO/2026 #41/40",
-        "parceiro": "Une Lunelli",
-        "calendario": "Une - Setembro/2026",
-        "calendarioId": "9e4a2aa2-a5d5-4e63-bf77-3fc645edae89",
-        "clienteRelacionado": "Une Lunelli",
-        "linkDrive": "https://drive.google.com/drive/folders/17E_CxGpAuP6fD0HFJbSJQ9cqS0zN94OK?usp=drive_link",
-        "linkCalendarioEditorial": "https://docs.google.com/spreadsheets/d/1anm1W8DbOvsvo4J44FWdSGLU2AR9vvc5/edit?gid=314412179#gid=314412179",
-        "responsavel": "Kiane Coelho",
-        "responsavelHistorico": "",
-        "responsavelCliente": "Kiane Coelho",
-        "designerResponsavel1": "Kiane Coelho",
-        "dataVencimento": "2026-09-04T20:30:00.000Z",
-        "stage": "fazer",
-        "phaseTitle": "Criação textual",
-        "tempoEstimadoHoras": 3,
-        "tempoGastoHoras": 0,
-        "criadoEm": "2026-08-26T21:12:37.017Z",
-        "concluidoEm": null,
-        "dataNaFaseAtual": "2026-08-26T21:12:37.021Z",
-        "entrouExecutandoEm": null,
-        "entrouMontagemEm": null,
-        "entrouValidacaoEm": null,
-        "tempoValidacaoDias": null,
-        "tempoAprovadoProgramacaoDias": null,
-        "teveAjustes": false,
-        "registroAjustes": "",
-        "clienteAtivo": true,
-        "clientePostsMes": 40
       },
       {
         "id": "62ab497b-dbca-437c-9dff-55f0e437e183",
@@ -4701,7 +4393,7 @@
       {
         "id": "69fd33e1-7aac-4831-87ef-bd3053322ce2",
         "contentType": "FEED",
-        "formatoEntrega": "Stories",
+        "formatoEntrega": "Carrossel",
         "statusTags": [],
         "goalfyTags": [
           {
@@ -5053,7 +4745,7 @@
       {
         "id": "75144440-b80c-4f10-999c-d2b5952a5cda",
         "contentType": "FEED",
-        "formatoEntrega": "Vídeo",
+        "formatoEntrega": "Carrossel",
         "statusTags": [],
         "goalfyTags": [
           {
@@ -5813,94 +5505,6 @@
         "clientePostsMes": 4
       },
       {
-        "id": "85cf064c-e79a-42fd-becd-681146ce34b6",
-        "contentType": "FEED",
-        "formatoEntrega": "Stories",
-        "statusTags": [],
-        "goalfyTags": [
-          {
-            "text": "FACEBOOK",
-            "color": "#2384f7"
-          },
-          {
-            "text": "INSTAGRAM",
-            "color": "#d623f7"
-          }
-        ],
-        "title": "[UNE LUNELLI] SETEMBRO/2026 #36/40",
-        "parceiro": "Une Lunelli",
-        "calendario": "Une - Setembro/2026",
-        "calendarioId": "9e4a2aa2-a5d5-4e63-bf77-3fc645edae89",
-        "clienteRelacionado": "Une Lunelli",
-        "linkDrive": "https://drive.google.com/drive/folders/17E_CxGpAuP6fD0HFJbSJQ9cqS0zN94OK?usp=drive_link",
-        "linkCalendarioEditorial": "https://docs.google.com/spreadsheets/d/1anm1W8DbOvsvo4J44FWdSGLU2AR9vvc5/edit?gid=314412179#gid=314412179",
-        "responsavel": "Kiane Coelho",
-        "responsavelHistorico": "",
-        "responsavelCliente": "Kiane Coelho",
-        "designerResponsavel1": "Kiane Coelho",
-        "dataVencimento": "2026-09-04T20:30:00.000Z",
-        "stage": "executando",
-        "phaseTitle": "Criação das artes",
-        "tempoEstimadoHoras": 3,
-        "tempoGastoHoras": 0,
-        "criadoEm": "2026-08-26T21:12:20.230Z",
-        "concluidoEm": null,
-        "dataNaFaseAtual": "2026-08-28T19:49:47.860Z",
-        "entrouExecutandoEm": "2026-08-28T19:49:47.860Z",
-        "entrouMontagemEm": null,
-        "entrouValidacaoEm": null,
-        "tempoValidacaoDias": null,
-        "tempoAprovadoProgramacaoDias": null,
-        "teveAjustes": false,
-        "registroAjustes": "",
-        "clienteAtivo": true,
-        "clientePostsMes": 40
-      },
-      {
-        "id": "8616ed9b-7857-45a9-82c8-a3be8c641912",
-        "contentType": "FEED",
-        "formatoEntrega": "Vídeo",
-        "statusTags": [],
-        "goalfyTags": [
-          {
-            "text": "FACEBOOK",
-            "color": "#2384f7"
-          },
-          {
-            "text": "INSTAGRAM",
-            "color": "#d623f7"
-          }
-        ],
-        "title": "[UNE LUNELLI] SETEMBRO/2026 #32/40",
-        "parceiro": "Une Lunelli",
-        "calendario": "Une - Setembro/2026",
-        "calendarioId": "9e4a2aa2-a5d5-4e63-bf77-3fc645edae89",
-        "clienteRelacionado": "Une Lunelli",
-        "linkDrive": "https://drive.google.com/drive/folders/17E_CxGpAuP6fD0HFJbSJQ9cqS0zN94OK?usp=drive_link",
-        "linkCalendarioEditorial": "https://docs.google.com/spreadsheets/d/1anm1W8DbOvsvo4J44FWdSGLU2AR9vvc5/edit?gid=314412179#gid=314412179",
-        "responsavel": "Kiane Coelho",
-        "responsavelHistorico": "",
-        "responsavelCliente": "Kiane Coelho",
-        "designerResponsavel1": "Kiane Coelho",
-        "dataVencimento": "2026-09-04T20:30:00.000Z",
-        "stage": "fazer",
-        "phaseTitle": "Criação textual",
-        "tempoEstimadoHoras": 3,
-        "tempoGastoHoras": 0,
-        "criadoEm": "2026-08-26T21:12:06.459Z",
-        "concluidoEm": null,
-        "dataNaFaseAtual": "2026-08-26T21:12:06.464Z",
-        "entrouExecutandoEm": null,
-        "entrouMontagemEm": null,
-        "entrouValidacaoEm": null,
-        "tempoValidacaoDias": null,
-        "tempoAprovadoProgramacaoDias": null,
-        "teveAjustes": false,
-        "registroAjustes": "",
-        "clienteAtivo": true,
-        "clientePostsMes": 40
-      },
-      {
         "id": "868026f0-34bb-47b0-bf64-3fdcefb6ce9a",
         "contentType": "FEED",
         "formatoEntrega": "Vídeo",
@@ -6389,7 +5993,7 @@
       {
         "id": "9227db79-75ec-4ce6-9860-6f5a27ba4d9b",
         "contentType": "FEED",
-        "formatoEntrega": "Stories",
+        "formatoEntrega": "Estático",
         "statusTags": [],
         "goalfyTags": [
           {
@@ -6671,50 +6275,6 @@
         "clientePostsMes": 12
       },
       {
-        "id": "9761fd7a-c035-4d9f-b958-1b65dbf15a04",
-        "contentType": "FEED",
-        "formatoEntrega": "Vídeo",
-        "statusTags": [],
-        "goalfyTags": [
-          {
-            "text": "FACEBOOK",
-            "color": "#2384f7"
-          },
-          {
-            "text": "INSTAGRAM",
-            "color": "#d623f7"
-          }
-        ],
-        "title": "[UNE LUNELLI] SETEMBRO/2026 #42/40",
-        "parceiro": "Une Lunelli",
-        "calendario": "Une - Setembro/2026",
-        "calendarioId": "9e4a2aa2-a5d5-4e63-bf77-3fc645edae89",
-        "clienteRelacionado": "Une Lunelli",
-        "linkDrive": "https://drive.google.com/drive/folders/17E_CxGpAuP6fD0HFJbSJQ9cqS0zN94OK?usp=drive_link",
-        "linkCalendarioEditorial": "https://docs.google.com/spreadsheets/d/1anm1W8DbOvsvo4J44FWdSGLU2AR9vvc5/edit?gid=314412179#gid=314412179",
-        "responsavel": "Kiane Coelho",
-        "responsavelHistorico": "",
-        "responsavelCliente": "Kiane Coelho",
-        "designerResponsavel1": "Kiane Coelho",
-        "dataVencimento": "2026-09-04T20:30:00.000Z",
-        "stage": "fazer",
-        "phaseTitle": "Criação textual",
-        "tempoEstimadoHoras": 3,
-        "tempoGastoHoras": 0,
-        "criadoEm": "2026-08-26T21:12:40.379Z",
-        "concluidoEm": null,
-        "dataNaFaseAtual": "2026-08-26T21:12:40.383Z",
-        "entrouExecutandoEm": null,
-        "entrouMontagemEm": null,
-        "entrouValidacaoEm": null,
-        "tempoValidacaoDias": null,
-        "tempoAprovadoProgramacaoDias": null,
-        "teveAjustes": false,
-        "registroAjustes": "",
-        "clienteAtivo": true,
-        "clientePostsMes": 40
-      },
-      {
         "id": "9997fedf-24c3-47e1-978c-b850089b20bf",
         "contentType": "FEED",
         "formatoEntrega": "Vídeo",
@@ -6877,13 +6437,13 @@
         "responsavelCliente": "Kiane Coelho",
         "designerResponsavel1": "Kiane Coelho",
         "dataVencimento": "2026-09-04T20:30:00.000Z",
-        "stage": "concluido",
-        "phaseTitle": "Post Programado",
+        "stage": "fazer",
+        "phaseTitle": "Criação textual",
         "tempoEstimadoHoras": 3,
         "tempoGastoHoras": 0,
         "criadoEm": "2026-08-26T21:11:27.835Z",
         "concluidoEm": "2026-08-31T20:04:30.009Z",
-        "dataNaFaseAtual": "2026-08-31T20:04:30.009Z",
+        "dataNaFaseAtual": "2026-08-26T21:11:27.838Z",
         "entrouExecutandoEm": "2026-08-27T19:22:22.259Z",
         "entrouMontagemEm": null,
         "entrouValidacaoEm": "2026-08-27T21:43:07.096Z",
@@ -7173,50 +6733,6 @@
         "registroAjustes": "",
         "clienteAtivo": true,
         "clientePostsMes": 6
-      },
-      {
-        "id": "a0147954-c612-480a-b409-c0f939e2ccce",
-        "contentType": "FEED",
-        "formatoEntrega": "Stories",
-        "statusTags": [],
-        "goalfyTags": [
-          {
-            "text": "FACEBOOK",
-            "color": "#2384f7"
-          },
-          {
-            "text": "INSTAGRAM",
-            "color": "#d623f7"
-          }
-        ],
-        "title": "[UNE LUNELLI] SETEMBRO/2026 #28/40",
-        "parceiro": "Une Lunelli",
-        "calendario": "Une - Setembro/2026",
-        "calendarioId": "9e4a2aa2-a5d5-4e63-bf77-3fc645edae89",
-        "clienteRelacionado": "Une Lunelli",
-        "linkDrive": "https://drive.google.com/drive/folders/17E_CxGpAuP6fD0HFJbSJQ9cqS0zN94OK?usp=drive_link",
-        "linkCalendarioEditorial": "https://docs.google.com/spreadsheets/d/1anm1W8DbOvsvo4J44FWdSGLU2AR9vvc5/edit?gid=314412179#gid=314412179",
-        "responsavel": "Kiane Coelho",
-        "responsavelHistorico": "",
-        "responsavelCliente": "Kiane Coelho",
-        "designerResponsavel1": "Kiane Coelho",
-        "dataVencimento": "2026-09-04T20:30:00.000Z",
-        "stage": "concluido",
-        "phaseTitle": "Post Programado",
-        "tempoEstimadoHoras": 3,
-        "tempoGastoHoras": 0,
-        "criadoEm": "2026-08-26T21:11:53.459Z",
-        "concluidoEm": "2026-08-31T20:13:49.587Z",
-        "dataNaFaseAtual": "2026-08-31T20:13:49.587Z",
-        "entrouExecutandoEm": "2026-08-28T17:45:28.551Z",
-        "entrouMontagemEm": null,
-        "entrouValidacaoEm": "2026-08-28T22:21:19.352Z",
-        "tempoValidacaoDias": 2.91,
-        "tempoAprovadoProgramacaoDias": 0,
-        "teveAjustes": false,
-        "registroAjustes": "",
-        "clienteAtivo": true,
-        "clientePostsMes": 40
       },
       {
         "id": "a0739124-8832-4a98-aba3-c37ea69e2ba3",
@@ -8035,13 +7551,13 @@
         "responsavelCliente": "Kiane Coelho",
         "designerResponsavel1": "Kiane Coelho",
         "dataVencimento": "2026-09-04T20:30:00.000Z",
-        "stage": "concluido",
-        "phaseTitle": "Post Programado",
+        "stage": "fazer",
+        "phaseTitle": "Criação textual",
         "tempoEstimadoHoras": 3,
         "tempoGastoHoras": 0,
         "criadoEm": "2026-08-26T21:11:15.138Z",
         "concluidoEm": "2026-08-31T20:00:50.234Z",
-        "dataNaFaseAtual": "2026-08-31T20:00:50.234Z",
+        "dataNaFaseAtual": "2026-08-26T21:11:15.142Z",
         "entrouExecutandoEm": "2026-08-27T19:15:28.271Z",
         "entrouMontagemEm": null,
         "entrouValidacaoEm": "2026-08-27T21:05:53.084Z",
@@ -8103,7 +7619,7 @@
       {
         "id": "afd80def-4a01-47ea-b8f2-a8edb5ff106e",
         "contentType": "FEED",
-        "formatoEntrega": "Stories",
+        "formatoEntrega": "Carrossel",
         "statusTags": [],
         "goalfyTags": [
           {
@@ -8525,50 +8041,6 @@
         "registroAjustes": "",
         "clienteAtivo": true,
         "clientePostsMes": 6
-      },
-      {
-        "id": "b6c720d4-83a3-44dc-a102-3f0670752e3a",
-        "contentType": "FEED",
-        "formatoEntrega": "Vídeo",
-        "statusTags": [],
-        "goalfyTags": [
-          {
-            "text": "FACEBOOK",
-            "color": "#2384f7"
-          },
-          {
-            "text": "INSTAGRAM",
-            "color": "#d623f7"
-          }
-        ],
-        "title": "[UNE LUNELLI] SETEMBRO/2026 #34/40",
-        "parceiro": "Une Lunelli",
-        "calendario": "Une - Setembro/2026",
-        "calendarioId": "9e4a2aa2-a5d5-4e63-bf77-3fc645edae89",
-        "clienteRelacionado": "Une Lunelli",
-        "linkDrive": "https://drive.google.com/drive/folders/17E_CxGpAuP6fD0HFJbSJQ9cqS0zN94OK?usp=drive_link",
-        "linkCalendarioEditorial": "https://docs.google.com/spreadsheets/d/1anm1W8DbOvsvo4J44FWdSGLU2AR9vvc5/edit?gid=314412179#gid=314412179",
-        "responsavel": "Kiane Coelho",
-        "responsavelHistorico": "",
-        "responsavelCliente": "Kiane Coelho",
-        "designerResponsavel1": "Kiane Coelho",
-        "dataVencimento": "2026-09-04T20:30:00.000Z",
-        "stage": "fazer",
-        "phaseTitle": "Criação textual",
-        "tempoEstimadoHoras": 3,
-        "tempoGastoHoras": 0,
-        "criadoEm": "2026-08-26T21:12:13.396Z",
-        "concluidoEm": null,
-        "dataNaFaseAtual": "2026-08-26T21:12:13.400Z",
-        "entrouExecutandoEm": null,
-        "entrouMontagemEm": null,
-        "entrouValidacaoEm": null,
-        "tempoValidacaoDias": null,
-        "tempoAprovadoProgramacaoDias": null,
-        "teveAjustes": false,
-        "registroAjustes": "",
-        "clienteAtivo": true,
-        "clientePostsMes": 40
       },
       {
         "id": "b7369e34-a55e-422f-8ece-43b5cf3b8575",
@@ -9227,13 +8699,13 @@
         "responsavelCliente": "vitorya",
         "designerResponsavel1": "vitorya",
         "dataVencimento": "2026-09-01T20:23:00.000Z",
-        "stage": "executando",
-        "phaseTitle": "Criação das artes",
+        "stage": "direcao_arte",
+        "phaseTitle": "Direção de arte",
         "tempoEstimadoHoras": 3,
         "tempoGastoHoras": 0,
         "criadoEm": "2026-08-28T23:23:13.909Z",
         "concluidoEm": null,
-        "dataNaFaseAtual": "2026-08-28T23:23:13.972Z",
+        "dataNaFaseAtual": "2026-08-31T23:12:32.948Z",
         "entrouExecutandoEm": "2026-08-28T23:23:13.972Z",
         "entrouMontagemEm": null,
         "entrouValidacaoEm": null,
@@ -9243,50 +8715,6 @@
         "registroAjustes": "",
         "clienteAtivo": true,
         "clientePostsMes": 15
-      },
-      {
-        "id": "c0efd9b1-6edb-4238-96ed-ea5bb8591b43",
-        "contentType": "FEED",
-        "formatoEntrega": "Estático",
-        "statusTags": [],
-        "goalfyTags": [
-          {
-            "text": "FACEBOOK",
-            "color": "#2384f7"
-          },
-          {
-            "text": "INSTAGRAM",
-            "color": "#d623f7"
-          }
-        ],
-        "title": "[UNE LUNELLI] SETEMBRO/2026 #40/40",
-        "parceiro": "Une Lunelli",
-        "calendario": "Une - Setembro/2026",
-        "calendarioId": "9e4a2aa2-a5d5-4e63-bf77-3fc645edae89",
-        "clienteRelacionado": "Une Lunelli",
-        "linkDrive": "https://drive.google.com/drive/folders/17E_CxGpAuP6fD0HFJbSJQ9cqS0zN94OK?usp=drive_link",
-        "linkCalendarioEditorial": "https://docs.google.com/spreadsheets/d/1anm1W8DbOvsvo4J44FWdSGLU2AR9vvc5/edit?gid=314412179#gid=314412179",
-        "responsavel": "Kiane Coelho",
-        "responsavelHistorico": "",
-        "responsavelCliente": "Kiane Coelho",
-        "designerResponsavel1": "Kiane Coelho",
-        "dataVencimento": "2026-09-04T20:30:00.000Z",
-        "stage": "executando",
-        "phaseTitle": "Criação das artes",
-        "tempoEstimadoHoras": 3,
-        "tempoGastoHoras": 0,
-        "criadoEm": "2026-08-26T21:12:33.792Z",
-        "concluidoEm": null,
-        "dataNaFaseAtual": "2026-08-28T20:03:21.045Z",
-        "entrouExecutandoEm": "2026-08-28T20:03:21.045Z",
-        "entrouMontagemEm": null,
-        "entrouValidacaoEm": null,
-        "tempoValidacaoDias": null,
-        "tempoAprovadoProgramacaoDias": null,
-        "teveAjustes": false,
-        "registroAjustes": "",
-        "clienteAtivo": true,
-        "clientePostsMes": 40
       },
       {
         "id": "c193fe8a-bb70-4a6a-baa2-806c6594169b",
@@ -9763,50 +9191,6 @@
         "clientePostsMes": 8
       },
       {
-        "id": "c7a05525-629c-4ab9-85ba-30e7e792216d",
-        "contentType": "FEED",
-        "formatoEntrega": "Stories",
-        "statusTags": [],
-        "goalfyTags": [
-          {
-            "text": "FACEBOOK",
-            "color": "#2384f7"
-          },
-          {
-            "text": "INSTAGRAM",
-            "color": "#d623f7"
-          }
-        ],
-        "title": "[UNE LUNELLI] SETEMBRO/2026 #39/40",
-        "parceiro": "Une Lunelli",
-        "calendario": "Une - Setembro/2026",
-        "calendarioId": "9e4a2aa2-a5d5-4e63-bf77-3fc645edae89",
-        "clienteRelacionado": "Une Lunelli",
-        "linkDrive": "https://drive.google.com/drive/folders/17E_CxGpAuP6fD0HFJbSJQ9cqS0zN94OK?usp=drive_link",
-        "linkCalendarioEditorial": "https://docs.google.com/spreadsheets/d/1anm1W8DbOvsvo4J44FWdSGLU2AR9vvc5/edit?gid=314412179#gid=314412179",
-        "responsavel": "Kiane Coelho",
-        "responsavelHistorico": "",
-        "responsavelCliente": "Kiane Coelho",
-        "designerResponsavel1": "Kiane Coelho",
-        "dataVencimento": "2026-09-04T20:30:00.000Z",
-        "stage": "executando",
-        "phaseTitle": "Criação das artes",
-        "tempoEstimadoHoras": 3,
-        "tempoGastoHoras": 0,
-        "criadoEm": "2026-08-26T21:12:30.460Z",
-        "concluidoEm": null,
-        "dataNaFaseAtual": "2026-08-28T19:50:02.002Z",
-        "entrouExecutandoEm": "2026-08-28T19:50:02.002Z",
-        "entrouMontagemEm": null,
-        "entrouValidacaoEm": null,
-        "tempoValidacaoDias": null,
-        "tempoAprovadoProgramacaoDias": null,
-        "teveAjustes": false,
-        "registroAjustes": "",
-        "clienteAtivo": true,
-        "clientePostsMes": 40
-      },
-      {
         "id": "c81fcbc2-c3b3-4625-b847-f444b171d86c",
         "contentType": "FEED",
         "formatoEntrega": "Estático",
@@ -9929,13 +9313,13 @@
         "responsavelCliente": "Kiane Coelho",
         "designerResponsavel1": "Kiane Coelho",
         "dataVencimento": "2026-09-04T20:30:00.000Z",
-        "stage": "concluido",
-        "phaseTitle": "Post Programado",
+        "stage": "fazer",
+        "phaseTitle": "Criação textual",
         "tempoEstimadoHoras": 3,
         "tempoGastoHoras": 0,
         "criadoEm": "2026-08-26T21:11:46.975Z",
         "concluidoEm": "2026-08-31T20:15:17.203Z",
-        "dataNaFaseAtual": "2026-08-31T20:15:17.203Z",
+        "dataNaFaseAtual": "2026-08-26T21:11:46.979Z",
         "entrouExecutandoEm": "2026-08-28T17:45:07.727Z",
         "entrouMontagemEm": null,
         "entrouValidacaoEm": "2026-08-28T22:21:02.072Z",
@@ -10395,13 +9779,13 @@
         "responsavelCliente": "Kiane Coelho",
         "designerResponsavel1": "Kiane Coelho",
         "dataVencimento": "2026-09-04T20:30:00.000Z",
-        "stage": "concluido",
-        "phaseTitle": "Post Programado",
+        "stage": "executando",
+        "phaseTitle": "Criação das artes",
         "tempoEstimadoHoras": 3,
         "tempoGastoHoras": 0,
         "criadoEm": "2026-08-26T21:11:30.964Z",
         "concluidoEm": "2026-08-31T20:06:57.485Z",
-        "dataNaFaseAtual": "2026-08-31T20:06:57.485Z",
+        "dataNaFaseAtual": "2026-08-27T19:39:10.598Z",
         "entrouExecutandoEm": "2026-08-27T19:39:10.598Z",
         "entrouMontagemEm": null,
         "entrouValidacaoEm": "2026-08-28T14:18:33.946Z",
@@ -11071,18 +10455,18 @@
         "responsavelCliente": "vitorya",
         "designerResponsavel1": "vitorya",
         "dataVencimento": "2026-08-14T17:35:00.000Z",
-        "stage": "aprovado_programacao",
-        "phaseTitle": "Aprovado para programação",
+        "stage": "concluido",
+        "phaseTitle": "Post Programado",
         "tempoEstimadoHoras": 3,
         "tempoGastoHoras": 0,
         "criadoEm": "2026-08-07T20:35:39.596Z",
-        "concluidoEm": null,
-        "dataNaFaseAtual": "2026-08-24T21:58:30.580Z",
+        "concluidoEm": "2026-08-31T21:45:41.191Z",
+        "dataNaFaseAtual": "2026-08-31T21:45:41.191Z",
         "entrouExecutandoEm": "2026-08-07T21:48:59.365Z",
         "entrouMontagemEm": null,
         "entrouValidacaoEm": "2026-08-14T20:48:17.105Z",
         "tempoValidacaoDias": 10.05,
-        "tempoAprovadoProgramacaoDias": 0,
+        "tempoAprovadoProgramacaoDias": 6.99,
         "teveAjustes": false,
         "registroAjustes": "",
         "clienteAtivo": true,
@@ -11137,50 +10521,6 @@
         "clientePostsMes": 12
       },
       {
-        "id": "dd7fea29-667e-45cc-8ef3-f3118ff40640",
-        "contentType": "FEED",
-        "formatoEntrega": "Stories",
-        "statusTags": [],
-        "goalfyTags": [
-          {
-            "text": "FACEBOOK",
-            "color": "#2384f7"
-          },
-          {
-            "text": "INSTAGRAM",
-            "color": "#d623f7"
-          }
-        ],
-        "title": "[UNE LUNELLI] SETEMBRO/2026 #35/40",
-        "parceiro": "Une Lunelli",
-        "calendario": "Une - Setembro/2026",
-        "calendarioId": "9e4a2aa2-a5d5-4e63-bf77-3fc645edae89",
-        "clienteRelacionado": "Une Lunelli",
-        "linkDrive": "https://drive.google.com/drive/folders/17E_CxGpAuP6fD0HFJbSJQ9cqS0zN94OK?usp=drive_link",
-        "linkCalendarioEditorial": "https://docs.google.com/spreadsheets/d/1anm1W8DbOvsvo4J44FWdSGLU2AR9vvc5/edit?gid=314412179#gid=314412179",
-        "responsavel": "Kiane Coelho",
-        "responsavelHistorico": "",
-        "responsavelCliente": "Kiane Coelho",
-        "designerResponsavel1": "Kiane Coelho",
-        "dataVencimento": "2026-09-04T20:30:00.000Z",
-        "stage": "executando",
-        "phaseTitle": "Criação das artes",
-        "tempoEstimadoHoras": 3,
-        "tempoGastoHoras": 0,
-        "criadoEm": "2026-08-26T21:12:16.903Z",
-        "concluidoEm": null,
-        "dataNaFaseAtual": "2026-08-28T19:50:09.664Z",
-        "entrouExecutandoEm": "2026-08-28T19:50:09.664Z",
-        "entrouMontagemEm": null,
-        "entrouValidacaoEm": null,
-        "tempoValidacaoDias": null,
-        "tempoAprovadoProgramacaoDias": null,
-        "teveAjustes": false,
-        "registroAjustes": "",
-        "clienteAtivo": true,
-        "clientePostsMes": 40
-      },
-      {
         "id": "dd8257b2-62de-4718-b9b4-cf618a326d0e",
         "contentType": "FEED",
         "formatoEntrega": "Carrossel",
@@ -11231,7 +10571,7 @@
       {
         "id": "de30c4e5-1164-42f1-8151-5dd10d6c9b4a",
         "contentType": "FEED",
-        "formatoEntrega": "Stories",
+        "formatoEntrega": "Carrossel",
         "statusTags": [],
         "goalfyTags": [
           {
@@ -11407,50 +10747,6 @@
         "entrouValidacaoEm": "2026-08-05T22:36:44.902Z",
         "tempoValidacaoDias": 0,
         "tempoAprovadoProgramacaoDias": 1.91,
-        "teveAjustes": false,
-        "registroAjustes": "",
-        "clienteAtivo": true,
-        "clientePostsMes": 40
-      },
-      {
-        "id": "e3df3140-7bc3-475f-9165-8cb8fc31fc29",
-        "contentType": "FEED",
-        "formatoEntrega": "Stories",
-        "statusTags": [],
-        "goalfyTags": [
-          {
-            "text": "FACEBOOK",
-            "color": "#2384f7"
-          },
-          {
-            "text": "INSTAGRAM",
-            "color": "#d623f7"
-          }
-        ],
-        "title": "[UNE LUNELLI] SETEMBRO/2026 #27/40",
-        "parceiro": "Une Lunelli",
-        "calendario": "Une - Setembro/2026",
-        "calendarioId": "9e4a2aa2-a5d5-4e63-bf77-3fc645edae89",
-        "clienteRelacionado": "Une Lunelli",
-        "linkDrive": "https://drive.google.com/drive/folders/17E_CxGpAuP6fD0HFJbSJQ9cqS0zN94OK?usp=drive_link",
-        "linkCalendarioEditorial": "https://docs.google.com/spreadsheets/d/1anm1W8DbOvsvo4J44FWdSGLU2AR9vvc5/edit?gid=314412179#gid=314412179",
-        "responsavel": "Kiane Coelho",
-        "responsavelHistorico": "",
-        "responsavelCliente": "Kiane Coelho",
-        "designerResponsavel1": "Kiane Coelho",
-        "dataVencimento": "2026-09-04T20:30:00.000Z",
-        "stage": "concluido",
-        "phaseTitle": "Post Programado",
-        "tempoEstimadoHoras": 3,
-        "tempoGastoHoras": 0,
-        "criadoEm": "2026-08-26T21:11:50.209Z",
-        "concluidoEm": "2026-08-31T20:13:56.501Z",
-        "dataNaFaseAtual": "2026-08-31T20:13:56.501Z",
-        "entrouExecutandoEm": "2026-08-28T17:45:15.882Z",
-        "entrouMontagemEm": null,
-        "entrouValidacaoEm": "2026-08-28T22:21:13.861Z",
-        "tempoValidacaoDias": 2.91,
-        "tempoAprovadoProgramacaoDias": 0,
         "teveAjustes": false,
         "registroAjustes": "",
         "clienteAtivo": true,
@@ -11635,13 +10931,13 @@
         "responsavelCliente": "Kiane Coelho",
         "designerResponsavel1": "Kiane Coelho",
         "dataVencimento": "2026-09-04T20:30:00.000Z",
-        "stage": "concluido",
-        "phaseTitle": "Post Programado",
+        "stage": "fazer",
+        "phaseTitle": "Criação textual",
         "tempoEstimadoHoras": 3,
         "tempoGastoHoras": 0,
         "criadoEm": "2026-08-26T21:11:37.350Z",
         "concluidoEm": "2026-08-31T20:10:14.737Z",
-        "dataNaFaseAtual": "2026-08-31T20:10:14.737Z",
+        "dataNaFaseAtual": "2026-08-26T21:11:37.355Z",
         "entrouExecutandoEm": "2026-08-27T19:50:05.206Z",
         "entrouMontagemEm": null,
         "entrouValidacaoEm": "2026-08-28T17:15:26.679Z",
@@ -12147,13 +11443,13 @@
         "responsavelCliente": "Kiane Coelho",
         "designerResponsavel1": "Kiane Coelho",
         "dataVencimento": "2026-09-04T20:30:00.000Z",
-        "stage": "concluido",
-        "phaseTitle": "Post Programado",
+        "stage": "fazer",
+        "phaseTitle": "Criação textual",
         "tempoEstimadoHoras": 3,
         "tempoGastoHoras": 0,
         "criadoEm": "2026-08-26T21:11:08.386Z",
         "concluidoEm": "2026-08-31T14:12:44.603Z",
-        "dataNaFaseAtual": "2026-08-31T14:12:44.603Z",
+        "dataNaFaseAtual": "2026-08-26T21:11:08.390Z",
         "entrouExecutandoEm": "2026-08-26T23:22:43.301Z",
         "entrouMontagemEm": null,
         "entrouValidacaoEm": "2026-08-27T20:05:11.971Z",
@@ -12267,7 +11563,7 @@
       {
         "id": "f29db754-5e99-4b72-9e84-d2a01ece4385",
         "contentType": "FEED",
-        "formatoEntrega": "Stories",
+        "formatoEntrega": "Carrossel",
         "statusTags": [],
         "goalfyTags": [
           {
@@ -12291,13 +11587,13 @@
         "responsavelCliente": "Kiane Coelho",
         "designerResponsavel1": "Kiane Coelho",
         "dataVencimento": "2026-09-04T20:30:00.000Z",
-        "stage": "concluido",
-        "phaseTitle": "Post Programado",
+        "stage": "validacao",
+        "phaseTitle": "Validação do Cliente",
         "tempoEstimadoHoras": 3,
         "tempoGastoHoras": 0,
         "criadoEm": "2026-08-26T21:11:24.612Z",
         "concluidoEm": "2026-08-31T20:01:25.061Z",
-        "dataNaFaseAtual": "2026-08-31T20:01:25.061Z",
+        "dataNaFaseAtual": "2026-08-27T21:06:18.809Z",
         "entrouExecutandoEm": "2026-08-27T19:16:21.407Z",
         "entrouMontagemEm": null,
         "entrouValidacaoEm": "2026-08-27T21:06:18.809Z",
