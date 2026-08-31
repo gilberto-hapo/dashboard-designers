@@ -23,7 +23,7 @@ export type CalendarioSegments = {
 };
 
 export type ProgressSegment = {
-  key: 'criacaoTextual' | 'criacaoDasArtes' | 'direcaoDeArte' | 'conferencia' | 'validacao' | 'aprovado' | 'publicado' | 'ajuste';
+  key: 'criacaoTextual' | 'criacaoDasArtes' | 'direcaoDeArte' | 'conferencia' | 'validacao' | 'aprovado' | 'publicado';
   count: number;
   className: string;
 };
@@ -52,7 +52,6 @@ export function getConclusionSegments(calendario: CalendarioSegments) {
     { key: 'validacao', count: calendario.postsEmValidacao, className: 'bg-orange-500' },
     { key: 'aprovado', count: calendario.postsAprovados, className: 'bg-emerald-800' },
     { key: 'publicado', count: calendario.postsPublicados, className: 'bg-green-400' },
-    { key: 'ajuste', count: 0, className: 'bg-amber-400' },
   ];
 
   const percent = total > 0 ? Math.round((decidedTotal / total) * 100) : 0;
@@ -104,7 +103,6 @@ const SEGMENT_LABELS: Record<ProgressSegment['key'], string> = {
   validacao: 'Validação do Cliente',
   aprovado: 'Aprovado para Programação',
   publicado: 'Publicado',
-  ajuste: 'Em ajuste',
 };
 
 export function SegmentedConclusionBar({

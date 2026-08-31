@@ -115,13 +115,8 @@ function getPostsConclusionSegments(posts: PortalPost[]) {
     validacao: 0,
     aprovado: 0,
     publicado: 0,
-    ajuste: 0,
   };
   posts.forEach((post) => {
-    if (decisionStatus(post) === 'adjustment') {
-      counts.ajuste += 1;
-      return;
-    }
     const stage = post.pipelineStage ?? 'criacaoTextual';
     counts[stage] += 1;
   });
@@ -135,7 +130,6 @@ function getPostsConclusionSegments(posts: PortalPost[]) {
     { key: 'validacao', count: counts.validacao, className: 'bg-orange-500' },
     { key: 'aprovado', count: counts.aprovado, className: 'bg-emerald-800' },
     { key: 'publicado', count: counts.publicado, className: 'bg-green-400' },
-    { key: 'ajuste', count: counts.ajuste, className: 'bg-amber-400' },
   ];
 
   const percent = total > 0 ? Math.round((decidedTotal / total) * 100) : 0;
