@@ -10,6 +10,7 @@ import {
   insertPostDecision,
   markDecisionSyncStatus,
   getLatestDecisionsForCalendars,
+  getAdjustmentCountsByCalendars,
   getDecisionHistoryForPost,
   getDecisionHistoryForPosts,
   markAdjustmentsResolvedForPost,
@@ -2018,6 +2019,102 @@ function formatMonthYear(dateValue) {
   return `${months[date.getUTCMonth()]}/${date.getUTCFullYear()}`;
 }
 
+const MES_ANO_ORDER = [
+  'JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO',
+  'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO',
+];
+
+// Gera os `mesAno` (ex. "AGOSTO/2026") dos últimos N meses corridos,
+// incluindo o mês atual, mais antigo -> mais recente.
+function getUltimosMesesAno(count, referenceDate = new Date()) {
+  const result = [];
+  for (let i = count - 1; i >= 0; i -= 1) {
+    const date = new Date(Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth() - i, 1));
+    result.push(`${MES_ANO_ORDER[date.getUTCMonth()]}/${date.getUTCFullYear()}`);
+  }
+  return result;
+}
+
+// Normaliza o rótulo de formatoEntrega vindo do custom field da Goalfy (ou
+// vazio, quando o campo não foi preenchido) para uma chave estável de
+// agregação — mesma normalização usada no restante do app via
+// normalizeLookupKey, mas preservando um rótulo legível para o front.
+function normalizeFormatoEntregaLabel(formatoEntrega) {
+  const normalized = normalizeLookupKey(formatoEntrega).toUpperCase();
+  if (!normalized) return 'NÃO INFORMADO';
+  if (normalized.includes('CARROSSEL')) return 'CARROSSEL';
+  if (normalized.includes('VIDEO')) return 'VÍDEO';
+  if (normalized.includes('STORY') || normalized.includes('STORIES')) return 'STORIES';
+  if (normalized.includes('ESTATICO') || normalized.includes('FEED')) return 'ESTÁTICO';
+  return String(formatoEntrega).trim().toUpperCase();
+}
+
+// Agrega, para um cliente, o histórico dos últimos 3 meses corridos:
+// quantidade de posts, distribuição por formato de conteúdo e quantidade de
+// ajustes solicitados — tudo a partir de dados já em memória (goalfyData) e
+// uma única query agregada ao Postgres, sem fan-out de Drive.
+async function resolveClientHistoricoTrimestre(clientId, { calendarios, goalfyData }) {
+  const mesesJanela = getUltimosMesesAno(3);
+  const calendariosDoCliente = calendarios.filter(
+    (c) => c.clientId === clientId && mesesJanela.includes(c.mesAno),
+  );
+  const calendarIds = calendariosDoCliente.map((c) => c.id);
+
+  const adjustmentCountsByCalendarId = await getAdjustmentCountsByCalendars(calendarIds);
+
+  const porMesAno = new Map(mesesJanela.map((mesAno) => [mesAno, {
+    mesAno,
+    temCalendario: false,
+    totalPosts: 0,
+    totalAjustes: 0,
+    taxaAjustes: 0,
+    porFormato: {},
+  }]));
+
+  calendariosDoCliente.forEach((calendario) => {
+    const bucket = porMesAno.get(calendario.mesAno);
+    if (!bucket) return;
+
+    bucket.temCalendario = true;
+    const tasksDoCalendario = goalfyData.tasks.filter((task) => task.calendarioId === calendario.id);
+    bucket.totalPosts += tasksDoCalendario.length;
+    bucket.totalAjustes += adjustmentCountsByCalendarId.get(calendario.id) || 0;
+
+    tasksDoCalendario.forEach((task) => {
+      const label = normalizeFormatoEntregaLabel(task.formatoEntrega);
+      bucket.porFormato[label] = (bucket.porFormato[label] || 0) + 1;
+    });
+  });
+
+  const meses = mesesJanela.map((mesAno) => {
+    const bucket = porMesAno.get(mesAno);
+    bucket.taxaAjustes = bucket.totalPosts > 0 ? Math.round((bucket.totalAjustes / bucket.totalPosts) * 100) : 0;
+    return bucket;
+  });
+
+  const totalPosts = meses.reduce((sum, mes) => sum + mes.totalPosts, 0);
+  const totalAjustes = meses.reduce((sum, mes) => sum + mes.totalAjustes, 0);
+  const formatoMaisUsado = Object.entries(
+    meses.reduce((acc, mes) => {
+      Object.entries(mes.porFormato).forEach(([formato, count]) => {
+        acc[formato] = (acc[formato] || 0) + count;
+      });
+      return acc;
+    }, {}),
+  ).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+
+  return {
+    meses,
+    resumo: {
+      totalPosts,
+      totalAjustes,
+      taxaAjustes: totalPosts > 0 ? Math.round((totalAjustes / totalPosts) * 100) : 0,
+      formatoMaisUsado,
+    },
+    geradoEm: new Date().toISOString(),
+  };
+}
+
 function buildPostTitles({ clienteNome, mesAno, totalPosts }) {
   const paddedTotal = String(totalPosts).padStart(2, '0');
   return Array.from({ length: totalPosts }, (_, index) => {
@@ -3229,6 +3326,35 @@ app.get('/api/clientes/:id/detail', requireAuth, async (req, res) => {
     res.json({ client, calendarios: clientCalendarios });
   } catch (error) {
     console.error('Client detail request failed', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/clientes/:id/historico-trimestre', requireAuth, async (req, res) => {
+  const clientId = String(req.params.id || '').trim();
+  if (!clientId) {
+    res.status(400).json({ error: 'clientId is required' });
+    return;
+  }
+
+  try {
+    const writeToken = getGoalfyCardsWriteToken();
+    const [clients, calendarios, goalfyData] = await Promise.all([
+      fetchCardsClients({ writeToken }),
+      fetchAllCalendarsWithPhase({ writeToken }),
+      fetchGoalfyData(),
+    ]);
+
+    const client = clients.find((c) => c.id === clientId);
+    if (!client) {
+      res.status(404).json({ error: 'Cliente não encontrado' });
+      return;
+    }
+
+    const historico = await resolveClientHistoricoTrimestre(clientId, { calendarios, goalfyData });
+    res.json(historico);
+  } catch (error) {
+    console.error('Client historico trimestre request failed', error);
     res.status(500).json({ error: error.message });
   }
 });

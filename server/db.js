@@ -170,6 +170,36 @@ export async function getLatestDecisionsForCalendars(calendarIds) {
   return decisionsByCalendarId;
 }
 
+// Contagem de POSTS DISTINTOS que receberam ao menos um ajuste (decisão
+// reprovada com feedback) por calendário — não o total de idas-e-voltas: um
+// mesmo post pode acumular várias rodadas de feedback, e o que queremos aqui
+// é "quantos posts precisaram de ajuste", não "quantas mensagens de feedback
+// foram trocadas". Sem o JOIN de "última decisão por post" usado em
+// getLatestDecisionsForCalendars, que serve para status atual, não para
+// contagem histórica. Retorna Map<calendarId, count>.
+export async function getAdjustmentCountsByCalendars(calendarIds, { since } = {}) {
+  await ensureSchema();
+  if (!calendarIds.length) return new Map();
+  const params = [calendarIds];
+  let sinceClause = '';
+  if (since) {
+    params.push(since);
+    sinceClause = ` AND created_at >= $${params.length}`;
+  }
+  const { rows } = await pool.query(
+    `SELECT calendar_id, COUNT(DISTINCT post_id) AS count
+     FROM post_decisions
+     WHERE calendar_id = ANY($1) AND approved = false AND feedback IS NOT NULL${sinceClause}
+     GROUP BY calendar_id`,
+    params,
+  );
+  const countsByCalendarId = new Map();
+  rows.forEach((row) => {
+    countsByCalendarId.set(row.calendar_id, Number(row.count));
+  });
+  return countsByCalendarId;
+}
+
 export async function deletePostDecision(decisionId, postId) {
   await ensureSchema();
   const { rowCount } = await pool.query(`DELETE FROM post_decisions WHERE id = $1 AND post_id = $2`, [

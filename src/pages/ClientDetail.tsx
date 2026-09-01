@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, ExternalLink, FolderOpen, Loader2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ChevronDown, ExternalLink, FolderOpen, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth';
 import Login from './Login';
@@ -13,6 +13,7 @@ import {
 import { fetchJson } from '@/lib/calendarUi';
 import { Button } from '@/components/ui/button';
 import { usePendingFeedbackCount } from '@/hooks/usePendingFeedbackCount';
+import { ClientQuarterHistoryChart } from '@/components/client/ClientQuarterHistoryChart';
 
 type LocalPublicacao = { nome: string; cor: string };
 
@@ -63,6 +64,7 @@ function ClientDetailContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [generatingClientLink, setGeneratingClientLink] = useState(false);
+  const [calendariosExpanded, setCalendariosExpanded] = useState(false);
 
   function loadClient() {
     if (!id) return;
@@ -192,39 +194,52 @@ function ClientDetailContent() {
               </div>
 
               <div className="space-y-3">
-                <h2 className="text-sm font-bold uppercase tracking-wide text-foreground">
-                  Calendários ({calendarios.length})
-                </h2>
-                {calendarios.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Nenhum calendário encontrado para este cliente.</p>
-                ) : (
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {calendarios.map((calendario) => (
-                      <button
-                        key={calendario.id}
-                        type="button"
-                        onClick={() => navigate(`/calendarios/${calendario.id}`)}
-                        className="flex flex-col gap-2 rounded-xl border border-border bg-card p-3 text-left transition-colors hover:border-foreground/30"
-                      >
-                        <p className="text-sm font-semibold text-foreground">{calendario.title}</p>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs text-muted-foreground">{calendario.mesAno}</span>
-                          <span
-                            className="inline-flex shrink-0 rounded border px-2 py-0.5 text-[10px] font-bold uppercase"
-                            style={{
-                              borderColor: calendario.phaseColor,
-                              backgroundColor: `${calendario.phaseColor}1a`,
-                              color: calendario.phaseColor,
-                            }}
-                          >
-                            {calendario.phaseTitle}
-                          </span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
+                <button
+                  type="button"
+                  onClick={() => setCalendariosExpanded((prev) => !prev)}
+                  className="flex w-full items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-left transition-colors hover:border-foreground/30"
+                >
+                  <h2 className="text-sm font-bold uppercase tracking-wide text-foreground">
+                    Calendários ({calendarios.length})
+                  </h2>
+                  <ChevronDown
+                    className={`h-4 w-4 text-muted-foreground transition-transform ${calendariosExpanded ? 'rotate-180' : ''}`}
+                  />
+                </button>
+                {calendariosExpanded && (
+                  calendarios.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Nenhum calendário encontrado para este cliente.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                      {calendarios.map((calendario) => (
+                        <button
+                          key={calendario.id}
+                          type="button"
+                          onClick={() => navigate(`/calendarios/${calendario.id}`)}
+                          className="flex flex-col gap-2 rounded-xl border border-border bg-card p-3 text-left transition-colors hover:border-foreground/30"
+                        >
+                          <p className="text-sm font-semibold text-foreground">{calendario.title}</p>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs text-muted-foreground">{calendario.mesAno}</span>
+                            <span
+                              className="inline-flex shrink-0 rounded border px-2 py-0.5 text-[10px] font-bold uppercase"
+                              style={{
+                                borderColor: calendario.phaseColor,
+                                backgroundColor: `${calendario.phaseColor}1a`,
+                                color: calendario.phaseColor,
+                              }}
+                            >
+                              {calendario.phaseTitle}
+                            </span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )
                 )}
               </div>
+
+              {client && <ClientQuarterHistoryChart clientId={client.id} />}
             </>
           )}
         </div>

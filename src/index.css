@@ -65,6 +65,16 @@
     --tag-aprovado: 142 70% 45%;
     --tag-aguardando: 38 92% 50%;
     --tag-data-comemorativa: 340 80% 55%;
+
+    /* Cores categóricas para gráficos (formato de conteúdo etc). Validadas
+       via skill dataviz contra a superfície --card deste app (sempre escuro,
+       sem modo claro): CVD delta E >= 8, contraste >= 3:1. */
+    --chart-format-1: #3987e5;
+    --chart-format-2: #d95926;
+    --chart-format-3: #199e70;
+    --chart-format-4: #c98500;
+    --chart-format-5: #6b7280;
+    --chart-neutral: hsl(var(--muted));
   }
 }
 
