@@ -430,7 +430,7 @@ function CalendarDetailContent() {
               <Tabs defaultValue="posts" className="space-y-3">
                 <TabsList>
                   <TabsTrigger value="posts">Posts ({calendario.posts.length})</TabsTrigger>
-                  <TabsTrigger value="editorial">Gerador de Copy</TabsTrigger>
+                  <TabsTrigger value="editorial">Gerador de Legenda</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="posts">
