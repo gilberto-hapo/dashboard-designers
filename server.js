@@ -24,6 +24,12 @@ import {
   cleanupCalendarMediaVariants,
   pregenerateMissingVariants,
 } from './server/mediaVariants.js';
+import { getEditorialCalendarItems } from './server/editorialSheet.js';
+import {
+  getClientPostHistoryForCopy,
+  upsertEditorialCopySuggestion,
+  getEditorialCopySuggestionsForCalendar,
+} from './server/db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1463,6 +1469,52 @@ async function generateAiDesignerClientReferencesBatch(payloads) {
   return normalized;
 }
 
+// Copy sugerida para um item do calendário editorial (aba "Calendário
+// Editorial"): usa o item da planilha (tema/aprofundamento/formato/linha
+// editorial) e o histórico geral do cliente (posts aprovados + feedbacks de
+// ajuste) como contexto — não gera nada automaticamente, o designer revisa
+// antes de usar.
+async function generateAiPostCopy({ item, clientNome, history, approvedCopyExamples }) {
+  const provider = getAiProvider();
+  const apiKey = provider === 'openai' ? process.env.OPENAI_API_KEY : process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('Nenhuma API key de IA configurada (GEMINI_API_KEY/OPENAI_API_KEY)');
+  }
+
+  const model = provider === 'openai'
+    ? (process.env.OPENAI_MODEL || 'gpt-4o-mini')
+    : (process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite');
+
+  const systemText = [
+    'Voce escreve copy (legenda) em portugues do Brasil para posts de redes sociais de agencia de design.',
+    'A copy deve ser uma sugestao inicial para o designer revisar e editar, nao um texto final.',
+    'Use o tema, aprofundamento, formato e linha editorial do item do calendario como base do conteudo.',
+    'approvedCopyExamples contem o texto real das legendas de posts recentes desse cliente que ja foram aprovados sem ressalvas — use como referencia de tamanho de texto, tom de voz, uso de emojis, formatacao e hashtags. Nao copie o conteudo especifico desses exemplos, apenas o estilo.',
+    'Se approvedCopyExamples estiver vazio, gere no tom profissional e leve padrao, sem inventar um estilo especifico do cliente.',
+    'Use os feedbacks de ajuste ja pedidos pelo cliente (pastFeedback) para evitar repetir os mesmos problemas apontados antes.',
+    'Se nao houver historico do cliente, gere a copy apenas com o item do calendario, sem inventar preferencias.',
+    'NUNCA use caracteres unicode estilizados de negrito ou italico (ex: 𝗻𝗲𝗴𝗿𝗶𝘁𝗼, 𝑖𝑡á𝑙𝑖𝑐𝑜) em nenhuma parte do texto. Escreva tudo em texto simples, sem nenhum tipo de destaque tipografico artificial — nem markdown (** ou *), nem unicode estilizado.',
+    'Responda somente com JSON valido no formato {"copy":"texto da legenda sugerida"}.',
+  ].join(' ');
+
+  const userPayload = {
+    cliente: clientNome || '',
+    item,
+    approvedCopyExamples: approvedCopyExamples || [],
+    pastFeedback: (history?.feedback || []).map((decision) => decision.feedback).filter(Boolean),
+  };
+
+  const parsed = provider === 'openai'
+    ? await requestOpenAiJson(model, apiKey, { systemText, userPayload, temperature: 0.8 })
+    : await requestGeminiJson(model, apiKey, {
+        systemInstruction: { parts: [{ text: systemText }] },
+        contents: [{ parts: [{ text: JSON.stringify(userPayload) }] }],
+        generationConfig: { temperature: 0.8, responseMimeType: 'application/json' },
+      });
+
+  return String(parsed?.copy || '').trim();
+}
+
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { identifier, email, password } = req.body ?? {};
@@ -1709,6 +1761,131 @@ app.post('/api/ai/designer-client-references-batch', requireAuth, async (req, re
       designers: {},
       source: 'fallback',
     });
+  }
+});
+
+// Gera uma sugestao de copy para um item do calendario editorial, usando o
+// historico geral do cliente (posts aprovados + feedbacks de ajuste) como
+// contexto adicional — nao persiste nada, e so uma sugestao para revisao.
+// Busca a legenda real (já extraída do Drive) dos últimos posts aprovados
+// do cliente, cruzando post_decisions (quais posts foram aprovados) com
+// listCalendarPostFolders (pasta + legenda de cada post) — dá à IA exemplos
+// concretos de tamanho/tom/hashtags já validados pelo cliente, não só a
+// contagem de aprovados. Roda sob demanda (só ao clicar "Gerar copy"), por
+// isso pode pagar o custo de resolver o Drive sem afetar o resto do app.
+async function getApprovedCopyExamplesForClient(clientCalendars, { limit = 15 } = {}) {
+  const postIds = [];
+  const calendarIdByPostId = new Map();
+  for (const calendario of clientCalendars) {
+    // Reaproveita o cache de listCalendarPostFolders (TTL 5 min) — na
+    // maioria dos casos essa chamada já é praticamente instantânea porque o
+    // calendário acabou de ser resolvido em /detail ou /editorial.
+    if (!calendario.linkDriveArtes) continue;
+    let folders = [];
+    try {
+      folders = await listCalendarPostFolders(calendario.linkDriveArtes);
+    } catch {
+      continue;
+    }
+    folders.forEach((folder) => {
+      calendarIdByPostId.set(folder.folderId, { calendarId: calendario.id, caption: folder.caption || null });
+      postIds.push(folder.folderId);
+    });
+  }
+
+  if (!postIds.length) return [];
+
+  const decisionsByPostId = await getDecisionHistoryForPosts(postIds);
+  const approvedWithCaption = [];
+  for (const [postId, decisions] of decisionsByPostId.entries()) {
+    const latestApproved = decisions.find((d) => d.approved);
+    if (!latestApproved) continue;
+    const caption = calendarIdByPostId.get(postId)?.caption;
+    if (caption) {
+      approvedWithCaption.push({ createdAt: latestApproved.createdAt, caption });
+    }
+  }
+
+  return approvedWithCaption
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, limit)
+    .map((entry) => entry.caption);
+}
+
+// SSE em vez de POST simples: buscar as legendas reais no Drive de todos os
+// posts aprovados do cliente é mais lento que as outras chamadas de IA do
+// app, e o designer precisa ver que algo está acontecendo em vez de uma
+// barra de carregamento indefinida.
+app.get('/api/ai/generate-post-copy/stream', requireAuth, async (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+
+  let closed = false;
+  req.on('close', () => {
+    closed = true;
+  });
+
+  function sendEvent(event, data) {
+    if (closed) return;
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  }
+
+  try {
+    const calendarId = String(req.query.calendarId || '').trim();
+    const item = JSON.parse(String(req.query.item || 'null'));
+    if (!calendarId || !item) {
+      sendEvent('error', { message: 'calendarId e item são obrigatórios' });
+      res.end();
+      return;
+    }
+
+    sendEvent('progress', { step: 'Analisando contexto do cliente...' });
+    const writeToken = getGoalfyCardsWriteToken();
+    const [calendarios, clients] = await Promise.all([
+      fetchAllCalendarsWithPhase({ writeToken }),
+      fetchCardsClients({ writeToken }),
+    ]);
+
+    const calendario = calendarios.find((c) => c.id === calendarId);
+    if (!calendario) {
+      sendEvent('error', { message: 'Calendário não encontrado' });
+      res.end();
+      return;
+    }
+
+    const client = clients.find((c) => normalizeLookupKey(c.nome) === normalizeLookupKey(calendario.clienteNome));
+    const clientCalendars = client
+      ? calendarios.filter((c) => normalizeLookupKey(c.clienteNome) === normalizeLookupKey(client.nome))
+      : [calendario];
+    const clientCalendarIds = clientCalendars.map((c) => c.id);
+
+    sendEvent('progress', { step: 'Buscando legendas de posts já aprovados...' });
+    const [history, approvedCopyExamples] = await Promise.all([
+      getClientPostHistoryForCopy(clientCalendarIds),
+      getApprovedCopyExamplesForClient(clientCalendars),
+    ]);
+
+    sendEvent('progress', { step: 'Gerando sugestão de copy...' });
+    const copy = await generateAiPostCopy({
+      item,
+      clientNome: calendario.clienteNome,
+      history,
+      approvedCopyExamples,
+    });
+
+    const itemKey = String(item?.oQue || '').trim();
+    if (itemKey) {
+      await upsertEditorialCopySuggestion(calendarId, itemKey, copy);
+    }
+
+    sendEvent('done', { copy });
+    res.end();
+  } catch (error) {
+    console.error('AI post copy generation failed', error);
+    sendEvent('error', { message: error.message });
+    if (!closed) res.end();
   }
 });
 
@@ -2946,6 +3123,42 @@ app.get('/api/calendarios/:id/detail', requireAuth, async (req, res) => {
     });
   } catch (error) {
     console.error('Calendar detail request failed', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Lista os itens do calendário editorial (planilha externa referenciada por
+// linkCalendarioEditorial) para exibição na aba "Calendário Editorial" — não
+// depende do Drive/Goalfy além de descobrir o link do calendário.
+app.get('/api/calendarios/:id/editorial', requireAuth, async (req, res) => {
+  const calendarId = String(req.params.id || '').trim();
+  if (!calendarId) {
+    res.status(400).json({ error: 'calendarId is required' });
+    return;
+  }
+
+  try {
+    const writeToken = getGoalfyCardsWriteToken();
+    const calendarios = await fetchAllCalendarsWithPhase({ writeToken });
+    const calendario = calendarios.find((c) => c.id === calendarId);
+    if (!calendario) {
+      res.status(404).json({ error: 'Calendário não encontrado' });
+      return;
+    }
+
+    if (!calendario.linkCalendarioEditorial) {
+      res.json({ items: [], hasLink: false });
+      return;
+    }
+
+    const [items, savedCopyByItemKey] = await Promise.all([
+      getEditorialCalendarItems(calendario.linkCalendarioEditorial, calendario.mesAno),
+      getEditorialCopySuggestionsForCalendar(calendarId),
+    ]);
+    const itemsWithCopy = items.map((item) => ({ ...item, copy: savedCopyByItemKey[item.oQue] || '' }));
+    res.json({ items: itemsWithCopy, hasLink: true });
+  } catch (error) {
+    console.error('Editorial calendar request failed', error);
     res.status(500).json({ error: error.message });
   }
 });

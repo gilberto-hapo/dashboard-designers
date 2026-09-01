@@ -73,6 +73,20 @@ function ensureSchema() {
       `);
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_media_variants_file_id ON media_variants (file_id)`);
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_media_variants_calendar_id ON media_variants (calendar_id)`);
+
+      // Copy sugerida pela IA para um item do calendário editorial (aba
+      // "Calendário Editorial") — item_key é o "oQue" da planilha (ex:
+      // "POST 1"), único dentro de um calendário. Guarda só a última
+      // sugestão por item (o designer pode gerar de novo e sobrescrever).
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS editorial_copy_suggestions (
+          calendar_id VARCHAR(255) NOT NULL,
+          item_key VARCHAR(255) NOT NULL,
+          copy TEXT NOT NULL,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          PRIMARY KEY (calendar_id, item_key)
+        )
+      `);
     })().catch((error) => {
       schemaReadyPromise = null;
       throw error;
@@ -207,6 +221,65 @@ export async function getDecisionHistoryForPosts(postIds) {
     decisionsByPostId.set(decision.postId, list);
   });
   return decisionsByPostId;
+}
+
+// Histórico geral do cliente para contexto de geração de copy: últimos
+// posts aprovados (referência de tom/estilo já validado) e últimos
+// feedbacks de ajuste (para a IA evitar repetir problemas já apontados).
+// post_decisions não tem client_id — recebe a lista de calendar_id do
+// cliente (resolvida a partir do Goalfy em server.js) em vez de fazer join.
+export async function getClientPostHistoryForCopy(calendarIds, { limit = 10 } = {}) {
+  await ensureSchema();
+  if (!calendarIds.length) {
+    return { approved: [], feedback: [] };
+  }
+
+  const { rows: approvedRows } = await pool.query(
+    `SELECT DISTINCT ON (post_id) *
+       FROM post_decisions
+      WHERE calendar_id = ANY($1) AND approved = true
+      ORDER BY post_id, created_at DESC
+      LIMIT $2`,
+    [calendarIds, limit],
+  );
+
+  const { rows: feedbackRows } = await pool.query(
+    `SELECT DISTINCT ON (post_id) *
+       FROM post_decisions
+      WHERE calendar_id = ANY($1) AND approved = false AND feedback IS NOT NULL AND feedback <> ''
+      ORDER BY post_id, created_at DESC
+      LIMIT $2`,
+    [calendarIds, limit],
+  );
+
+  return {
+    approved: approvedRows.map(rowToDecision),
+    feedback: feedbackRows.map(rowToDecision),
+  };
+}
+
+// Salva/atualiza a copy sugerida pela IA para um item do calendário
+// editorial — o designer pode gerar de novo, sobrescrevendo a anterior.
+export async function upsertEditorialCopySuggestion(calendarId, itemKey, copy) {
+  await ensureSchema();
+  await pool.query(
+    `INSERT INTO editorial_copy_suggestions (calendar_id, item_key, copy, updated_at)
+     VALUES ($1, $2, $3, now())
+     ON CONFLICT (calendar_id, item_key) DO UPDATE SET copy = EXCLUDED.copy, updated_at = EXCLUDED.updated_at`,
+    [calendarId, itemKey, copy],
+  );
+}
+
+// Todas as copies já geradas para os itens de um calendário — usado para
+// pré-carregar a aba "Calendário Editorial" com o que já foi sugerido
+// antes, sem precisar gerar de novo.
+export async function getEditorialCopySuggestionsForCalendar(calendarId) {
+  await ensureSchema();
+  const { rows } = await pool.query(
+    `SELECT item_key, copy FROM editorial_copy_suggestions WHERE calendar_id = $1`,
+    [calendarId],
+  );
+  return Object.fromEntries(rows.map((row) => [row.item_key, row.copy]));
 }
 
 export async function markAdjustmentsResolvedForPost(postId) {
