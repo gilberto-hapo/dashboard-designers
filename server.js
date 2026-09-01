@@ -1867,7 +1867,7 @@ app.get('/api/ai/generate-post-copy/stream', requireAuth, async (req, res) => {
       getApprovedCopyExamplesForClient(clientCalendars),
     ]);
 
-    sendEvent('progress', { step: 'Gerando sugestão de copy...' });
+    sendEvent('progress', { step: 'Gerando sugestão de legenda...' });
     const copy = await generateAiPostCopy({
       item,
       clientNome: calendario.clienteNome,

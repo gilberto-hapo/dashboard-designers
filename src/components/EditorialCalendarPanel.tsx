@@ -87,7 +87,7 @@ function EditorialItemRow({ calendarId, item }: { calendarId: string; item: Edit
       if (finished) return;
       const data = (event as MessageEvent).data;
       const message = data ? JSON.parse(data)?.message : null;
-      finish(message || 'Erro ao gerar copy');
+      finish(message || 'Erro ao gerar legenda');
     });
   }
 
@@ -118,7 +118,7 @@ function EditorialItemRow({ calendarId, item }: { calendarId: string; item: Edit
           )}
           {copy && (
             <span className="rounded-full border border-emerald-800/40 bg-emerald-800/15 px-2 py-0.5 text-[10px] font-medium text-emerald-600">
-              Copy gerada
+              Legenda gerada
             </span>
           )}
         </div>
@@ -147,7 +147,7 @@ function EditorialItemRow({ calendarId, item }: { calendarId: string; item: Edit
                   onClick={handleGenerateCopy}
                 >
                   {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                  Gerar copy
+                  Gerar legenda
                 </Button>
                 {generating && progressStep && <p className="text-xs text-muted-foreground">{progressStep}</p>}
               </div>
