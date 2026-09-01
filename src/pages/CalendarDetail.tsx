@@ -34,8 +34,6 @@ import {
   type PortalPost,
   type PostPipelineStage,
 } from '@/components/ClientPortalFeed';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { EditorialCalendarPanel } from '@/components/EditorialCalendarPanel';
 
 type CalendarDetailData = {
   id: string;
@@ -427,55 +425,47 @@ function CalendarDetailContent() {
                 </div>
               </div>
 
-              <Tabs defaultValue="posts" className="space-y-3">
-                <TabsList>
-                  <TabsTrigger value="posts">Posts ({calendario.posts.length})</TabsTrigger>
-                  <TabsTrigger value="editorial">Gerador de Legenda</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="posts">
-                  {calendario.posts.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Nenhuma pasta de post encontrada no Drive deste calendário.</p>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6">
-                      {calendario.posts.map((post) => (
-                        <div key={post.id}>
-                          <GridThumbShared
-                            mediaUrl={(fileId) => buildMediaUrl(fileId, id!, 'thumb')}
-                            media={post.media}
-                            title={post.goalfyCardTitle || post.title}
-                            status={decisionStatus(post)}
-                            internalLabels
-                            onOpen={() => navigate(`/calendarios/${id}/posts/${post.id}`)}
-                          />
-                          <p className="mt-1.5 truncate text-xs font-medium text-foreground">
-                            {post.goalfyCardTitle || post.title}
-                          </p>
-                          {post.folderName && (
-                            <p className="truncate text-[11px] text-muted-foreground">Pasta: {post.folderName}</p>
-                          )}
-                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                            <span className="inline-block rounded-full border border-border px-2 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
-                              {post.formatoEntrega || 'Post'}
+              <div className="space-y-3">
+                <h2 className="text-sm font-bold uppercase tracking-wide text-foreground">
+                  Posts ({calendario.posts.length})
+                </h2>
+                {calendario.posts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Nenhuma pasta de post encontrada no Drive deste calendário.</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6">
+                    {calendario.posts.map((post) => (
+                      <div key={post.id}>
+                        <GridThumbShared
+                          mediaUrl={(fileId) => buildMediaUrl(fileId, id!, 'thumb')}
+                          media={post.media}
+                          title={post.goalfyCardTitle || post.title}
+                          status={decisionStatus(post)}
+                          internalLabels
+                          onOpen={() => navigate(`/calendarios/${id}/posts/${post.id}`)}
+                        />
+                        <p className="mt-1.5 truncate text-xs font-medium text-foreground">
+                          {post.goalfyCardTitle || post.title}
+                        </p>
+                        {post.folderName && (
+                          <p className="truncate text-[11px] text-muted-foreground">Pasta: {post.folderName}</p>
+                        )}
+                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                          <span className="inline-block rounded-full border border-border px-2 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
+                            {post.formatoEntrega || 'Post'}
+                          </span>
+                          {post.pipelineStage && (
+                            <span
+                              className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-medium ${PIPELINE_STAGE_STYLES[post.pipelineStage].className}`}
+                            >
+                              {PIPELINE_STAGE_STYLES[post.pipelineStage].label}
                             </span>
-                            {post.pipelineStage && (
-                              <span
-                                className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-medium ${PIPELINE_STAGE_STYLES[post.pipelineStage].className}`}
-                              >
-                                {PIPELINE_STAGE_STYLES[post.pipelineStage].label}
-                              </span>
-                            )}
-                          </div>
+                          )}
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="editorial">
-                  <EditorialCalendarPanel calendarId={id!} />
-                </TabsContent>
-              </Tabs>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </>
           )}
         </div>
