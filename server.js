@@ -961,7 +961,15 @@ async function requestGeminiJson(model, apiKey, body) {
   return execute();
 }
 
-async function requestOpenAiJson(model, apiKey, { systemText, userPayload, temperature = 0.8 }) {
+async function requestOpenAiJson(model, apiKey, { systemText, userPayload, temperature = 0.8, maxTokens }) {
+  // O calculo padrao (items.length * 130, teto 900) foi desenhado para as
+  // features que geram varios itens em lote (referencias de designer) -- um
+  // caller que gera um unico texto longo (ex: legenda de post) deve passar
+  // maxTokens explicitamente, senao cai no minimo de 280 tokens mesmo tendo
+  // bastante contexto para desenvolver.
+  const resolvedMaxTokens =
+    maxTokens ?? Math.max(280, Math.min(900, (Array.isArray(userPayload?.items) ? userPayload.items.length : 1) * 130));
+
   const response = await fetch(OPENAI_API_BASE_URL, {
     method: 'POST',
     headers: {
@@ -972,7 +980,7 @@ async function requestOpenAiJson(model, apiKey, { systemText, userPayload, tempe
     body: JSON.stringify({
       model,
       temperature,
-      max_tokens: Math.max(280, Math.min(900, (Array.isArray(userPayload?.items) ? userPayload.items.length : 1) * 130)),
+      max_tokens: resolvedMaxTokens,
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: systemText },
@@ -1504,12 +1512,16 @@ async function generateAiPostCopy({ item, clientNome, history, approvedCopyExamp
     pastFeedback: (history?.feedback || []).map((decision) => decision.feedback).filter(Boolean),
   };
 
+  // 900 tokens cobre bem uma legenda longa (Instagram permite ate ~2200
+  // caracteres) mais a folga do wrapper JSON -- o padrao de 280 (herdado do
+  // calculo pensado para geracao em lote de textos curtos) cortava a
+  // capacidade da IA de desenvolver o texto mesmo com bom contexto.
   const parsed = provider === 'openai'
-    ? await requestOpenAiJson(model, apiKey, { systemText, userPayload, temperature: 0.8 })
+    ? await requestOpenAiJson(model, apiKey, { systemText, userPayload, temperature: 0.8, maxTokens: 900 })
     : await requestGeminiJson(model, apiKey, {
         systemInstruction: { parts: [{ text: systemText }] },
         contents: [{ parts: [{ text: JSON.stringify(userPayload) }] }],
-        generationConfig: { temperature: 0.8, responseMimeType: 'application/json' },
+        generationConfig: { temperature: 0.8, responseMimeType: 'application/json', maxOutputTokens: 900 },
       });
 
   return String(parsed?.copy || '').trim();
