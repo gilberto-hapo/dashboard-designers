@@ -447,7 +447,15 @@ export function PostMediaViewShared({
   }
 
   if (media.type === 'video') {
-    return <SingleVideoFrame src={buildMediaUrl(media.files[0].id)} mimeType={media.files[0].mimeType} poster={media.coverImageId ? buildMediaUrl(media.coverImageId) : undefined} />;
+    const file = media.files[0];
+    return (
+      <div>
+        <SingleVideoFrame src={buildMediaUrl(file.id)} mimeType={file.mimeType} poster={media.coverImageId ? buildMediaUrl(media.coverImageId) : undefined} />
+        <div className="flex bg-background px-2">
+          <DriveLink href={driveViewUrl(file.id)} />
+        </div>
+      </div>
+    );
   }
 
   const pinOverlayProps = {
@@ -614,6 +622,23 @@ function QualityMaxLink({ href }: { href: string }) {
       className="ml-auto px-1 py-1.5 text-[11px] text-muted-foreground hover:text-foreground"
     >
       Ver em qualidade máxima
+    </a>
+  );
+}
+
+function driveViewUrl(fileId: string) {
+  return `https://drive.google.com/file/d/${fileId}/preview`;
+}
+
+function DriveLink({ href }: { href: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="ml-auto px-1 py-1.5 text-[11px] text-muted-foreground hover:text-foreground"
+    >
+      Ver no Drive
     </a>
   );
 }
