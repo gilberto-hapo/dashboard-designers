@@ -12,6 +12,7 @@ import {
 } from '@/components/SidebarNav';
 import { fetchJson } from '@/lib/calendarUi';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { usePendingFeedbackCount } from '@/hooks/usePendingFeedbackCount';
 import { ClientQuarterHistoryChart } from '@/components/client/ClientQuarterHistoryChart';
 
@@ -27,6 +28,10 @@ type ClienteDetailData = {
   locaisPublicacao: LocalPublicacao[];
   linkDriveGeral: string | null;
   linkApresentacao: string | null;
+};
+
+type ClienteSettings = {
+  tagFilterEnabled: boolean;
 };
 
 type ClienteCalendarioResumo = {
@@ -65,18 +70,42 @@ function ClientDetailContent() {
   const [error, setError] = useState<string | null>(null);
   const [generatingClientLink, setGeneratingClientLink] = useState(false);
   const [calendariosExpanded, setCalendariosExpanded] = useState(false);
+  const [tagFilterEnabled, setTagFilterEnabled] = useState(false);
+  const [savingTagFilter, setSavingTagFilter] = useState(false);
 
   function loadClient() {
     if (!id) return;
     setLoading(true);
     setError(null);
-    fetchJson<{ client: ClienteDetailData; calendarios: ClienteCalendarioResumo[] }>(`/api/clientes/${id}/detail`)
+    fetchJson<{ client: ClienteDetailData; calendarios: ClienteCalendarioResumo[]; settings: ClienteSettings }>(
+      `/api/clientes/${id}/detail`,
+    )
       .then((data) => {
         setClient(data.client);
         setCalendarios(data.calendarios);
+        setTagFilterEnabled(data.settings?.tagFilterEnabled ?? false);
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Erro ao carregar cliente'))
       .finally(() => setLoading(false));
+  }
+
+  async function handleToggleTagFilter(next: boolean) {
+    if (!id) return;
+    setTagFilterEnabled(next);
+    setSavingTagFilter(true);
+    try {
+      await fetchJson<{ settings: ClienteSettings }>(`/api/clientes/${id}/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tagFilterEnabled: next }),
+      });
+      toast.success(next ? 'Filtro por etiqueta ativado para este cliente.' : 'Filtro por etiqueta desativado.');
+    } catch (err) {
+      setTagFilterEnabled(!next);
+      toast.error(err instanceof Error ? err.message : 'Não foi possível salvar a configuração.');
+    } finally {
+      setSavingTagFilter(false);
+    }
   }
 
   useEffect(() => {
@@ -170,19 +199,29 @@ function ClientDetailContent() {
               <div className="space-y-3 rounded-xl border border-border bg-card p-4">
                 <div>
                   <h1 className="text-lg font-semibold text-foreground">{client.nome}</h1>
-                  {client.locaisPublicacao.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {client.locaisPublicacao.map((local) => (
-                        <span
-                          key={local.nome}
-                          className="rounded px-2 py-0.5 text-[10px] font-bold uppercase text-white"
-                          style={{ backgroundColor: local.cor }}
-                        >
-                          {local.nome}
-                        </span>
-                      ))}
+                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                    {client.locaisPublicacao.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {client.locaisPublicacao.map((local) => (
+                          <span
+                            key={local.nome}
+                            className="rounded px-2 py-0.5 text-[10px] font-bold uppercase text-white"
+                            style={{ backgroundColor: local.cor }}
+                          >
+                            {local.nome}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div className="ml-auto flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Filtro por canal no portal do cliente</span>
+                      <Switch
+                        checked={tagFilterEnabled}
+                        disabled={savingTagFilter}
+                        onCheckedChange={handleToggleTagFilter}
+                      />
                     </div>
-                  )}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 border-t border-border pt-3 sm:grid-cols-4">

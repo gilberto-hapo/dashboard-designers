@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { AlertTriangle, Loader2 } from 'lucide-react';
-import { ClientPortalFeed, type PortalPost } from '@/components/ClientPortalFeed';
+import { ClientPortalFeed, getAvailableSocialTags, TagFilterDropdown, type PortalPost } from '@/components/ClientPortalFeed';
 import hapoLogo from '@/assets/hapo-logo.svg';
 
 type PortalCalendarioResumo = {
@@ -16,6 +16,7 @@ type PortalCliente = {
   id: string;
   nome: string;
   calendarios: PortalCalendarioResumo[];
+  tagFilterEnabled?: boolean;
 };
 
 export default function ClientPortal() {
@@ -23,6 +24,7 @@ export default function ClientPortal() {
   const [cliente, setCliente] = useState<PortalCliente | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!token) return;
@@ -66,6 +68,17 @@ export default function ClientPortal() {
     calendario.posts.map((post) => ({ ...post, calendarLabel: calendario.mesAno || calendario.title })),
   );
   const postsWithMedia = allPosts.filter((post) => (post.media?.files?.length ?? 0) > 0);
+  const availableTags = getAvailableSocialTags(postsWithMedia);
+  const showTagFilter = Boolean(cliente.tagFilterEnabled) && availableTags.length > 0;
+
+  function toggleTag(tag: string) {
+    setSelectedTags((prev) => {
+      const next = new Set(prev);
+      if (next.has(tag)) next.delete(tag);
+      else next.add(tag);
+      return next;
+    });
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -74,6 +87,11 @@ export default function ClientPortal() {
           <img src={hapoLogo} alt="hapo" className="h-6 w-auto shrink-0" />
           <div className="h-5 w-px shrink-0 bg-border" />
           <h1 className="truncate text-base font-semibold text-foreground">{cliente.nome}</h1>
+          {showTagFilter && (
+            <div className="ml-auto shrink-0">
+              <TagFilterDropdown availableTags={availableTags} selectedTags={selectedTags} onToggleTag={toggleTag} />
+            </div>
+          )}
         </div>
       </header>
 
@@ -83,7 +101,7 @@ export default function ClientPortal() {
             Seus posts estão sendo produzidos e logo estarão aqui para aprovação.
           </p>
         ) : (
-          <ClientPortalFeed token={token!} posts={allPosts} />
+          <ClientPortalFeed token={token!} posts={allPosts} selectedTags={showTagFilter ? selectedTags : undefined} />
         )}
       </main>
     </div>

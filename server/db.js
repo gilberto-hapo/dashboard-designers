@@ -73,6 +73,18 @@ function ensureSchema() {
       `);
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_media_variants_file_id ON media_variants (file_id)`);
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_media_variants_calendar_id ON media_variants (calendar_id)`);
+
+      // Configurações opt-in por cliente (ex: filtro por etiqueta no portal
+      // público). Ausência de linha para um client_id = todas as opções
+      // desligadas — o comportamento padrão nunca muda para quem não foi
+      // configurado explicitamente.
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS client_settings (
+          client_id TEXT PRIMARY KEY,
+          tag_filter_enabled BOOLEAN NOT NULL DEFAULT false,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `);
     })().catch((error) => {
       schemaReadyPromise = null;
       throw error;
@@ -352,6 +364,27 @@ export async function listMediaVariantsByCalendar(calendarId) {
 export async function deleteMediaVariantsByCalendar(calendarId) {
   await ensureSchema();
   await pool.query(`DELETE FROM media_variants WHERE calendar_id = $1`, [calendarId]);
+}
+
+export async function getClientSettings(clientId) {
+  await ensureSchema();
+  const { rows } = await pool.query(
+    `SELECT tag_filter_enabled FROM client_settings WHERE client_id = $1`,
+    [clientId],
+  );
+  return { tagFilterEnabled: rows[0]?.tag_filter_enabled ?? false };
+}
+
+export async function upsertClientSettings(clientId, { tagFilterEnabled }) {
+  await ensureSchema();
+  await pool.query(
+    `INSERT INTO client_settings (client_id, tag_filter_enabled, updated_at)
+     VALUES ($1, $2, now())
+     ON CONFLICT (client_id) DO UPDATE
+       SET tag_filter_enabled = EXCLUDED.tag_filter_enabled, updated_at = now()`,
+    [clientId, Boolean(tagFilterEnabled)],
+  );
+  return { tagFilterEnabled: Boolean(tagFilterEnabled) };
 }
 
 export default pool;

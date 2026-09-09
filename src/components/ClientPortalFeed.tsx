@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, Loader2, MapPin, MessageSquareWarning, MoreVertical, Play } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Loader2, MapPin, MessageSquareWarning, MoreVertical, Play } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
@@ -26,10 +26,17 @@ import {
 } from '@/components/ui/alert-dialog';
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+
+// Redes sociais reconhecidas para o filtro por etiqueta do portal — a lista é
+// fixa (não "qualquer tag do card") para não misturar redes com tags de
+// status internas (ex: "APROVADO DI", "DATA COMEMORATIVA") que também vêm no
+// mesmo campo de tags do card Goalfy.
+const KNOWN_SOCIAL_TAGS = ['LINKEDIN', 'INSTAGRAM', 'FACEBOOK', 'TIKTOK', 'YOUTUBE'];
 
 export type PostMedia = {
   type: 'image' | 'video';
@@ -1181,18 +1188,83 @@ export function PostDetail({
   );
 }
 
+export type PortalTagOption = { text: string; color: string | null };
+
+// Deriva as opções do dropdown de filtro a partir dos posts visíveis,
+// restrito às redes sociais conhecidas (não qualquer tag livre do card, que
+// também carrega tags de status como "APROVADO DI"/"DATA COMEMORATIVA").
+export function getAvailableSocialTags(posts: PortalPost[]): PortalTagOption[] {
+  const seen = new Map<string, string | null>();
+  posts.forEach((post) => {
+    (post.tags ?? []).forEach((tag) => {
+      const normalized = tag.text.trim().toUpperCase();
+      if (KNOWN_SOCIAL_TAGS.includes(normalized) && !seen.has(normalized)) {
+        seen.set(normalized, tag.color);
+      }
+    });
+  });
+  return Array.from(seen.entries()).map(([text, color]) => ({ text, color }));
+}
+
+export function TagFilterDropdown({
+  availableTags,
+  selectedTags,
+  onToggleTag,
+}: {
+  availableTags: PortalTagOption[];
+  selectedTags: Set<string>;
+  onToggleTag: (tag: string) => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-2">
+          Filtrar por Canal
+          {selectedTags.size > 0 && (
+            <span className="rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
+              {selectedTags.size}
+            </span>
+          )}
+          <ChevronDown className="h-3.5 w-3.5" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {availableTags.map((tag) => (
+          <DropdownMenuCheckboxItem
+            key={tag.text}
+            checked={selectedTags.has(tag.text)}
+            onCheckedChange={() => onToggleTag(tag.text)}
+            onSelect={(event) => event.preventDefault()}
+          >
+            {tag.text}
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export function ClientPortalFeed({
   token,
   posts,
+  selectedTags,
 }: {
   token: string;
   posts: PortalPost[];
+  selectedTags?: Set<string>;
 }) {
   const navigate = useNavigate();
   const visiblePosts = posts.filter((post) => (post.media?.files?.length ?? 0) > 0);
 
+  const filteredPosts =
+    !selectedTags || selectedTags.size === 0
+      ? visiblePosts
+      : visiblePosts.filter((post) =>
+          (post.tags ?? []).some((tag) => selectedTags.has(tag.text.trim().toUpperCase())),
+        );
+
   const groups: Array<{ label: string | null; posts: PortalPost[] }> = [];
-  visiblePosts.forEach((post) => {
+  filteredPosts.forEach((post) => {
     const label = post.calendarLabel ?? null;
     const lastGroup = groups[groups.length - 1];
     if (lastGroup && lastGroup.label === label) {

@@ -18,6 +18,8 @@ import {
   getAdjustmentResolvedAtForPosts,
   deletePostDecision,
   listFileIdsMissingVariant,
+  getClientSettings,
+  upsertClientSettings,
 } from './server/db.js';
 import { listCalendarPostFolders, getDriveFileStream, getDriveFileMetadata, clearDriveFolderCache } from './server/drive.js';
 import {
@@ -2591,10 +2593,13 @@ async function resolvePublicClientPayload(clientId, { forceRefreshDrive = false 
     }),
   );
 
+  const settings = await getClientSettings(clientId);
+
   return {
     id: client.id,
     nome: client.nome,
     calendarios: resolvedCalendarios,
+    tagFilterEnabled: settings.tagFilterEnabled,
   };
 }
 
@@ -3332,9 +3337,35 @@ app.get('/api/clientes/:id/detail', requireAuth, async (req, res) => {
         phaseColor: c.phaseColor,
       }));
 
-    res.json({ client, calendarios: clientCalendarios });
+    const settings = await getClientSettings(clientId);
+
+    res.json({ client, calendarios: clientCalendarios, settings });
   } catch (error) {
     console.error('Client detail request failed', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Salva configurações opt-in do portal público de um cliente (ex: filtro por
+// etiqueta) — não afeta o board da Goalfy, fica só no Postgres local.
+app.post('/api/clientes/:id/settings', requireAuth, async (req, res) => {
+  const clientId = String(req.params.id || '').trim();
+  if (!clientId) {
+    res.status(400).json({ error: 'clientId is required' });
+    return;
+  }
+
+  const { tagFilterEnabled } = req.body ?? {};
+  if (typeof tagFilterEnabled !== 'boolean') {
+    res.status(400).json({ error: 'tagFilterEnabled deve ser boolean' });
+    return;
+  }
+
+  try {
+    const settings = await upsertClientSettings(clientId, { tagFilterEnabled });
+    res.json({ settings });
+  } catch (error) {
+    console.error('Erro ao salvar configurações do cliente', error);
     res.status(500).json({ error: error.message });
   }
 });
