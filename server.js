@@ -2358,8 +2358,17 @@ function inferFormatoEntrega(media) {
 // "Aprovar" no link. Isso NÃO é usado para decidir se o post existe (isso
 // vem só das pastas do Drive) — só para status.
 function extractPostSequenceNumber(title) {
-  const match = String(title || '').match(/#(\d+)\s*\/\s*\d+/);
-  return match ? Number(match[1]) : null;
+  const text = String(title || '');
+  // Aceita "#NN/TT" (formato antigo), "#NN" e "NN#" (formato atual dos
+  // títulos no board de Posts, ex: "SETEMBRO/2026 #08" ou "SETEMBRO/2026
+  // 01#") — o "#" pode vir antes ou depois do número.
+  const withSlash = text.match(/#(\d+)\s*\/\s*\d+/);
+  if (withSlash) return Number(withSlash[1]);
+  const hashBefore = text.match(/#(\d+)(?!\s*\/)/);
+  if (hashBefore) return Number(hashBefore[1]);
+  const hashAfter = text.match(/(\d+)#/);
+  if (hashAfter) return Number(hashAfter[1]);
+  return null;
 }
 
 // Resolve os posts de UM calendário (subpastas do Drive de artes, casadas por
