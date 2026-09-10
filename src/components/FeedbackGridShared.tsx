@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, Loader2, MessageSquareWarning, X } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Loader2, MessageSquareWarning, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -59,6 +60,7 @@ export function FeedbackGridShared({
   gridClassName = 'grid grid-cols-2 gap-3 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6',
   showCopywriterTag = false,
   linkTo,
+  enableInlineComments = false,
 }: {
   posts: FeedbackPost[];
   readOnly?: boolean;
@@ -69,10 +71,24 @@ export function FeedbackGridShared({
   gridClassName?: string;
   showCopywriterTag?: boolean;
   linkTo?: (postId: string) => string;
+  enableInlineComments?: boolean;
 }) {
   const navigate = useNavigate();
   const [openPostId, setOpenPostId] = useState<string | null>(null);
   const [confirmingResolve, setConfirmingResolve] = useState(false);
+  const [expandedPostIds, setExpandedPostIds] = useState<Set<string>>(() => new Set());
+
+  const toggleExpanded = (postId: string) => {
+    setExpandedPostIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(postId)) {
+        next.delete(postId);
+      } else {
+        next.add(postId);
+      }
+      return next;
+    });
+  };
 
   const resolveThumbUrl = (post: FeedbackPost) =>
     mediaUrlOverride
@@ -100,40 +116,69 @@ export function FeedbackGridShared({
   return (
     <>
       <div className={gridClassName}>
-        {posts.map((post) => (
-          <div key={post.postId} className="space-y-1.5">
-            <div className="overflow-hidden border border-amber-500/40">
-              <GridThumbShared
-                mediaUrl={resolveThumbUrl(post)}
-                media={post.media}
-                title={post.postTitle}
-                status="adjustment"
-                internalLabels
-                onOpen={() => {
-                  if (linkTo) {
-                    navigate(linkTo(post.postId));
-                    return;
-                  }
-                  setOpenPostId(post.postId);
-                }}
-              />
-            </div>
-            <p className="truncate text-xs font-medium text-foreground">{post.postTitle || post.calendarTitle}</p>
-            <p className="truncate text-[11px] text-muted-foreground">{post.calendarTitle}</p>
-            <div className="flex flex-wrap gap-1">
-              {post.designer && (
-                <span className="inline-flex rounded border border-border px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
-                  {post.designer}
-                </span>
+        {posts.map((post) => {
+          const isExpanded = expandedPostIds.has(post.postId);
+          return (
+            <div key={post.postId} className="space-y-1.5">
+              <div className="overflow-hidden border border-amber-500/40">
+                <GridThumbShared
+                  mediaUrl={resolveThumbUrl(post)}
+                  media={post.media}
+                  title={post.postTitle}
+                  status="adjustment"
+                  internalLabels
+                  onOpen={() => {
+                    if (linkTo) {
+                      navigate(linkTo(post.postId));
+                      return;
+                    }
+                    setOpenPostId(post.postId);
+                  }}
+                />
+              </div>
+              <p className="truncate text-xs font-medium text-foreground">{post.postTitle || post.calendarTitle}</p>
+              <p className="truncate text-[11px] text-muted-foreground">{post.calendarTitle}</p>
+              <div className="flex flex-wrap gap-1">
+                {post.designer && (
+                  <span className="inline-flex rounded border border-border px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
+                    {post.designer}
+                  </span>
+                )}
+                {showCopywriterTag && post.copywriter && (
+                  <span className="inline-flex rounded border border-border px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
+                    {post.copywriter.trim().split(/\s+/)[0]}
+                  </span>
+                )}
+              </div>
+
+              {enableInlineComments && (
+                <Collapsible open={isExpanded} onOpenChange={() => toggleExpanded(post.postId)}>
+                  <CollapsibleTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-center gap-1 rounded border border-border py-1 text-[10px] font-medium uppercase text-muted-foreground hover:bg-muted"
+                    >
+                      Comentários
+                      <ChevronDown
+                        className={`h-3 w-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                      />
+                    </button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    {isExpanded && (
+                      <div className="pt-1.5">
+                        <AdjustmentsBlock
+                          feedbackHistory={post.feedbackHistory}
+                          resolvedFeedbackHistory={post.resolvedFeedbackHistory}
+                        />
+                      </div>
+                    )}
+                  </CollapsibleContent>
+                </Collapsible>
               )}
-              {showCopywriterTag && post.copywriter && (
-                <span className="inline-flex rounded border border-border px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
-                  {post.copywriter.trim().split(/\s+/)[0]}
-                </span>
-              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <Dialog

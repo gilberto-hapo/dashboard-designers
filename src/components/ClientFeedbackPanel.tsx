@@ -121,6 +121,7 @@ export function ClientFeedbackPanel({
         posts={filteredPosts}
         emptyMessage="Nenhum feedback pendente de cliente no momento."
         linkTo={(postId) => `/feedback/posts/${postId}`}
+        enableInlineComments
       />
     </div>
   );
