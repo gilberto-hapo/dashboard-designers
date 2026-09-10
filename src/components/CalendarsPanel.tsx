@@ -368,7 +368,8 @@ export function CalendarsPanel({
                         </span>
                       )}
                       <div>
-                        <h3 className="text-sm font-semibold text-foreground">{calendario.title}</h3>
+                        <h3 className="text-sm font-semibold uppercase text-foreground">{calendario.clienteNome}</h3>
+                        <p className="mt-0.5 truncate text-[10px] text-muted-foreground/70">{calendario.mesAno}</p>
                         <div className="mt-1.5 flex items-center gap-1.5">
                           <span
                             className="rounded border px-1.5 py-0.5 text-[10px] font-bold uppercase"
