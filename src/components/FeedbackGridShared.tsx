@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, ChevronDown, Loader2, MessageSquareWarning, X } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Loader2, MessageSquareText, MessageSquareWarning, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Collapsible, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,6 +21,27 @@ import {
   type PortalPostTag,
   type PostMedia,
 } from '@/components/ClientPortalFeed';
+
+// Mesma paleta e hash usados em ClientScorePanel.tsx, para manter a cor de
+// cada designer consistente entre as telas Clientes e Feedback.
+const DESIGNER_COLORS = ['#E67E22', '#9B59B6', '#1ABC9C', '#3498DB', '#E74C3C', '#2ECC71', '#F39C12', '#8E44AD'];
+
+function hashString(value: string) {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash << 5) - hash + value.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+function designerColor(name: string) {
+  return DESIGNER_COLORS[hashString(name) % DESIGNER_COLORS.length];
+}
+
+function firstName(name: string) {
+  return name.trim().split(/\s+/)[0];
+}
 
 export type FeedbackHistoryEntry = {
   id?: number;
@@ -137,44 +158,53 @@ export function FeedbackGridShared({
                 />
               </div>
               <p className="truncate text-xs font-medium text-foreground">{post.postTitle || post.calendarTitle}</p>
-              <p className="truncate text-[11px] text-muted-foreground">{post.calendarTitle}</p>
-              <div className="flex flex-wrap gap-1">
-                {post.designer && (
-                  <span className="inline-flex rounded border border-border px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
-                    {post.designer}
-                  </span>
-                )}
-                {showCopywriterTag && post.copywriter && (
-                  <span className="inline-flex rounded border border-border px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
-                    {post.copywriter.trim().split(/\s+/)[0]}
-                  </span>
+              <div className="flex flex-wrap items-center justify-between gap-1">
+                <div className="flex flex-wrap items-center gap-1">
+                  {post.designer && (
+                    <span
+                      className="inline-block max-w-full truncate rounded-full px-2.5 py-0.5 text-[11px] font-medium uppercase"
+                      style={{
+                        backgroundColor: `${designerColor(post.designer)}25`,
+                        color: designerColor(post.designer),
+                      }}
+                    >
+                      {firstName(post.designer)}
+                    </span>
+                  )}
+                  {showCopywriterTag && post.copywriter && (
+                    <span className="inline-flex rounded border border-border px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
+                      {post.copywriter.trim().split(/\s+/)[0]}
+                    </span>
+                  )}
+                </div>
+
+                {enableInlineComments && (
+                  <Collapsible open={isExpanded} onOpenChange={() => toggleExpanded(post.postId)}>
+                    <CollapsibleTrigger asChild>
+                      <button
+                        type="button"
+                        className="flex shrink-0 items-center gap-0.5 text-muted-foreground hover:text-foreground"
+                      >
+                        <MessageSquareText className="h-3.5 w-3.5" />
+                        {post.feedbackHistory.length > 0 && (
+                          <span className="text-[10px] font-medium">{post.feedbackHistory.length}</span>
+                        )}
+                        <ChevronDown
+                          className={`h-3 w-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                        />
+                      </button>
+                    </CollapsibleTrigger>
+                  </Collapsible>
                 )}
               </div>
 
-              {enableInlineComments && (
-                <Collapsible open={isExpanded} onOpenChange={() => toggleExpanded(post.postId)}>
-                  <CollapsibleTrigger asChild>
-                    <button
-                      type="button"
-                      className="flex w-full items-center justify-center gap-1 rounded border border-border py-1 text-[10px] font-medium uppercase text-muted-foreground hover:bg-muted"
-                    >
-                      Comentários
-                      <ChevronDown
-                        className={`h-3 w-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                      />
-                    </button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    {isExpanded && (
-                      <div className="pt-1.5">
-                        <AdjustmentsBlock
-                          feedbackHistory={post.feedbackHistory}
-                          resolvedFeedbackHistory={post.resolvedFeedbackHistory}
-                        />
-                      </div>
-                    )}
-                  </CollapsibleContent>
-                </Collapsible>
+              {enableInlineComments && isExpanded && (
+                <div className="pt-1">
+                  <AdjustmentsBlock
+                    feedbackHistory={post.feedbackHistory}
+                    resolvedFeedbackHistory={post.resolvedFeedbackHistory}
+                  />
+                </div>
               )}
             </div>
           );
