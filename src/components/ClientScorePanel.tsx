@@ -38,9 +38,16 @@ type ClienteInfo = {
   ativo?: boolean;
 };
 
+type MediaPostsCalendarios = {
+  totalCalendarios: number;
+  totalPosts: number;
+  mediaPosts: number | null;
+};
+
 export function ClientScorePanel({ selectedDesigner = 'Todos' }: { selectedDesigner?: string }) {
   const navigate = useNavigate();
   const [clients, setClients] = useState<ClienteInfo[]>([]);
+  const [mediaPostsByClientId, setMediaPostsByClientId] = useState<Record<string, MediaPostsCalendarios>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,6 +58,10 @@ export function ClientScorePanel({ selectedDesigner = 'Todos' }: { selectedDesig
       .then((data) => setClients(data.clients))
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
+
+    fetchJson<{ clientes: Record<string, MediaPostsCalendarios> }>('/api/clientes/media-posts-calendarios')
+      .then((data) => setMediaPostsByClientId(data.clientes))
+      .catch(() => setMediaPostsByClientId({}));
   }, []);
 
   const filteredClients = clients
@@ -77,10 +88,23 @@ export function ClientScorePanel({ selectedDesigner = 'Todos' }: { selectedDesig
 
   const totalPostsPerMonth = filteredClients.reduce((sum, client) => sum + client.postsContratados, 0);
 
+  const clientMedias = filteredClients
+    .map((client) => mediaPostsByClientId[client.id]?.mediaPosts)
+    .filter((media): media is number => media != null);
+  const somaMedias = clientMedias.length > 0 ? clientMedias.reduce((sum, media) => sum + media, 0) : null;
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
         Total: <span className="font-bold text-foreground">{totalPostsPerMonth}</span> posts/mês
+        {somaMedias != null && (
+          <>
+            {' · '}
+            <span className="font-bold text-emerald-500">{somaMedias.toFixed(1)}</span> posts realizados/mês
+          </>
+        )}
+        {' · '}
+        <span className="font-bold text-foreground">{filteredClients.length}</span> clientes
       </p>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
@@ -121,6 +145,15 @@ export function ClientScorePanel({ selectedDesigner = 'Todos' }: { selectedDesig
             )}
             <p className="text-sm text-muted-foreground">
               <span className="font-bold text-foreground">{client.postsContratados}</span> posts/mês
+              {mediaPostsByClientId[client.id]?.mediaPosts != null && (
+                <>
+                  {' · '}
+                  <span className="font-bold text-emerald-500">
+                    {mediaPostsByClientId[client.id].mediaPosts!.toFixed(1)}
+                  </span>{' '}
+                  média
+                </>
+              )}
             </p>
           </div>
         ))}

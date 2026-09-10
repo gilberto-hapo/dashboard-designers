@@ -46,6 +46,7 @@ const OPENAI_API_BASE_URL = 'https://api.openai.com/v1/chat/completions';
 
 const CARDS_CLIENTS_CACHE_TTL_MS = 1000 * 60;
 const CALENDARS_WITH_PHASE_CACHE_TTL_MS = 1000 * 60;
+const ALL_POSTS_INCLUDING_ARCHIVED_CACHE_TTL_MS = 1000 * 60 * 5;
 
 const app = express();
 let cachedGoalfyData = null;
@@ -58,6 +59,9 @@ let inflightCardsClientsPromise = null;
 let cachedCalendarsWithPhase = null;
 let cachedCalendarsWithPhaseAt = 0;
 let inflightCalendarsWithPhasePromise = null;
+let cachedAllPostsIncludingArchived = null;
+let cachedAllPostsIncludingArchivedAt = 0;
+let inflightAllPostsIncludingArchivedPromise = null;
 let goalfyRefreshState = {
   inProgress: false,
   startedAt: 0,
@@ -634,6 +638,44 @@ async function fetchAllPostsViaRest({ writeToken }) {
   const activeCards = postCards.filter((card) => normalizeLookupKey(card.phase?.title) !== 'arquivado');
 
   return activeCards.map((card) => buildTaskFromPostCard(card, card, calendarMetaById));
+}
+
+// Mesma fonte de fetchAllPostsViaRest, mas SEM excluir a fase "Arquivado" —
+// usada só para contar "posts criados" por calendário (ex: média de posts nos
+// últimos calendários concluídos). Um calendário concluído normalmente já
+// teve a maioria dos posts arquivados, então fetchGoalfyData/tasks (que
+// existe para Agenda/Estatísticas e propositalmente só mostra trabalho ativo)
+// subrepresenta calendários antigos. Cache próprio, não mexe no cache de
+// fetchGoalfyData.
+async function fetchAllPostsIncludingArchived({ writeToken }) {
+  if (
+    cachedAllPostsIncludingArchived &&
+    Date.now() - cachedAllPostsIncludingArchivedAt < ALL_POSTS_INCLUDING_ARCHIVED_CACHE_TTL_MS
+  ) {
+    return cachedAllPostsIncludingArchived;
+  }
+
+  if (inflightAllPostsIncludingArchivedPromise) {
+    return inflightAllPostsIncludingArchivedPromise;
+  }
+
+  inflightAllPostsIncludingArchivedPromise = (async () => {
+    const [postCards, calendarMetaById] = await Promise.all([
+      goalfyApiFetch(`/cards/board/${CARDS_POSTS_BOARD_ID}`, { writeToken }),
+      buildCalendarMetaMap({ writeToken }),
+    ]);
+    return postCards.map((card) => buildTaskFromPostCard(card, card, calendarMetaById));
+  })()
+    .then((tasks) => {
+      cachedAllPostsIncludingArchived = tasks;
+      cachedAllPostsIncludingArchivedAt = Date.now();
+      return tasks;
+    })
+    .finally(() => {
+      inflightAllPostsIncludingArchivedPromise = null;
+    });
+
+  return inflightAllPostsIncludingArchivedPromise;
 }
 
 async function loadGoalfyDataFromSource() {
@@ -2117,6 +2159,86 @@ async function resolveClientHistoricoTrimestre(clientId, { calendarios, goalfyDa
   };
 }
 
+// Média de posts CRIADOS (não precisam estar publicados, só existir como card
+// no board de Posts — incluindo arquivados) nos últimos N calendários
+// CONCLUÍDOS (fase "Posts Programados", a fase final do board de Calendário —
+// mesmo critério usado em CalendarsPanel.tsx) de cada cliente — não uma janela
+// fixa de meses corridos como resolveClientHistoricoTrimestre: um cliente com
+// calendários concluídos só em Jun/Jul/Set (sem Ago) considera esses 3, sem
+// mês vazio contando como 0. Cliente sem NENHUM calendário concluído ainda
+// (ex: recém-chegado, ou só com calendário na Caixa de Entrada/Em Andamento)
+// cai no fallback de usar o próprio "Posts Contratados" cadastrado do
+// cliente como a média exibida — evita que um calendário recém-criado, ainda
+// sem posts (fase Caixa de Entrada), entre na conta e derrube a média para um
+// valor artificialmente baixo.
+//
+// Usa allPosts (fetchAllPostsIncludingArchived), não goalfyData.tasks: esta
+// última exclui a fase "Arquivado" de propósito (serve à Agenda/Estatísticas,
+// que só quer trabalho ativo), mas um calendário concluído normalmente já tem
+// a maioria dos posts arquivados — contar só tasks ativas subrepresentaria
+// exatamente os calendários que este cálculo quer medir.
+//
+// Limitação conhecida (decisão deliberada, não bug): conta CARDS criados no
+// board de Posts da Goalfy, não pastas do Drive. A tela de detalhe do
+// calendário (CalendarDetail.tsx) mostra "Cards criados" com esse mesmo
+// número, que pode ser bem menor que a contagem de posts em
+// "POSTS (N)" daquela tela — aquela grade inclui pastas do Drive sem card
+// Goalfy correspondente ainda. Optou-se por não consultar o Drive aqui
+// (evita 1 chamada de Drive por calendário considerado, replicando o
+// fan-out que já causou lentidão em outras telas).
+function resolveMediaPostsUltimosCalendariosPorCliente(clients, { calendarios, allPosts }, ultimosN = 3) {
+  const clientIds = clients.map((client) => client.id);
+  const postsContratadosByClientId = new Map(clients.map((client) => [client.id, client.postsContratados]));
+  const concluidosPorCliente = new Map(clientIds.map((id) => [id, []]));
+  calendarios.forEach((calendario) => {
+    if (!calendario.clientId || !concluidosPorCliente.has(calendario.clientId)) return;
+    if (calendario.phaseTitle === 'Posts Programados') {
+      concluidosPorCliente.get(calendario.clientId).push(calendario);
+    }
+  });
+
+  const tasksCountByCalendarId = new Map();
+  allPosts.forEach((task) => {
+    if (!task.calendarioId) return;
+    tasksCountByCalendarId.set(task.calendarioId, (tasksCountByCalendarId.get(task.calendarioId) || 0) + 1);
+  });
+
+  const ordenarMaisRecentes = (lista) =>
+    lista
+      .slice()
+      .sort((a, b) => String(b.primeiroDia || '').localeCompare(String(a.primeiroDia || '')))
+      .slice(0, ultimosN);
+
+  const resultByClientId = new Map();
+  clientIds.forEach((clientId) => {
+    const calendariosDoCliente = ordenarMaisRecentes(concluidosPorCliente.get(clientId) || []);
+    const totalCalendarios = calendariosDoCliente.length;
+
+    if (totalCalendarios === 0) {
+      const postsContratados = postsContratadosByClientId.get(clientId) || 0;
+      resultByClientId.set(clientId, {
+        totalCalendarios: 0,
+        totalPosts: postsContratados,
+        mediaPosts: postsContratados > 0 ? postsContratados : null,
+      });
+      return;
+    }
+
+    const totalPosts = calendariosDoCliente.reduce(
+      (sum, calendario) => sum + (tasksCountByCalendarId.get(calendario.id) || 0),
+      0,
+    );
+
+    resultByClientId.set(clientId, {
+      totalCalendarios,
+      totalPosts,
+      mediaPosts: totalPosts / totalCalendarios,
+    });
+  });
+
+  return resultByClientId;
+}
+
 function buildPostTitles({ clienteNome, mesAno, totalPosts }) {
   const paddedTotal = String(totalPosts).padStart(2, '0');
   return Array.from({ length: totalPosts }, (_, index) => {
@@ -3306,6 +3428,26 @@ app.get('/api/clientes', requireAuth, async (_req, res) => {
   }
 });
 
+// Média de posts nos últimos calendários de cada cliente, para exibir junto
+// aos cards da tela "Clientes" sem fan-out (1 request só, não 1 por cliente).
+app.get('/api/clientes/media-posts-calendarios', requireAuth, async (_req, res) => {
+  try {
+    const writeToken = getGoalfyCardsWriteToken();
+    const [clients, calendarios, allPosts] = await Promise.all([
+      fetchCardsClients({ writeToken }),
+      fetchAllCalendarsWithPhase({ writeToken }),
+      fetchAllPostsIncludingArchived({ writeToken }),
+    ]);
+
+    const resultByClientId = resolveMediaPostsUltimosCalendariosPorCliente(clients, { calendarios, allPosts });
+
+    res.json({ clientes: Object.fromEntries(resultByClientId) });
+  } catch (error) {
+    console.error('Clientes media posts calendarios request failed', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/clientes/:id/detail', requireAuth, async (req, res) => {
   const clientId = String(req.params.id || '').trim();
   if (!clientId) {
@@ -3427,9 +3569,9 @@ app.get('/api/clientes/designers', requireAuth, async (_req, res) => {
   try {
     const writeToken = getGoalfyCardsWriteToken();
     const clients = await fetchCardsClients({ writeToken });
-    const designers = [...new Set(clients.map((c) => c.designer).filter(Boolean))].sort((a, b) =>
-      a.localeCompare(b, 'pt-BR'),
-    );
+    const designers = [...new Set(
+      clients.filter((c) => c.ativo !== false).map((c) => c.designer).filter(Boolean),
+    )].sort((a, b) => a.localeCompare(b, 'pt-BR'));
     res.json({ designers });
   } catch (error) {
     console.error('Clientes designers request failed', error);

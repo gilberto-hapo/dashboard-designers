@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, ChevronDown, ExternalLink, FolderOpen, Loader2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ExternalLink, FolderOpen, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth';
 import Login from './Login';
@@ -42,6 +42,12 @@ type ClienteCalendarioResumo = {
   phaseColor: string;
 };
 
+type MediaPostsCalendarios = {
+  totalCalendarios: number;
+  totalPosts: number;
+  mediaPosts: number | null;
+};
+
 function InfoColumn({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="space-y-0.5">
@@ -66,10 +72,10 @@ function ClientDetailContent() {
 
   const [client, setClient] = useState<ClienteDetailData | null>(null);
   const [calendarios, setCalendarios] = useState<ClienteCalendarioResumo[]>([]);
+  const [mediaPosts, setMediaPosts] = useState<MediaPostsCalendarios | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [generatingClientLink, setGeneratingClientLink] = useState(false);
-  const [calendariosExpanded, setCalendariosExpanded] = useState(false);
   const [tagFilterEnabled, setTagFilterEnabled] = useState(false);
   const [savingTagFilter, setSavingTagFilter] = useState(false);
 
@@ -87,6 +93,10 @@ function ClientDetailContent() {
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Erro ao carregar cliente'))
       .finally(() => setLoading(false));
+
+    fetchJson<{ clientes: Record<string, MediaPostsCalendarios> }>('/api/clientes/media-posts-calendarios')
+      .then((data) => setMediaPosts(data.clientes[id] ?? null))
+      .catch(() => setMediaPosts(null));
   }
 
   async function handleToggleTagFilter(next: boolean) {
@@ -224,61 +234,60 @@ function ClientDetailContent() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 border-t border-border pt-3 sm:grid-cols-4">
+                <div className="grid grid-cols-2 gap-4 border-t border-border pt-3 sm:grid-cols-3 lg:grid-cols-5">
                   <InfoColumn label="Designer Responsável" value={client.designer || '—'} />
                   <InfoColumn label="Planejador Responsável" value={client.planejador || '—'} />
                   <InfoColumn label="Copywriter Dedicado" value={client.copywriter || '—'} />
                   <InfoColumn label="Posts Contratados" value={client.postsContratados} />
+                  <InfoColumn
+                    label="Média de Posts"
+                    value={
+                      mediaPosts?.mediaPosts != null ? (
+                        <span className="text-emerald-500">{mediaPosts.mediaPosts.toFixed(1)}</span>
+                      ) : (
+                        '—'
+                      )
+                    }
+                  />
                 </div>
               </div>
 
+              {client && <ClientQuarterHistoryChart clientId={client.id} />}
+
               <div className="space-y-3">
-                <button
-                  type="button"
-                  onClick={() => setCalendariosExpanded((prev) => !prev)}
-                  className="flex w-full items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-left transition-colors hover:border-foreground/30"
-                >
-                  <h2 className="text-sm font-bold uppercase tracking-wide text-foreground">
-                    Calendários ({calendarios.length})
-                  </h2>
-                  <ChevronDown
-                    className={`h-4 w-4 text-muted-foreground transition-transform ${calendariosExpanded ? 'rotate-180' : ''}`}
-                  />
-                </button>
-                {calendariosExpanded && (
-                  calendarios.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Nenhum calendário encontrado para este cliente.</p>
-                  ) : (
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                      {calendarios.map((calendario) => (
-                        <button
-                          key={calendario.id}
-                          type="button"
-                          onClick={() => navigate(`/calendarios/${calendario.id}`)}
-                          className="flex flex-col gap-2 rounded-xl border border-border bg-card p-3 text-left transition-colors hover:border-foreground/30"
-                        >
-                          <p className="text-sm font-semibold text-foreground">{calendario.title}</p>
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-xs text-muted-foreground">{calendario.mesAno}</span>
-                            <span
-                              className="inline-flex shrink-0 rounded border px-2 py-0.5 text-[10px] font-bold uppercase"
-                              style={{
-                                borderColor: calendario.phaseColor,
-                                backgroundColor: `${calendario.phaseColor}1a`,
-                                color: calendario.phaseColor,
-                              }}
-                            >
-                              {calendario.phaseTitle}
-                            </span>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )
+                <h2 className="text-sm font-bold uppercase tracking-wide text-foreground">
+                  Calendários ({calendarios.length})
+                </h2>
+                {calendarios.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Nenhum calendário encontrado para este cliente.</p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {calendarios.map((calendario) => (
+                      <button
+                        key={calendario.id}
+                        type="button"
+                        onClick={() => navigate(`/calendarios/${calendario.id}`)}
+                        className="flex flex-col gap-2 rounded-xl border border-border bg-card p-3 text-left transition-colors hover:border-foreground/30"
+                      >
+                        <p className="text-sm font-semibold text-foreground">{calendario.title}</p>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs text-muted-foreground">{calendario.mesAno}</span>
+                          <span
+                            className="inline-flex shrink-0 rounded border px-2 py-0.5 text-[10px] font-bold uppercase"
+                            style={{
+                              borderColor: calendario.phaseColor,
+                              backgroundColor: `${calendario.phaseColor}1a`,
+                              color: calendario.phaseColor,
+                            }}
+                          >
+                            {calendario.phaseTitle}
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
                 )}
               </div>
-
-              {client && <ClientQuarterHistoryChart clientId={client.id} />}
             </>
           )}
         </div>
