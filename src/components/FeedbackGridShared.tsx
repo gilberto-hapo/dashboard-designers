@@ -158,25 +158,18 @@ export function FeedbackGridShared({
                 />
               </div>
               <p className="truncate text-xs font-medium text-foreground">{post.postTitle || post.calendarTitle}</p>
-              <div className="flex flex-wrap items-center justify-between gap-1">
-                <div className="flex flex-wrap items-center gap-1">
-                  {post.designer && (
-                    <span
-                      className="inline-block max-w-full truncate rounded-full px-2.5 py-0.5 text-[11px] font-medium uppercase"
-                      style={{
-                        backgroundColor: `${designerColor(post.designer)}25`,
-                        color: designerColor(post.designer),
-                      }}
-                    >
-                      {firstName(post.designer)}
-                    </span>
-                  )}
-                  {showCopywriterTag && post.copywriter && (
-                    <span className="inline-flex rounded border border-border px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
-                      {post.copywriter.trim().split(/\s+/)[0]}
-                    </span>
-                  )}
-                </div>
+              <div className="flex flex-wrap items-center gap-2.5">
+                {post.designer && (
+                  <span
+                    className="inline-block max-w-full truncate rounded-full px-2.5 py-0.5 text-[11px] font-medium uppercase"
+                    style={{
+                      backgroundColor: `${designerColor(post.designer)}25`,
+                      color: designerColor(post.designer),
+                    }}
+                  >
+                    {firstName(post.designer)}
+                  </span>
+                )}
 
                 {enableInlineComments && (
                   <Collapsible open={isExpanded} onOpenChange={() => toggleExpanded(post.postId)}>
@@ -185,16 +178,22 @@ export function FeedbackGridShared({
                         type="button"
                         className="flex shrink-0 items-center gap-0.5 text-muted-foreground hover:text-foreground"
                       >
-                        <MessageSquareText className="h-3.5 w-3.5" />
+                        <MessageSquareText className="h-4 w-4" />
                         {post.feedbackHistory.length > 0 && (
-                          <span className="text-[10px] font-medium">{post.feedbackHistory.length}</span>
+                          <span className="text-[11px] font-medium">{post.feedbackHistory.length}</span>
                         )}
                         <ChevronDown
-                          className={`h-3 w-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                          className={`h-3.5 w-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                         />
                       </button>
                     </CollapsibleTrigger>
                   </Collapsible>
+                )}
+
+                {showCopywriterTag && post.copywriter && (
+                  <span className="inline-flex rounded border border-border px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
+                    {post.copywriter.trim().split(/\s+/)[0]}
+                  </span>
                 )}
               </div>
 
