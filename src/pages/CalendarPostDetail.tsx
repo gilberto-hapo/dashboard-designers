@@ -156,7 +156,7 @@ function CalendarPostDetailContent() {
             <PostTags tags={post.tags} />
 
             {post.caption && (
-              <p className="whitespace-pre-wrap text-sm text-foreground">
+              <p className="mt-6 whitespace-pre-wrap break-words text-base text-foreground md:text-[15px]">
                 <LinkifiedText text={post.caption} />
               </p>
             )}

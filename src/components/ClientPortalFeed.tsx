@@ -798,7 +798,7 @@ function CaptionText({ caption }: { caption: string | null }) {
   if (!caption) return null;
 
   return (
-    <div className="whitespace-pre-wrap text-sm text-foreground">
+    <div className="mt-6 whitespace-pre-wrap break-words text-base text-foreground md:text-[15px]">
       <LinkifiedText text={caption} />
     </div>
   );

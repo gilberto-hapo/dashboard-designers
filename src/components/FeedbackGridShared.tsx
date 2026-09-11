@@ -254,7 +254,7 @@ export function FeedbackGridShared({
                   <p className="text-xs text-muted-foreground">{openPost.calendarTitle}</p>
 
                   {openPost.caption && (
-                    <p className="whitespace-pre-wrap text-sm text-foreground">{openPost.caption}</p>
+                    <p className="whitespace-pre-wrap break-words text-sm text-foreground">{openPost.caption}</p>
                   )}
 
                   <AdjustmentsBlock
