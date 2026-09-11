@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, ChevronDown, Loader2, MapPin, MessageSquareWarning, MoreVertical, Play } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { LinkifiedText } from '@/lib/calendarUi';
 import {
   Carousel,
   type CarouselApi,
@@ -796,7 +797,11 @@ export function GridThumbShared({
 function CaptionText({ caption }: { caption: string | null }) {
   if (!caption) return null;
 
-  return <div className="whitespace-pre-wrap text-sm text-foreground">{caption}</div>;
+  return (
+    <div className="whitespace-pre-wrap text-sm text-foreground">
+      <LinkifiedText text={caption} />
+    </div>
+  );
 }
 
 function PostMediaView({

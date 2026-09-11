@@ -4,7 +4,7 @@ import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth';
 import Login from './Login';
-import { fetchJson } from '@/lib/calendarUi';
+import { fetchJson, LinkifiedText } from '@/lib/calendarUi';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -123,7 +123,11 @@ function FeedbackPostDetailContent() {
 
             <PostTags tags={post.tags} />
 
-            {post.caption && <p className="whitespace-pre-wrap text-sm text-foreground">{post.caption}</p>}
+            {post.caption && (
+              <p className="whitespace-pre-wrap text-sm text-foreground">
+                <LinkifiedText text={post.caption} />
+              </p>
+            )}
 
             <AdjustmentsBlock
               feedbackHistory={post.feedbackHistory}

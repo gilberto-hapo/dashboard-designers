@@ -140,3 +140,31 @@ export function InfoRow({ label, value }: { label: string; value: React.ReactNod
     </div>
   );
 }
+
+const URL_SPLIT_PATTERN = /(https?:\/\/[^\s<]+[^\s<.,:;"')\]])/g;
+const URL_TEST_PATTERN = /^https?:\/\//;
+
+// Legenda vem como texto puro extraído do docx (mammoth) — sem isso, um link
+// colado na seção "Fontes" fica como texto cru em vez de clicável.
+export function LinkifiedText({ text }: { text: string }) {
+  const parts = text.split(URL_SPLIT_PATTERN);
+  return (
+    <>
+      {parts.map((part, index) =>
+        URL_TEST_PATTERN.test(part) ? (
+          <a
+            key={index}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary underline underline-offset-2 hover:opacity-80"
+          >
+            {part}
+          </a>
+        ) : (
+          <span key={index}>{part}</span>
+        ),
+      )}
+    </>
+  );
+}

@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AlertTriangle, ArrowLeft, Loader2 } from 'lucide-react';
 import { AdjustmentsBlock, ReadOnlyPostMedia, PostTags } from '@/components/ClientPortalFeed';
 import type { FeedbackPost } from '@/components/FeedbackGridShared';
+import { LinkifiedText } from '@/lib/calendarUi';
 
 type CopywriterPayload = {
   posts: FeedbackPost[];
@@ -101,7 +102,11 @@ export default function CopywriterPostDetail() {
 
             <PostTags tags={post.tags} />
 
-            {post.caption && <p className="whitespace-pre-wrap text-sm text-foreground">{post.caption}</p>}
+            {post.caption && (
+              <p className="whitespace-pre-wrap text-sm text-foreground">
+                <LinkifiedText text={post.caption} />
+              </p>
+            )}
 
             <AdjustmentsBlock
               feedbackHistory={post.feedbackHistory}
