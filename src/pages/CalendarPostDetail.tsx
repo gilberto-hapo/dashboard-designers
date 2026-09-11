@@ -47,7 +47,7 @@ function CalendarPostDetailContent() {
     if (!id) return;
     setLoading(true);
     setError(null);
-    fetchJson<{ calendario: CalendarDetailData }>(`/api/calendarios/${id}/detail?refresh=1`)
+    fetchJson<{ calendario: CalendarDetailData }>(`/api/calendarios/${id}/detail`)
       .then((data) => setCalendario(data.calendario))
       .catch((err) => setError(err instanceof Error ? err.message : 'Erro ao carregar calendário'))
       .finally(() => setLoading(false));

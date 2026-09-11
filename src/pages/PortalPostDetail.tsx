@@ -29,7 +29,7 @@ export default function PortalPostDetail() {
     setLoading(true);
     setError(null);
 
-    fetch(`/api/public/portal/${token}?refresh=1`)
+    fetch(`/api/public/portal/${token}`)
       .then(async (response) => {
         const body = await response.json().catch(() => null);
         if (!response.ok) {
