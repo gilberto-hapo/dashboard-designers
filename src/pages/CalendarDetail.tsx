@@ -76,6 +76,7 @@ const PIPELINE_STAGE_STYLES: Record<Exclude<PostPipelineStage, null>, { label: s
   validacao: { label: 'Validação', className: 'border-orange-500/30 bg-orange-500/10 text-orange-400' },
   aprovado: { label: 'Aprovado para Programação', className: 'border-emerald-800/40 bg-emerald-800/15 text-emerald-600' },
   publicado: { label: 'Publicado', className: 'border-green-400/30 bg-green-400/10 text-green-300' },
+  arquivado: { label: 'Arquivado', className: 'border-zinc-500/30 bg-zinc-500/10 text-zinc-400' },
 };
 
 // Resumo do topo: reflete só a FASE do kanban da Goalfy (post.pipelineStage),
@@ -91,6 +92,7 @@ function getPostsPipelineStageCounts(posts: PortalPost[]) {
     validacao: 0,
     aprovado: 0,
     publicado: 0,
+    arquivado: 0,
   };
   posts.forEach((post) => {
     const stage = post.pipelineStage ?? 'criacaoTextual';
@@ -100,13 +102,19 @@ function getPostsPipelineStageCounts(posts: PortalPost[]) {
     else if (stage === 'validacao') counts.validacao += 1;
     else if (stage === 'aprovado') counts.aprovado += 1;
     else if (stage === 'publicado') counts.publicado += 1;
+    else if (stage === 'arquivado') counts.arquivado += 1;
     else counts.criacaoTextual += 1;
   });
   return counts;
 }
 
 function getPostsConclusionSegments(posts: PortalPost[]) {
-  const total = posts.length;
+  // Posts arquivados são tratados como se tivessem sido removidos do
+  // calendário: não entram no total nem no numerador da % de progresso (a
+  // fase "Arquivado" é a forma de "excluir" um post sem desalinhar a
+  // numeração sequencial dos demais — ver server.js resolveCalendarPosts).
+  const activePosts = posts.filter((post) => post.pipelineStage !== 'arquivado');
+  const total = activePosts.length;
   const counts = {
     criacaoTextual: 0,
     criacaoDasArtes: 0,
@@ -116,9 +124,9 @@ function getPostsConclusionSegments(posts: PortalPost[]) {
     aprovado: 0,
     publicado: 0,
   };
-  posts.forEach((post) => {
+  activePosts.forEach((post) => {
     const stage = post.pipelineStage ?? 'criacaoTextual';
-    counts[stage] += 1;
+    counts[stage as keyof typeof counts] += 1;
   });
 
   const decidedTotal = counts.aprovado + counts.publicado;
@@ -395,6 +403,12 @@ function CalendarDetailContent() {
                             {pipelineCounts.publicado}
                           </span>
                         </span>
+                        <span className={`flex items-center gap-1.5 rounded-full border border-zinc-500/30 bg-zinc-500/10 px-2.5 py-1 text-zinc-400 ${pipelineCounts.arquivado > 0 ? '' : 'opacity-50'}`}>
+                          Arquivado
+                          <span className={pipelineCounts.arquivado > 0 ? 'font-bold text-white' : ''}>
+                            {pipelineCounts.arquivado}
+                          </span>
+                        </span>
                       </div>
                     );
                   })()}
@@ -440,6 +454,7 @@ function CalendarDetailContent() {
                           media={post.media}
                           title={post.goalfyCardTitle || post.title}
                           status={decisionStatus(post)}
+                          archived={post.pipelineStage === 'arquivado'}
                           internalLabels
                           onOpen={() => navigate(`/calendarios/${id}/posts/${post.id}`)}
                         />

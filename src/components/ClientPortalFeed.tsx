@@ -73,6 +73,7 @@ export type PostPipelineStage =
   | 'validacao'
   | 'aprovado'
   | 'publicado'
+  | 'arquivado'
   | null;
 
 export type PortalPost = {
@@ -714,6 +715,7 @@ export function GridThumbShared({
   media,
   title,
   status,
+  archived = false,
   internalLabels = false,
   onOpen,
 }: {
@@ -721,6 +723,7 @@ export function GridThumbShared({
   media: PostMedia | null;
   title: string;
   status?: GridThumbStatus;
+  archived?: boolean;
   internalLabels?: boolean;
   onOpen: () => void;
 }) {
@@ -743,7 +746,11 @@ export function GridThumbShared({
       onClick={onOpen}
       className="group relative block aspect-[3/4] w-full overflow-hidden bg-muted focus:outline-none"
     >
-      {!firstFile ? (
+      {archived ? (
+        <div className="flex h-full w-full items-center justify-center bg-zinc-800 p-2">
+          <p className="text-center text-xs font-semibold uppercase tracking-wide text-zinc-400">Arquivado</p>
+        </div>
+      ) : !firstFile ? (
         <div className="flex h-full w-full items-center justify-center p-2">
           <p className="text-center text-[10px] text-muted-foreground">Mídia ainda não disponível</p>
         </div>
@@ -773,12 +780,12 @@ export function GridThumbShared({
           loading="lazy"
         />
       )}
-      {hasMultiple && (
+      {!archived && hasMultiple && (
         <span className="absolute right-2 top-2 rounded-full bg-black/50 px-1.5 py-0.5 text-[10px] font-semibold text-white">
           1/{media?.files.length}
         </span>
       )}
-      {statusStyle && (
+      {!archived && statusStyle && (
         <>
           <span className={`absolute inset-0 ${statusStyle.overlay}`} />
           <span className={`pointer-events-none absolute inset-0 border-[3px] ${statusStyle.border}`} />

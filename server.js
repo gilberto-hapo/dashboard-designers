@@ -368,7 +368,10 @@ function requireAuth(req, res, next) {
 // (boardId e9d22a5a-8263-41da-9784-3e77589e8469), que tem fases diferentes
 // do board anterior. "Criação textual"/"Criação das artes" mapeiam para
 // fazer/executando (mesmas 2 primeiras colunas do fluxo anterior);
-// "Post Programado" e "Arquivado" mapeiam para concluido.
+// "Post Programado" mapeia para concluido. "Arquivado" tem stage próprio
+// (arquivado) — usado como forma de "excluir" um post sem desalinhar a
+// numeração sequencial dos demais (ver resolveCalendarPosts): a pasta do
+// Drive permanece no lugar, só o card muda de fase.
 //
 // Mapeado por phaseId (não pelo título) porque o título exibido na Goalfy
 // pode ser renomeado livremente pelo usuário sem avisar — ex: a fase
@@ -382,7 +385,7 @@ const stagePhaseIdMap = {
   '8380cb38-f9d4-4e65-a414-8d02daa12d80': 'validacao', // Validação do Cliente
   '9f9c1a44-3abb-4779-8948-660a3c9bb293': 'aprovado_programacao', // Aprovado para programação
   'e0b32273-ecf8-4925-8438-6b8965f93607': 'concluido', // Post Programado
-  '4f819103-ac82-456a-b307-fda98812081f': 'concluido', // Arquivado
+  '4f819103-ac82-456a-b307-fda98812081f': 'arquivado', // Arquivado
 };
 // Fallback por título, usado apenas se a API não retornar phase.id por
 // algum motivo. Mantido por título (não por id) para continuar funcionando
@@ -396,7 +399,7 @@ const stageMap = {
   'validacao do cliente': 'validacao',
   'aprovado para programacao': 'aprovado_programacao',
   'post programado': 'concluido',
-  arquivado: 'concluido',
+  arquivado: 'arquivado',
 };
 
 // Traduz o stage interno (já colapsado via stagePhaseIdMap/stageMap) para o
@@ -420,6 +423,8 @@ function pipelineStageFromRawStage(rawStage) {
       return 'aprovado';
     case 'concluido':
       return 'publicado';
+    case 'arquivado':
+      return 'arquivado';
     default:
       return null;
   }
@@ -2529,10 +2534,23 @@ async function resolveCalendarPosts(
   }
 
   const tasks = goalfyData?.tasks || [];
-  const calendarTasks = tasks.filter((task) => task.calendarioId === calendario.id);
+  // goalfyData.tasks exclui de propósito a fase "Arquivado" (ver
+  // fetchAllPostsViaRest) para não poluir Agenda/Estatísticas com trabalho
+  // inativo. Mas um post "excluído" pelo fluxo de arquivamento (pasta mantida
+  // no lugar, card movido para Arquivado) precisa continuar casando pela
+  // mesma posição sequencial — por isso complementamos aqui com os cards
+  // arquivados vindos de fetchAllPostsIncludingArchived (já cacheado,
+  // deduplicado por inflight promise entre chamadas concorrentes).
+  const archivedTasks = (await fetchAllPostsIncludingArchived({ writeToken: getGoalfyCardsWriteToken() })).filter(
+    (task) => task.calendarioId === calendario.id && task.stage === 'arquivado',
+  );
+  const calendarTasks = tasks.filter((task) => task.calendarioId === calendario.id).concat(archivedTasks);
   // Ordem de prioridade quando há mais de uma task Goalfy com o mesmo número
   // de sequência no título (ex: card antigo/arquivado duplicado) — sempre
   // vence o estágio mais avançado do pipeline, nunca a última task iterada.
+  // "arquivado" tem a mesma prioridade máxima de "concluido": ambos são fases
+  // terminais e não há caso de card ativo que deva perder posição para um
+  // card arquivado (ou vice-versa) com o mesmo número de sequência.
   const STAGE_PRIORITY = {
     fazer: 0,
     executando: 1,
@@ -2541,6 +2559,7 @@ async function resolveCalendarPosts(
     validacao: 2,
     aprovado_programacao: 3,
     concluido: 4,
+    arquivado: 4,
   };
   const goalfyRawStageBySequence = new Map();
   const goalfyPhaseTitleBySequence = new Map();
