@@ -2846,7 +2846,11 @@ async function pregenerateActiveMediaVariants() {
   const imageFiles = resolvedCalendarios.flatMap((calendario) =>
     calendario.posts
       .filter((post) => post.media?.type === 'image')
-      .flatMap((post) => (post.media.files || []).map((file) => ({ fileId: file.id, calendarId: calendario.id }))),
+      .flatMap((post) =>
+        (post.media.files || [])
+          .filter((file) => String(file.mimeType || '').startsWith('image/'))
+          .map((file) => ({ fileId: file.id, calendarId: calendario.id })),
+      ),
   );
 
   const result = await pregenerateMissingVariants(imageFiles, logServerEvent);

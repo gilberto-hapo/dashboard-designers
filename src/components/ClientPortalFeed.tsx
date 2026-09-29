@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, ChevronDown, Loader2, MapPin, MessageSquareWarning, MoreVertical, Play } from 'lucide-react';
 import { toast } from 'sonner';
@@ -502,9 +502,14 @@ export function PostMediaViewShared({
       title={title}
       buildMediaUrl={buildMediaUrl}
       originalMediaUrl={originalMediaUrl}
+      coverImageId={media.coverImageId}
       pinOverlayProps={pinOverlayProps}
     />
   );
+}
+
+function isVideoFile(file: { mimeType: string }) {
+  return file.mimeType.startsWith('video/');
 }
 
 function CarouselMediaFrames({
@@ -512,20 +517,28 @@ function CarouselMediaFrames({
   title,
   buildMediaUrl,
   originalMediaUrl,
+  coverImageId,
   pinOverlayProps,
 }: {
   files: PostMedia['files'];
   title: string;
   buildMediaUrl: (fileId: string) => string;
   originalMediaUrl?: (fileId: string) => string;
+  coverImageId?: string | null;
   pinOverlayProps: Omit<Parameters<typeof MediaPinOverlay>[0], 'mediaFileId'>;
 }) {
   const [api, setApi] = useState<CarouselApi>();
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!api) return;
-    const onSelect = () => setSelectedIndex(api.selectedScrollSnap());
+    // Carrossel com vídeo no meio: ao trocar de slide, pausa o vídeo que
+    // estava tocando para ele não continuar com som fora da tela.
+    const onSelect = () => {
+      setSelectedIndex(api.selectedScrollSnap());
+      containerRef.current?.querySelectorAll('video').forEach((video) => video.pause());
+    };
     onSelect();
     api.on('select', onSelect);
     return () => {
@@ -536,24 +549,36 @@ function CarouselMediaFrames({
   const selectedFile = files[selectedIndex];
 
   return (
-    <div>
+    <div ref={containerRef}>
       <Carousel className="w-full" opts={{ containScroll: 'trimSnaps' }} setApi={setApi}>
         <CarouselContent>
           {files.map((file, index) => (
             <CarouselItem key={file.id}>
-              <SingleMediaFrame
-                src={buildMediaUrl(file.id)}
-                alt={`${title} — imagem ${index + 1}`}
-                mediaFileId={file.id}
-                pinOverlayProps={pinOverlayProps}
-              />
+              {isVideoFile(file) ? (
+                <SingleVideoFrame
+                  src={buildMediaUrl(file.id)}
+                  mimeType={file.mimeType}
+                  poster={coverImageId ? buildMediaUrl(coverImageId) : undefined}
+                />
+              ) : (
+                <SingleMediaFrame
+                  src={buildMediaUrl(file.id)}
+                  alt={`${title} — imagem ${index + 1}`}
+                  mediaFileId={file.id}
+                  pinOverlayProps={pinOverlayProps}
+                />
+              )}
             </CarouselItem>
           ))}
         </CarouselContent>
         <CarouselPrevious className="left-2" />
         <CarouselNext className="right-2" />
       </Carousel>
-      {originalMediaUrl && selectedFile ? (
+      {selectedFile && isVideoFile(selectedFile) ? (
+        <div className="flex bg-background px-2">
+          <DriveLink href={driveViewUrl(selectedFile.id)} />
+        </div>
+      ) : originalMediaUrl && selectedFile ? (
         <div className="flex bg-background px-2">
           <QualityMaxLink href={originalMediaUrl(selectedFile.id)} />
         </div>
@@ -730,6 +755,8 @@ export function GridThumbShared({
   const firstFile = media?.files?.[0];
   const isVideo = media?.type === 'video';
   const hasMultiple = (media?.files?.length ?? 0) > 1;
+  const hasVideoSlide = hasMultiple && (media?.files ?? []).some(isVideoFile);
+  const showVideoThumb = isVideo || Boolean(firstFile && isVideoFile(firstFile));
   const coverImageId = media?.coverImageId;
   const statusStyle = status ? GRID_THUMB_STATUS_STYLES[status] : null;
   const statusLabel = internalLabels
@@ -754,7 +781,7 @@ export function GridThumbShared({
         <div className="flex h-full w-full items-center justify-center p-2">
           <p className="text-center text-[10px] text-muted-foreground">Mídia ainda não disponível</p>
         </div>
-      ) : isVideo ? (
+      ) : showVideoThumb ? (
         <>
           {coverImageId ? (
             <img
@@ -768,9 +795,11 @@ export function GridThumbShared({
               <source src={buildMediaUrl(firstFile.id)} type={firstFile.mimeType} />
             </video>
           )}
-          <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/50">
-            <Play className="h-3 w-3 fill-white text-white" />
-          </span>
+          {!hasMultiple && (
+            <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/50">
+              <Play className="h-3 w-3 fill-white text-white" />
+            </span>
+          )}
         </>
       ) : (
         <img
@@ -781,7 +810,8 @@ export function GridThumbShared({
         />
       )}
       {!archived && hasMultiple && (
-        <span className="absolute right-2 top-2 rounded-full bg-black/50 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+        <span className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-black/50 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+          {hasVideoSlide && <Play className="h-2.5 w-2.5 fill-white text-white" />}
           1/{media?.files.length}
         </span>
       )}

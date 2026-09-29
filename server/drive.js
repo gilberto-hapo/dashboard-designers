@@ -278,12 +278,29 @@ async function resolvePostFolderContent(folder) {
   // uma imagem, o nome ainda é necessário para saber qual delas é a capa.
   const coverImage = images.length === 1 ? images[0] : images.find((f) => /capa/i.test(f.name)) || null;
 
+  // Carrossel com vídeo no meio: vídeo + 2 ou mais imagens (sem contar a
+  // "capa") vira galeria mista, na ordem dos nomes dos arquivos. Com só uma
+  // imagem, continua sendo vídeo com capa (regra acima).
+  const slideImages = images.filter((f) => !/capa/i.test(f.name));
+  const isMixedCarousel = Boolean(video) && slideImages.length >= 2;
+  const mixedFiles = isMixedCarousel
+    ? [...slideImages, ...mediaFiles.filter((f) => isVideo(f.mimeType))].sort((a, b) =>
+        a.name.localeCompare(b.name, 'pt-BR'),
+      )
+    : [];
+
   return {
     folderId: folder.id,
     folderName: folder.name,
     hasMedia: mediaFiles.length > 0,
     caption,
-    media: video
+    media: isMixedCarousel
+      ? {
+          type: 'image',
+          files: mixedFiles.map((f) => ({ id: f.id, mimeType: f.mimeType })),
+          coverImageId: images.find((f) => /capa/i.test(f.name))?.id || null,
+        }
+      : video
       ? {
           type: 'video',
           files: [{ id: video.id, mimeType: video.mimeType }],
