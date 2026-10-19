@@ -3363,6 +3363,43 @@ function summarizeFeedbackCounts(posts) {
   return { total: posts.length, countsByCalendarId };
 }
 
+// Posts aprovados pelo cliente (clique em "Aprovar" no portal) que ainda não
+// foram publicados — bolinha verde no card do calendário. "Publicado" vem da
+// fase Goalfy casada por posição da pasta no Drive, então exige resolver o
+// Drive; para não virar fan-out em todo o histórico, só entram calendários
+// "Em Andamento" (concluído = tudo publicado) com alguma aprovação no banco.
+async function loadApprovedUnpublishedCounts() {
+  const writeToken = getGoalfyCardsWriteToken();
+  const [calendarios, clients, goalfyData] = await Promise.all([
+    fetchAllCalendarsWithPhase({ writeToken }),
+    fetchCardsClients({ writeToken }),
+    fetchGoalfyData(),
+  ]);
+  const preFetched = { calendarios, clients, goalfyData };
+
+  const emAndamentoKey = normalizeLookupKey(CARDS_CALENDAR_PHASES[CARDS_CALENDAR_PHASE_EM_ANDAMENTO_ID].title);
+  const activeCalendarios = calendarios.filter(
+    (c) => c.phaseTitle && normalizeLookupKey(c.phaseTitle) === emAndamentoKey,
+  );
+  const decisionsByCalendarId = await getLatestDecisionsForCalendars(activeCalendarios.map((c) => c.id));
+  const candidateCalendarIds = activeCalendarios
+    .filter((c) => (decisionsByCalendarId.get(c.id) || []).some((d) => d.approved))
+    .map((c) => c.id);
+
+  const resolvedCalendarios = await Promise.all(
+    candidateCalendarIds.map((calendarId) => resolvePublicCalendarPayload(calendarId, preFetched)),
+  );
+
+  const approvedCountsByCalendarId = {};
+  resolvedCalendarios.filter(Boolean).forEach((calendario) => {
+    const count = calendario.posts.filter(
+      (post) => post.decision?.approved && !post.published && post.pipelineStage !== 'arquivado',
+    ).length;
+    if (count > 0) approvedCountsByCalendarId[calendario.id] = count;
+  });
+  return approvedCountsByCalendarId;
+}
+
 // Contagem de posts com feedback pendente por calendário, para o badge/sino
 // de notificações. Usa a MESMA resolução completa (Drive + Postgres +
 // Goalfy) de loadFeedbackList — um post só conta como pendente se a pasta
@@ -3380,9 +3417,16 @@ function getCachedFeedbackCounts() {
   }
 
   if (!inflightFeedbackCountPromise) {
-    inflightFeedbackCountPromise = loadFeedbackList()
-      .then((posts) => {
-        feedbackCountCache = { value: summarizeFeedbackCounts(posts), at: nowMs() };
+    inflightFeedbackCountPromise = Promise.all([
+      loadFeedbackList(),
+      // Falha nas aprovações não pode derrubar a contagem de ajustes.
+      loadApprovedUnpublishedCounts().catch((error) => {
+        console.error('Approved count refresh failed', error);
+        return feedbackCountCache?.value?.approvedCountsByCalendarId || {};
+      }),
+    ])
+      .then(([posts, approvedCountsByCalendarId]) => {
+        feedbackCountCache = { value: { ...summarizeFeedbackCounts(posts), approvedCountsByCalendarId }, at: nowMs() };
         return feedbackCountCache.value;
       })
       .catch((error) => {
@@ -3405,7 +3449,7 @@ function getCachedFeedbackCounts() {
   // esperando o fan-out completo no Drive de TODOS os calendários com
   // feedback pendente. loadFeedbackList continua rodando em background e
   // popula o cache real para a próxima chamada.
-  return feedbackCountCache ? feedbackCountCache.value : { total: 0, countsByCalendarId: {} };
+  return feedbackCountCache ? feedbackCountCache.value : { total: 0, countsByCalendarId: {}, approvedCountsByCalendarId: {} };
 }
 
 app.get('/api/feedback-count', requireAuth, (_req, res) => {

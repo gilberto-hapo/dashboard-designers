@@ -337,7 +337,8 @@ export function CalendarsPanel({
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
                 {group.items.map((calendario) => {
                   const progress = getConclusionSegments(calendario);
-                  const pendingFeedbackCount = pendingFeedbackByCalendar[calendario.id] ?? 0;
+                  const pendingFeedbackCount = pendingFeedbackByCalendar.adjustments[calendario.id] ?? 0;
+                  const approvedCount = pendingFeedbackByCalendar.approved[calendario.id] ?? 0;
 
                   return (
                     <div
@@ -359,13 +360,25 @@ export function CalendarsPanel({
                           : 'border-border bg-card hover:border-primary/50'
                       }`}
                     >
-                      {pendingFeedbackCount > 0 && (
-                        <span
-                          title={`${pendingFeedbackCount} post${pendingFeedbackCount > 1 ? 's' : ''} com ajuste pendente`}
-                          className="absolute right-2 top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white"
-                        >
-                          {pendingFeedbackCount}
-                        </span>
+                      {(pendingFeedbackCount > 0 || approvedCount > 0) && (
+                        <div className="absolute right-2 top-2 flex items-center gap-1">
+                          {pendingFeedbackCount > 0 && (
+                            <span
+                              title={`${pendingFeedbackCount} post${pendingFeedbackCount > 1 ? 's' : ''} com ajuste pendente`}
+                              className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white"
+                            >
+                              {pendingFeedbackCount}
+                            </span>
+                          )}
+                          {approvedCount > 0 && (
+                            <span
+                              title={`${approvedCount} post${approvedCount > 1 ? 's' : ''} aprovado${approvedCount > 1 ? 's' : ''} pelo cliente, aguardando publicação`}
+                              className="flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-500 px-1 text-[10px] font-bold text-white"
+                            >
+                              {approvedCount}
+                            </span>
+                          )}
+                        </div>
                       )}
                       <div>
                         <h3 className="text-sm font-semibold uppercase text-foreground">{calendario.clienteNome}</h3>

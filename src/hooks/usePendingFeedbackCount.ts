@@ -3,13 +3,19 @@ import { useEffect, useState } from 'react';
 type FeedbackCountResponse = {
   total: number;
   countsByCalendarId: Record<string, number>;
+  approvedCountsByCalendarId?: Record<string, number>;
+};
+
+type CalendarCounts = {
+  adjustments: Record<string, number>;
+  approved: Record<string, number>;
 };
 
 // Cache em memória do módulo (sobrevive entre navegações de rota dentro da
 // mesma sessão do SPA) — evita o badge "zerar e reaparecer" a cada troca de
 // página enquanto o fetch novo ainda não respondeu.
 let lastKnownCount = 0;
-let lastKnownCountsByCalendarId: Record<string, number> = {};
+let lastKnownCountsByCalendarId: CalendarCounts = { adjustments: {}, approved: {} };
 
 // /api/feedback-count é cacheado no servidor por ~10min e nunca bloqueia
 // esperando o Drive (stale-while-revalidate) — ao contrário de /api/feedback
@@ -36,14 +42,18 @@ export function usePendingFeedbackCount(refreshSignal?: number) {
 }
 
 // Cache em memória equivalente ao acima, mas agrupado por calendário — usado
-// para exibir o indicador de ajuste pendente no card de cada calendário.
+// para exibir no card de cada calendário os indicadores de ajuste pendente
+// (vermelho) e de aprovação do cliente ainda não publicada (verde).
 export function usePendingFeedbackByCalendar(refreshSignal?: number) {
   const [countsByCalendarId, setCountsByCalendarId] = useState(lastKnownCountsByCalendarId);
 
   useEffect(() => {
     fetchFeedbackCounts()
       .then((data) => {
-        const counts = data.countsByCalendarId ?? {};
+        const counts = {
+          adjustments: data.countsByCalendarId ?? {},
+          approved: data.approvedCountsByCalendarId ?? {},
+        };
         lastKnownCountsByCalendarId = counts;
         setCountsByCalendarId(counts);
       })
