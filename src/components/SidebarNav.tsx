@@ -134,7 +134,7 @@ export function SidebarNav({
                 >
                   <Icon className="h-4 w-4" />
                   {badgeCount > 0 && (
-                    <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
+                    <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[rgb(201_81_27)] px-1 text-[10px] font-bold leading-none text-white">
                       {badgeCount > 99 ? '99+' : badgeCount}
                     </span>
                   )}
@@ -143,7 +143,7 @@ export function SidebarNav({
                   <span className="flex flex-1 items-center justify-between gap-2">
                     <span className="text-sm font-semibold text-foreground">{item.label}</span>
                     {badgeCount > 0 && (
-                      <span className="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-bold leading-none text-white">
+                      <span className="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-[rgb(201_81_27)] px-1.5 text-[11px] font-bold leading-none text-white">
                         {badgeCount > 99 ? '99+' : badgeCount}
                       </span>
                     )}
@@ -215,7 +215,7 @@ export function SidebarNav({
             <div className="relative">
               <Icon className="h-5 w-5" />
               {badgeCount > 0 && (
-                <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
+                <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[rgb(201_81_27)] px-1 text-[10px] font-bold leading-none text-white">
                   {badgeCount > 99 ? '99+' : badgeCount}
                 </span>
               )}

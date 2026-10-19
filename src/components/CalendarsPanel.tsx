@@ -365,7 +365,7 @@ export function CalendarsPanel({
                           {pendingFeedbackCount > 0 && (
                             <span
                               title={`${pendingFeedbackCount} post${pendingFeedbackCount > 1 ? 's' : ''} com ajuste pendente`}
-                              className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white"
+                              className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[rgb(201_81_27)] px-1 text-[10px] font-bold text-white"
                             >
                               {pendingFeedbackCount}
                             </span>
@@ -373,7 +373,7 @@ export function CalendarsPanel({
                           {approvedCount > 0 && (
                             <span
                               title={`${approvedCount} post${approvedCount > 1 ? 's' : ''} aprovado${approvedCount > 1 ? 's' : ''} pelo cliente, aguardando publicação`}
-                              className="flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-500 px-1 text-[10px] font-bold text-white"
+                              className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[rgb(34_143_107)] px-1 text-[10px] font-bold text-white"
                             >
                               {approvedCount}
                             </span>
