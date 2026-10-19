@@ -33,6 +33,13 @@ function buildMediaUrl(fileId: string, calendarId: string, variant: 'thumb' | 'p
   return `/api/media/${fileId}?calendarId=${calendarId}&variant=${variant}`;
 }
 
+function formatApprovedAt(iso: string) {
+  const date = new Date(iso);
+  const day = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
+  const time = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(date);
+  return `${day} às ${time}`;
+}
+
 function CalendarPostDetailContent() {
   const { id, postId } = useParams<{ id: string; postId: string }>();
   const navigate = useNavigate();
@@ -167,7 +174,15 @@ function CalendarPostDetailContent() {
             />
 
             <div className="mt-4 pt-2">
-              {isPublished || isApproved ? null : hasPendingAdjustments ? (
+              {isApproved && post.decision?.createdAt ? (
+                <div className="flex items-center gap-3 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3">
+                  <CheckCircle2 className="h-6 w-6 shrink-0 text-emerald-500" />
+                  <div>
+                    <p className="text-sm font-semibold text-emerald-500">Aprovado pelo cliente</p>
+                    <p className="text-xs text-emerald-500/80">em {formatApprovedAt(post.decision.createdAt)}</p>
+                  </div>
+                </div>
+              ) : isPublished || isApproved ? null : hasPendingAdjustments ? (
                 <Button
                   className="h-14 w-full gap-2 text-base bg-emerald-600 text-white hover:bg-emerald-600/90"
                   disabled={submitting}
