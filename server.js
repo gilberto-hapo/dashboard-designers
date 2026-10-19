@@ -3370,11 +3370,20 @@ function summarizeFeedbackCounts(posts) {
 // "Em Andamento" (concluído = tudo publicado) com alguma aprovação no banco.
 async function loadApprovedUnpublishedCounts() {
   const writeToken = getGoalfyCardsWriteToken();
-  const [calendarios, clients, goalfyData] = await Promise.all([
+  const [calendarios, clients, staleOrFreshGoalfyData] = await Promise.all([
     fetchAllCalendarsWithPhase({ writeToken }),
     fetchCardsClients({ writeToken }),
     fetchGoalfyData(),
   ]);
+  // Logo após um deploy/restart, fetchGoalfyData devolve na hora o snapshot
+  // persistido (pode ter semanas) e só atualiza em background. Com ele, posts
+  // já publicados não aparecem como publicados e todo post aprovado vira
+  // bolinha verde. Como esta contagem já roda em background, espera o refresh
+  // que fetchGoalfyData acabou de disparar em vez de cachear um número errado.
+  const goalfyData =
+    inflightBackgroundRefreshPromise && Date.now() - cachedGoalfyDataAt >= GOALFY_CACHE_TTL_MS
+      ? await inflightBackgroundRefreshPromise
+      : staleOrFreshGoalfyData;
   const preFetched = { calendarios, clients, goalfyData };
 
   const emAndamentoKey = normalizeLookupKey(CARDS_CALENDAR_PHASES[CARDS_CALENDAR_PHASE_EM_ANDAMENTO_ID].title);
